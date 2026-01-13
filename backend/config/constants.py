@@ -1,0 +1,246 @@
+"""
+Application Constants
+Based on app-constants.php from CodeIgniter
+
+This file contains all table names and configuration constants
+"""
+from datetime import datetime
+import os
+
+# Support Phone
+SUPPORT_PHONE = '+91 984 904 9259'
+
+# Environment detection (similar to PHP getEnvironment())
+def get_environment() -> str:
+    """
+    Get environment based on host
+    Based on getEnvironment() from config.php
+    """
+    # In FastAPI, we'll use the ENVIRONMENT from .env
+    # This is kept for compatibility
+    return os.getenv('ENVIRONMENT', 'DEV')
+
+# Portal Environment
+PORTAL_ENV = get_environment()
+
+# Get values from environment or use defaults
+# These would typically come from .env file, but we provide defaults
+HOT_FOLDER = os.getenv('HOT_FOLDER', 'osucsc_dev')
+HOT_PATH = os.getenv('HOT_PATH', 'OSUCSC')
+SHARE_PATH = os.getenv('SHARE_PATH', f'\\\\172.16.2.22\\{HOT_FOLDER}\\')
+SHARE_PATH_REPLACE = os.getenv('SHARE_PATH_REPLACE', f'//172.16.2.22/{HOT_FOLDER}/')
+IS_UBUNTU = os.getenv('IS_UBUNTU', 'False').lower() == 'true'
+
+# Institution Name
+INS_NAME = os.getenv('INS_NAME', 'OSUCSC')
+STUDENT_LABEL = os.getenv('STUDENT_LABEL', 'OSUCSC')
+
+# Paths
+TRANSCRIPTS_HIGH_SCHOOL = f'{SHARE_PATH}{HOT_PATH}_HIGH_SCHOOL_TRANSCRIPT/ToBeProcessed/'
+TRANSCRIPTS_COLLEGE = f'{SHARE_PATH}{HOT_PATH}_COLLEGE_TRANSCRIPT/ToBeProcessed/'
+
+TRANSCRIPTS_HIGH_SCHOOL_TOBEPROCESSED = f'{SHARE_PATH_REPLACE}{HOT_PATH}_HIGH_SCHOOL_TRANSCRIPT/ToBeProcessed/'
+TRANSCRIPTS_COLLEGE_TOBEPROCESSED = f'{SHARE_PATH_REPLACE}{HOT_PATH}_COLLEGE_TRANSCRIPT/ToBeProcessed/'
+
+TRANSCRIPTS_HIGH_SCHOOL_PROCESSED = f'{SHARE_PATH_REPLACE}{HOT_PATH}_HIGH_SCHOOL_TRANSCRIPT/Processed/'
+TRANSCRIPTS_COLLEGE_PROCESSED = f'{SHARE_PATH_REPLACE}{HOT_PATH}_COLLEGE_TRANSCRIPT/Processed/'
+
+# Status Colors
+STATUS_SUCC = 'blue'
+STATUS_FAIL = 'red'
+STATUS_PROCESSED = 'green'
+STATUS_RERUN = 'black'
+
+# Project IDs
+SCHOOL_PROJECT_ID = 1
+COLLEGE_PROJECT_ID = 2
+
+# HDR File Path Update SQL (for reference)
+HDR_FILE_PATH_UPDATE = f"""update TRANSCRIPT_HDR_OCR
+set FILE_PATH=
+IIF(FILE_PATH like 'ftp:{TRANSCRIPTS_COLLEGE_TOBEPROCESSED}%', '{TRANSCRIPTS_COLLEGE_PROCESSED}','')+IIF(FILE_PATH like 'ftp:{TRANSCRIPTS_HIGH_SCHOOL_TOBEPROCESSED}%','{TRANSCRIPTS_HIGH_SCHOOL_PROCESSED}','') + REPLACE(REPLACE(REPLACE(FILE_PATH, 'ftp:{TRANSCRIPTS_COLLEGE_TOBEPROCESSED}', ''),'ftp:{TRANSCRIPTS_HIGH_SCHOOL_TOBEPROCESSED}',''),'/','/Batch HF_ID'+BATCH_ID+'/') where FILE_PATH like ('ftp:{SHARE_PATH_REPLACE}%')"""
+
+# ============================================================================
+# TABLE NAMES
+# All table names from app-constants.php
+# ============================================================================
+
+# Admin & User Tables
+TBL_ADMIN = 'PORTAL_ADMIN'
+TBL_ROLES = 'PORTAL_ROLES'
+TBL_PERMISSIONS = 'PORTAL_PERMISSIONS'
+TBL_ROLE_PERMISSIONS = 'PORTAL_ROLE_PERMISSIONS'
+TBL_USER_CLIENTS = 'PORTAL_USER_CLIENTS'
+
+# Configuration Tables
+TBL_CONFIGURATION = 'PORTAL_CONFIGURATION'
+TBL_SMTP = 'PORTAL_SMTP'
+TBL_BUSINESS = 'BUSINESS_SETTINGS'
+TBL_PROJECT_BUSINESS = 'PROJECT_BUSINESS_SETTINGS'
+
+# Client & Project Tables
+TBL_CLIENT = 'CLIENT_MAPPING'
+TBL_PROJECT = 'PROJECT_MAPPING'
+TBL_BOTS = 'BOTS_MAPPING'
+
+# Institution & Mapping Tables
+TBL_INSTITUTION_MAPPING = 'INSTITUTION_MAPPING'
+TBL_TERM_MAPPING = 'TERM_MAPPING'
+TBL_TERM_NAMEMAPPING = 'TERM_NAME_MAPPING'
+TBL_DEGREE = 'DEGREE_MAPPING'
+TBL_GRADE = 'GRADES_MAPPING'
+TBL_ACCEPTED_GRADES_MAPPING = 'ACCEPTED_GRADES_MAPPING'
+TBL_TRANSFER_GRADES_MAPPING = 'TRANSFER_GRADES_MAPPING'
+TBL_YEAR_MAPPING = 'YEAR_MAPPING'
+TBL_OVERRRIDE = 'OVERRIDE_EDIT_MAPPING'
+TBL_ACCREDITED_INSTITUTION = 'ACCREDITED_INSTITUTION'
+
+# Name Mapping Tables
+TBL_PrefixName = 'PrefixName'
+TBL_SuffixName = 'SuffixName'
+TBL_CombinedName = 'CombinedName'
+
+# Status & Courses Tables
+TBL_STATUS = 'ALL_STATUS_CODES'
+TBL_COURSES = 'SKIP_COURSES'
+TBL_SKIP_KEYWORDS = 'SKIP_KEYWORDS'
+
+# Transcript Tables
+TBL_TRANSCRIPTHDROCR = 'TRANSCRIPT_HDR_OCR'
+TBL_TRANSCRIPT_LINE_OCR_LEFT = 'TRANSCRIPT_LINE_OCR_LEFT'
+TBL_TRANSCRIPT_LINE_OCR_RIGHT = 'TRANSCRIPT_LINE_OCR_RIGHT'
+TBL_TRANSCRIPT_LINE_OCR_MIDDLE = 'TRANSCRIPT_LINE_OCR_MIDDLE'
+TBL_TRANSCRIPTLINEOCR = 'TRANSCRIPT_LINE_OCR'
+TBL_TRANSCRIPTHDRDATA = 'TRANSCRIPT_HDR_DATA'
+TBL_TRANSCRIPTLINEDATA = 'TRANSCRIPT_LINE_DATA'
+TBL_TRANSCRIPT_TEST_SCORE_OCR = 'TRANSCRIPT_TEST_SCORE_OCR'
+
+# Download & Log Tables
+TBL_DOWNLOAD = 'TRANSCRIPT_DOWNLOAD'
+TBL_KICKOUT = 'DIGISCRIPT_LOG'
+TBL_DIGISCRIPTBOTLOG = 'DIGISCRIPT_BOT_LOG'
+TBL_BOT_SCHEDULE = 'BOT_SCHEDULE'
+
+# Articulation Tables
+TBL_ARTICULATION = 'ARTICULATION_LOG'
+TBL_ARTICULATIONBOTLOG = 'ARTICULATION_BOT_LOG'
+TBL_ARTICULATIONINPUT = 'ARTICULATION_INPUT'
+TBL_ARTICULATIONSTG = 'ARTICULATION_STG'
+
+# AP Credits Table
+TBL_APCREDITSCHECK = 'AP_CREDITS_CHECK'
+
+# Banner Tables
+TBL_BANNER_APPLICANT_DATA = 'BANNER_APPLICANT_DATA'
+
+# Portal Tables
+TBL_CATEGORY = 'PORTAL_CATEGORY'
+TBL_ARTICLE = 'PORTAL_ARTICLE'
+TBL_BATCH_ASSIGN_STG = 'PORTAL_ASSIGN_BATCHS'
+
+# Error Log Table
+TBL_Error_Log = 'Error_Log'
+
+# GPA Mapping Tables
+TBL_GPA_PICK_MAPPING = 'GPA_PICK_MAPPING'
+TBL_GPA_SCALE_MAPPING = 'GPA_SCALE_MAPPING_70_100'
+
+# ============================================================================
+# IMPORTANT TEXTS
+# ============================================================================
+
+PASSWORD_FORMAT = '<a href="#" data-toggle="tooltip" title="The password must adhere to the following guidelines: it should consist of a minimum of 8 characters, contain at least one uppercase letter, one numerical digit, and one special character."><i class="fa fa-info-circle"></i></a>'
+
+SYSTEM_NAME = 'DigiScript'
+
+# Copyright (dynamic year)
+COPY_RIGHTS = f'<strong>Copyright &copy; {datetime.now().year} DigiScript Automation - Powered by <a href="https://www.ktechproducts.com" target="_blank">KTech Products</a>.</strong> All rights reserved.'
+
+VERSION = 'V.202401.01'
+
+# ============================================================================
+# TABLE NAME DICTIONARY (for easy lookup)
+# ============================================================================
+
+TABLES = {
+    # Admin & User
+    'ADMIN': TBL_ADMIN,
+    'ROLES': TBL_ROLES,
+    'PERMISSIONS': TBL_PERMISSIONS,
+    'ROLE_PERMISSIONS': TBL_ROLE_PERMISSIONS,
+    'USER_CLIENTS': TBL_USER_CLIENTS,
+    
+    # Configuration
+    'CONFIGURATION': TBL_CONFIGURATION,
+    'SMTP': TBL_SMTP,
+    'BUSINESS': TBL_BUSINESS,
+    'PROJECT_BUSINESS': TBL_PROJECT_BUSINESS,
+    
+    # Client & Project
+    'CLIENT': TBL_CLIENT,
+    'PROJECT': TBL_PROJECT,
+    'BOTS': TBL_BOTS,
+    
+    # Institution & Mapping
+    'INSTITUTION_MAPPING': TBL_INSTITUTION_MAPPING,
+    'TERM_MAPPING': TBL_TERM_MAPPING,
+    'TERM_NAMEMAPPING': TBL_TERM_NAMEMAPPING,
+    'DEGREE': TBL_DEGREE,
+    'GRADE': TBL_GRADE,
+    'ACCEPTED_GRADES_MAPPING': TBL_ACCEPTED_GRADES_MAPPING,
+    'TRANSFER_GRADES_MAPPING': TBL_TRANSFER_GRADES_MAPPING,
+    'YEAR_MAPPING': TBL_YEAR_MAPPING,
+    'OVERRRIDE': TBL_OVERRRIDE,
+    'ACCREDITED_INSTITUTION': TBL_ACCREDITED_INSTITUTION,
+    
+    # Name Mapping
+    'PREFIX_NAME': TBL_PrefixName,
+    'SUFFIX_NAME': TBL_SuffixName,
+    'COMBINED_NAME': TBL_CombinedName,
+    
+    # Status & Courses
+    'STATUS': TBL_STATUS,
+    'COURSES': TBL_COURSES,
+    'SKIP_KEYWORDS': TBL_SKIP_KEYWORDS,
+    
+    # Transcript
+    'TRANSCRIPTHDROCR': TBL_TRANSCRIPTHDROCR,
+    'TRANSCRIPT_LINE_OCR_LEFT': TBL_TRANSCRIPT_LINE_OCR_LEFT,
+    'TRANSCRIPT_LINE_OCR_RIGHT': TBL_TRANSCRIPT_LINE_OCR_RIGHT,
+    'TRANSCRIPT_LINE_OCR_MIDDLE': TBL_TRANSCRIPT_LINE_OCR_MIDDLE,
+    'TRANSCRIPTLINEOCR': TBL_TRANSCRIPTLINEOCR,
+    'TRANSCRIPTHDRDATA': TBL_TRANSCRIPTHDRDATA,
+    'TRANSCRIPTLINEDATA': TBL_TRANSCRIPTLINEDATA,
+    'TRANSCRIPT_TEST_SCORE_OCR': TBL_TRANSCRIPT_TEST_SCORE_OCR,
+    
+    # Download & Log
+    'DOWNLOAD': TBL_DOWNLOAD,
+    'KICKOUT': TBL_KICKOUT,
+    'DIGISCRIPTBOTLOG': TBL_DIGISCRIPTBOTLOG,
+    'BOT_SCHEDULE': TBL_BOT_SCHEDULE,
+    
+    # Articulation
+    'ARTICULATION': TBL_ARTICULATION,
+    'ARTICULATIONBOTLOG': TBL_ARTICULATIONBOTLOG,
+    'ARTICULATIONINPUT': TBL_ARTICULATIONINPUT,
+    'ARTICULATIONSTG': TBL_ARTICULATIONSTG,
+    
+    # AP Credits
+    'APCREDITSCHECK': TBL_APCREDITSCHECK,
+    
+    # Banner
+    'BANNER_APPLICANT_DATA': TBL_BANNER_APPLICANT_DATA,
+    
+    # Portal
+    'CATEGORY': TBL_CATEGORY,
+    'ARTICLE': TBL_ARTICLE,
+    'BATCH_ASSIGN_STG': TBL_BATCH_ASSIGN_STG,
+    
+    # Error Log
+    'ERROR_LOG': TBL_Error_Log,
+    
+    # GPA Mapping
+    'GPA_PICK_MAPPING': TBL_GPA_PICK_MAPPING,
+    'GPA_SCALE_MAPPING': TBL_GPA_SCALE_MAPPING,
+}
+

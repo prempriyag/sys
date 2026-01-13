@@ -1,0 +1,352 @@
+import { MenuConfig } from "../../types/menu";
+
+// College menu configuration (mapped from admin folder)
+export const collegeMenu: MenuConfig = {
+  module: "college",
+  items: [
+    {
+      name: "Dashboard",
+      path: "/dashboard",
+      icon: "dashboard",
+      permission: "college_dashboard",
+    },
+    {
+      name: "User Management",
+      path: "/college/users",
+      icon: "user-circle",
+      permission: "user_management",
+    },
+    {
+      name: "Transcripts",
+      icon: "file-text",
+      permissions: ["college_transcripts_kickouts", "transcript_articulationkickouts", "college_processed", "college_rerun"],
+      subItems: [
+        {
+          name: "Transcript Kickouts",
+          path: "/college/transcriptkickouts",
+          permission: "college_transcripts_kickouts",
+        },
+        {
+          name: "Articulation Kickouts",
+          path: "/college/transcript_articulationkickouts",
+          permission: "college_transcripts_kickouts",
+        },
+        {
+          name: "Processed",
+          path: "/college/transcriptprocessed",
+          permission: "college_processed",
+        },
+        {
+          name: "Rerun",
+          path: "/college/reprocessed",
+          permission: "college_rerun",
+        },
+      ],
+    },
+    {
+      name: "Articulation",
+      icon: "settings",
+      permissions: ["articulation_kickouts", "articulation_phase2_kickouts", "articulation_processed", "articulation_rerun"],
+      subItems: [
+        {
+          name: "Kickouts",
+          path: "/college/articulationkickouts",
+          permission: "articulation_kickouts",
+        },
+        {
+          name: "Phase-2 Kickouts",
+          path: "/college/articulationphase2kickouts",
+          permission: "articulation_phase2_kickouts",
+        },
+        {
+          name: "Processed",
+          path: "/college/articulationprocessed",
+          permission: "articulation_processed",
+        },
+        {
+          name: "Rerun",
+          path: "/college/articulationrerun",
+          permission: "articulation_rerun",
+        },
+      ],
+    },
+    {
+      name: "Student Action Center",
+      icon: "users",
+      // Uses checkallpermission - show if user has any of these permissions
+      permissions: ["student_log_kickout", "student_log_processed", "student_log_rerun", "student_view"],
+      subItems: [
+        {
+          name: "Ready for Articulation",
+          icon: "file-text",
+          // Uses checkallpermission - show if user has any of these permissions
+          permissions: ["student_log_kickout", "student_log_processed", "student_log_rerun"],
+          subItems: [
+            {
+              name: "Kickouts",
+              path: "/college/studentlogkickouts",
+              permission: "student_log_kickout",
+            },
+            {
+              name: "Processed",
+              path: "/college/studentlogprocessed",
+              permission: "student_log_processed",
+            },
+            {
+              name: "Rerun",
+              path: "/college/studentlogreprocessed",
+              permission: "student_log_rerun",
+            },
+          ],
+        },
+        {
+          name: "Student to Transcripts",
+          path: "/college/studentview",
+          permission: "student_view",
+        },
+      ],
+    },
+    {
+      name: "Reports",
+      icon: "bar-chart",
+      // PHP shows this menu without permission check - sub-items have individual checks
+      // Use checkallpermission with sub-item permissions
+      permissions: ["college_transcript_reports", "college_equivalent_roll_mismatch", "college_articulation_reports", "college_digiscript_reports"],
+      subItems: [
+        {
+          name: "Transcripts",
+          path: "/college/transcriptreports",
+          permission: "college_digiscript_reports",
+        },
+        {
+          name: "Equivalent Roll Mismatch",
+          path: "/college/transcriptequivalenthours",
+          permission: "college_digiscript_reports",
+        },
+        {
+          name: "Articulation",
+          path: "/college/articulationreports",
+          permission: "college_digiscript_reports",
+        },
+        {
+          name: "DigiScript",
+          path: "/college/digiscriptreports",
+          permission: "college_digiscript_reports",
+        },
+      ],
+    },
+    {
+      name: "College Uploads",
+      icon: "upload",
+      // Uses checkallpermission - show if user has any of these permissions
+      permissions: ["college_upload_transcripts", "college_downloaded_transcripts"],
+      subItems: [
+        {
+          name: "Upload Transcript",
+          path: "/college/transcripts/add",
+          permission: "college_upload_transcripts",
+        },
+        {
+          name: "Uploaded Transcripts",
+          path: "/college/transcripts",
+          permission: "college_downloaded_transcripts",
+        },
+      ],
+    },
+    {
+      name: "Setup",
+      icon: "settings",
+      // Uses checkallpermission - show if user has any of these permissions
+      permissions: ["college_degree", "college_terms", "college_term_names", "osu_skip_keywords", "skip_exclude_courses", "institutions_mapping", "accredited_institution", "suffix_names", "prefix_words", "combine_words"],
+      subItems: [
+        {
+          name: "Degree",
+          path: "/college/degreemapping",
+          permission: "college_degree",
+        },
+        {
+          name: "Terms",
+          path: "/college/termmapping",
+          permission: "college_terms",
+        },
+        {
+          name: "Terms Name",
+          path: "/college/termnamemapping",
+          permission: "college_term_names",
+        },
+        {
+          name: "Equivalent Grades",
+          path: "/college/grademapping",
+          permission: "par_grade_mapping",
+        },
+        {
+          name: "Skip Keywords",
+          path: "/college/osuskipkeywords",
+          permission: "osu_skip_keywords",
+        },
+        {
+          name: "Accepted Grades",
+          path: "/college/acceptGradeMapping",
+          permission: "accepted_grades_mapping",
+        },
+        {
+          name: "Accredited Institution",
+          path: "/college/accreditedInstitution",
+          permission: "accredited_institution",
+        },
+        {
+          name: "Transfer Grades",
+          path: "/college/transfergrademapping",
+          permission: "transfer_grade_mapping",
+        },
+        {
+          name: "Year Mapping",
+          path: "/college/yearmapping",
+          permission: "year_mapping",
+        },
+        {
+          name: "Institution Mapping",
+          path: "/college/institutionmapping",
+          permission: "institutions_mapping",
+        },
+        {
+          name: "Tech Center Mapping",
+          path: "/college/techinstitutionmapping",
+          permission: "institutions_mapping",
+        },
+        {
+          name: "Skip/Exclude Courses",
+          path: "/college/skipcourses",
+          permission: "skip_exclude_courses",
+        },
+        {
+          name: "Override Edit Mapping",
+          path: "/college/overrideeditmapping",
+          permission: "override_edit_mapping",
+        },
+        {
+          name: "Suffix Names",
+          path: "/college/suffixname",
+          permission: "suffix_names",
+        },
+        {
+          name: "Prefix Names",
+          path: "/college/prefixname",
+          permission: "prefix_words",
+        },
+        {
+          name: "Combined Names",
+          path: "/college/combinedname",
+          permission: "combine_words",
+        },
+        {
+          name: "Bot Schedule",
+          path: "/college/botschedule",
+          permission: "bot_schedule",
+        },
+        {
+          name: "Bot Status Report",
+          path: "/college/botstatusreport",
+          permission: "bot_status_report",
+        },
+      ],
+    },
+    {
+      name: "OCR [P1]",
+      icon: "eye",
+      // Uses checkallpermission - show if user has any of these permissions
+      permissions: ["college_transcript_header_ocr", "college_transcript_line_ocr"],
+      subItems: [
+        {
+          name: "Transcript Header OCR",
+          path: "/college/transcripthdrocr",
+          permission: "college_transcript_header_ocr",
+        },
+        {
+          name: "Transcript Line OCR",
+          path: "/college/transcriptlineocr",
+          permission: "college_transcript_line_ocr",
+        },
+      ],
+    },
+    {
+      name: "DATA [P2]",
+      icon: "database",
+      // Uses checkallpermission - show if user has any of these permissions
+      permissions: ["college_transcript_header_data", "college_transcript_line_data"],
+      subItems: [
+        {
+          name: "Transcript Header DATA",
+          path: "/college/transcripthdrdata",
+          permission: "college_transcript_header_data",
+        },
+        {
+          name: "Transcript Line DATA",
+          path: "/college/transcriptlinedata",
+          permission: "college_transcript_line_data",
+        },
+      ],
+    },
+    {
+      name: "Audit Log [P3]",
+      icon: "file-text",
+      // PHP uses checkallpermission with transcript_log and articulation_log
+      permissions: ["transcript_log", "articulation_log"],
+      subItems: [
+        {
+          name: "Transcript Log",
+          path: "/college/digiscriptbotlog",
+          permission: "transcript_log",
+        },
+        {
+          name: "Articulation Log",
+          path: "/college/articulationbotlog",
+          permission: "articulation_log",
+        },
+      ],
+    },
+    {
+      name: "Reset Batch ID",
+      path: "/college/storedprocedure",
+      icon: "refresh",
+      permission: "stored_procedure",
+    },
+    {
+      name: "Settings",
+      icon: "settings",
+      // PHP uses checkallpermission with smtp_setup, configurations, permissions, role
+      permissions: ["smtp_setup", "configurations", "permissions", "role"],
+      subItems: [
+        {
+          name: "Permissions",
+          path: "/college/permissions",
+          permission: "permissions",
+        },
+        {
+          name: "Roles",
+          path: "/college/roles",
+          permission: "role",
+        },
+        {
+          name: "Error Logs",
+          path: "/college/Error_log",
+        },
+        {
+          name: "Master Settings",
+          path: "/college/master_setup",
+        },
+        {
+          name: "SMTP Setup",
+          path: "/college/smtp",
+          permission: "smtp_setup",
+        },
+      ],
+    },
+    {
+      name: "User Manual",
+      path: "/college/Help",
+      icon: "book",
+    },
+  ],
+};
+

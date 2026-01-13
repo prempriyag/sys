@@ -1,0 +1,756 @@
+import React, { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from "react";
+import { Table, TableHeader, TableBody, TableRow, TableCell } from "./table";
+import Input from "../form/input/InputField";
+import { getAuthToken, removeAuthToken } from "../../config/api";
+
+interface Column {
+  data: string;
+  name?: string;
+  searchable?: boolean;
+  orderable?: boolean;
+  render?: (data: any, row: any) => React.ReactNode;
+}
+
+interface DataTableProps {
+  columns: Column[];
+  ajaxUrl: string;
+  ajaxMethod?: "GET" | "POST";
+  ajaxData?: Record<string, any>; // Additional data to send with AJAX request
+  onRowClick?: (row: any) => void;
+  pageLength?: number;
+  lengthMenu?: number[];
+  refreshTrigger?: number; // External trigger to refresh table
+  showExport?: boolean; // Show export buttons
+  showColumnVisibility?: boolean; // Show column visibility toggle
+  exportFileName?: string; // Default export file name
+}
+
+export interface DataTableRef {
+  refresh: () => void;
+}
+
+interface DataTableResponse {
+  draw: number;
+  recordsTotal?: number;
+  recordsFiltered?: number;
+  iTotalRecords?: number; // Alternative format
+  iTotalDisplayRecords?: number; // Alternative format
+  data?: any[];
+  aaData?: any[]; // Alternative data format
+}
+
+const DataTableComponent = (props: DataTableProps, ref: React.ForwardedRef<DataTableRef>): React.ReactElement => {
+  // Destructure props
+  const columns = props.columns;
+  const ajaxUrl = props.ajaxUrl;
+  const ajaxMethod = props.ajaxMethod;
+  const ajaxData = props.ajaxData;
+  const onRowClick = props.onRowClick;
+  const pageLength = props.pageLength;
+  const lengthMenu = props.lengthMenu;
+  const refreshTrigger = props.refreshTrigger;
+  const showExport = props.showExport !== false;
+  const showColumnVisibility = props.showColumnVisibility !== false;
+  const exportFileName = props.exportFileName || "export";
+  
+  // Apply default values
+  const method = ajaxMethod || "POST";
+  const pageLen = pageLength || 10;
+  const menu = lengthMenu || [10, 25, 50, 100];
+  
+  // Column visibility state
+  const [visibleColumns, setVisibleColumns] = useState<Set<number>>(
+    new Set(columns.map((_, idx) => idx))
+  );
+  const [showColumnMenu, setShowColumnMenu] = useState(false);
+  const columnMenuRef = useRef<HTMLDivElement>(null);
+  
+  // Calculate visible columns array - must be early so it's available everywhere
+  const visibleColumnsArray = columns.filter((_, idx) => visibleColumns.has(idx));
+
+  // Close column menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (columnMenuRef.current && !columnMenuRef.current.contains(event.target as Node)) {
+        setShowColumnMenu(false);
+      }
+    };
+
+    if (showColumnMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showColumnMenu]);
+  const [data, setData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [start, setStart] = useState(0);
+  const [length, setLength] = useState(pageLen);
+  const [recordsTotal, setRecordsTotal] = useState(0);
+  const [recordsFiltered, setRecordsFiltered] = useState(0);
+  const [order, setOrder] = useState<{ column: number; dir: "asc" | "desc" }>({
+    column: 0,
+    dir: "desc",
+  });
+  const [globalSearch, setGlobalSearch] = useState("");
+  const [columnSearch, setColumnSearch] = useState<Record<number, string>>({});
+  const [columnSearchInput, setColumnSearchInput] = useState<Record<number, string>>({}); // Input values (not yet applied)
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const callCountRef = useRef(0);
+
+  const drawRef = useRef(1);
+
+  const fetchData = useCallback(async () => {
+    const startTime = performance.now();
+    callCountRef.current += 1;
+    const callId = callCountRef.current;
+    const currentDraw = drawRef.current;
+    
+    // Check token before making request
+    const token = getAuthToken();
+    if (!token) {
+      console.error(`[DataTable] AJAX Call #${callId} - No token found`);
+      removeAuthToken();
+      window.location.href = "/signin";
+      return;
+    }
+    
+    console.log(`[DataTable] AJAX Call #${callId} - Starting`, {
+      draw: currentDraw,
+      start,
+      length,
+      order,
+      globalSearch,
+      columnSearch,
+      timestamp: new Date().toISOString(),
+      tokenPresent: !!token,
+    });
+
+    setLoading(true);
+    try {
+      const requestData = {
+        draw: currentDraw,
+        start,
+        length,
+        order: [order],
+        columns: columns.map((col, idx) => {
+          const searchValue = columnSearch[idx] || "";
+          if (searchValue) {
+            console.log(`[DataTable] Sending column search in request: idx=${idx}, data="${col.data}", value="${searchValue}"`);
+          }
+          return {
+            data: col.data,
+            name: col.name || col.data,
+            searchable: col.searchable !== false,
+            orderable: col.orderable !== false,
+            search: {
+              value: searchValue,
+              regex: false,
+            },
+          };
+        }),
+        search: {
+          value: globalSearch,
+          regex: false,
+        },
+        // Merge additional ajaxData if provided
+        ...(ajaxData || {}),
+      };
+
+      const response = await fetch(ajaxUrl, {
+        method: method,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: method === "POST" ? JSON.stringify(requestData) : undefined,
+      });
+
+      const endTime = performance.now();
+      const duration = endTime - startTime;
+
+      if (!response.ok) {
+        // Handle 401 Unauthorized
+        if (response.status === 401) {
+          removeAuthToken();
+          window.location.href = "/signin";
+          throw new Error("Session expired. Please login again.");
+        }
+        // Try to get error message from response
+        let errorMessage = `HTTP error! status: ${response.status}`;
+        try {
+          const errorData = await response.clone().json();
+          if (errorData.detail) {
+            errorMessage = errorData.detail;
+          } else if (errorData.message) {
+            errorMessage = errorData.message;
+          }
+        } catch {
+          // If JSON parsing fails, use default message
+        }
+        throw new Error(errorMessage);
+      }
+
+      const result: DataTableResponse = await response.json();
+      setData(result.aaData || result.data || []);
+      // Support both formats: recordsTotal/recordsFiltered and iTotalRecords/iTotalDisplayRecords
+      setRecordsTotal(result.recordsTotal || result.iTotalRecords || 0);
+      setRecordsFiltered(result.recordsFiltered || result.iTotalDisplayRecords || 0);
+      drawRef.current += 1;
+
+      console.log(`[DataTable] AJAX Call #${callId} - Completed`, {
+        duration: `${duration.toFixed(2)}ms`,
+        recordsReturned: result.aaData?.length || result.data?.length || 0,
+        recordsTotal: result.recordsTotal,
+        recordsFiltered: result.recordsFiltered,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      const endTime = performance.now();
+      const duration = endTime - startTime;
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      const currentToken = getAuthToken();
+      console.error(`[DataTable] AJAX Call #${callId} - Failed`, {
+        duration: `${duration.toFixed(2)}ms`,
+        error: errorMessage,
+        timestamp: new Date().toISOString(),
+        token: currentToken ? "Present" : "Missing",
+      });
+      
+      // If it's an authentication error, the redirect should have already happened
+      // But we still need to clear the data
+      if (errorMessage.includes("Session expired") || errorMessage.includes("No authentication token")) {
+        setData([]);
+        return; // Don't set loading to false yet, redirect is happening
+      }
+      
+      setData([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [start, length, order, globalSearch, columnSearch, columns, ajaxUrl, method]);
+
+  // Track previous values to detect actual changes
+  const prevValuesRef = useRef({
+    start,
+    length,
+    orderColumn: order.column,
+    orderDir: order.dir,
+    globalSearch,
+    columnSearch: JSON.stringify(columnSearch),
+    refreshTrigger,
+    isInitialMount: true,
+  });
+
+  // Single effect to handle all data fetching
+  useEffect(() => {
+    const currentValues = {
+      start,
+      length,
+      orderColumn: order.column,
+      orderDir: order.dir,
+      globalSearch,
+      columnSearch: JSON.stringify(columnSearch),
+      refreshTrigger,
+    };
+
+    const prev = prevValuesRef.current;
+    const isGlobalSearchChange = prev.globalSearch !== currentValues.globalSearch;
+    const isColumnSearchChange = prev.columnSearch !== currentValues.columnSearch;
+    const isPaginationChange = prev.start !== currentValues.start || 
+                              prev.length !== currentValues.length;
+    const isSortChange = prev.orderColumn !== currentValues.orderColumn || 
+                        prev.orderDir !== currentValues.orderDir;
+    const isRefreshTrigger = refreshTrigger !== undefined && 
+                            refreshTrigger > 0 && 
+                            prev.refreshTrigger !== currentValues.refreshTrigger;
+    const isInitialMount = prev.isInitialMount;
+
+    // Clear any existing search timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+      searchTimeoutRef.current = undefined;
+    }
+
+    // Handle global search changes with debounce (typing in global search box)
+    if (isGlobalSearchChange && !isInitialMount) {
+      searchTimeoutRef.current = setTimeout(() => {
+        prevValuesRef.current = { ...currentValues, isInitialMount: false };
+        setStart(0);
+        drawRef.current = 1;
+        fetchData();
+      }, 500);
+      return;
+    }
+
+    // Handle column search changes immediately (Enter/blur from column inputs)
+    if (isColumnSearchChange && !isInitialMount) {
+      console.log(`[DataTable] Column search changed, triggering fetch:`, {
+        prev: prev.columnSearch,
+        current: currentValues.columnSearch,
+        columnSearch: columnSearch
+      });
+      prevValuesRef.current = { ...currentValues, isInitialMount: false };
+      setStart(0); // Reset to first page when search changes
+      drawRef.current = 1;
+      fetchData();
+      return;
+    }
+
+    // Handle other changes immediately (but skip initial mount for pagination/sort)
+    if (isInitialMount) {
+      // Initial mount - fetch once
+      prevValuesRef.current = { ...currentValues, isInitialMount: false };
+      drawRef.current = 1;
+      fetchData();
+    } else if (isRefreshTrigger) {
+      // External refresh trigger
+      prevValuesRef.current = { ...currentValues, isInitialMount: false };
+      setStart(0);
+      drawRef.current = 1;
+      fetchData();
+    } else if (isPaginationChange || isSortChange) {
+      // Pagination or sorting change
+      prevValuesRef.current = { ...currentValues, isInitialMount: false };
+      drawRef.current = 1;
+      fetchData();
+    } else {
+      // Update ref even if no fetch needed
+      prevValuesRef.current = { ...currentValues, isInitialMount: false };
+    }
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [start, length, order.column, order.dir, globalSearch, columnSearch, refreshTrigger]);
+
+  // Sync input values with applied search values when search is cleared externally
+  useEffect(() => {
+    setColumnSearchInput((prev) => {
+      const synced: Record<number, string> = { ...prev };
+      // Sync with applied search values
+      Object.keys(columnSearch).forEach((key) => {
+        const idx = Number(key);
+        synced[idx] = columnSearch[idx];
+      });
+      // Clear inputs that don't have applied search
+      Object.keys(synced).forEach((key) => {
+        const idx = Number(key);
+        if (!(idx in columnSearch)) {
+          delete synced[idx];
+        }
+      });
+      return synced;
+    });
+  }, [columnSearch]);
+
+  // Expose refresh method via ref
+  useImperativeHandle(ref, () => ({
+    refresh: () => {
+      drawRef.current = 1;
+      setStart(0);
+      fetchData();
+    },
+  }));
+
+  const handleSort = (columnIndex: number) => {
+    setOrder({
+      column: columnIndex,
+      dir: order.column === columnIndex && order.dir === "asc" ? "desc" : "asc",
+    });
+    setStart(0);
+  };
+
+  const handlePageChange = (newStart: number) => {
+    setStart(newStart);
+  };
+
+  const handleLengthChange = (newLength: number) => {
+    setLength(newLength);
+    setStart(0);
+  };
+
+  const handleColumnSearch = (columnIndex: number, value: string) => {
+    // Update input value (what user is typing)
+    setColumnSearchInput((prev) => {
+      const newInput = { ...prev, [columnIndex]: value };
+      
+      // If input is cleared (empty), automatically apply the search to refresh data
+      if (!value.trim()) {
+        // Check if there was a previous search value for this column
+        setColumnSearch((prevSearch) => {
+          const hadPreviousSearch = prevSearch[columnIndex] && prevSearch[columnIndex].trim();
+          if (hadPreviousSearch) {
+            // Clear the search immediately when input is cleared
+            const newSearch = { ...prevSearch };
+            delete newSearch[columnIndex];
+            // Trigger API call by updating columnSearch state
+            return newSearch;
+          }
+          return prevSearch;
+        });
+      }
+      
+      return newInput;
+    });
+  };
+
+  const applyColumnSearch = (columnIndex: number, value: string) => {
+    const trimmedValue = value.trim();
+    console.log(`[DataTable] Applying column search: columnIndex=${columnIndex}, value="${trimmedValue}"`);
+    
+    // Apply the search value (triggers API call via useEffect)
+    setColumnSearch((prev) => {
+      const newSearch = { ...prev };
+      if (trimmedValue) {
+        newSearch[columnIndex] = trimmedValue;
+      } else {
+        // Remove key if value is empty
+        delete newSearch[columnIndex];
+      }
+      console.log(`[DataTable] Updated columnSearch:`, newSearch);
+      return newSearch;
+    });
+    // Update input value to match applied value
+    setColumnSearchInput((prev) => {
+      const newInput = { ...prev };
+      if (trimmedValue) {
+        newInput[columnIndex] = trimmedValue;
+      } else {
+        delete newInput[columnIndex];
+      }
+      return newInput;
+    });
+    // Note: setStart(0) will be handled by the useEffect when it detects columnSearch change
+  };
+
+  const handleColumnSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, columnIndex: number) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const value = columnSearchInput[columnIndex] || "";
+      applyColumnSearch(columnIndex, value);
+    }
+  };
+
+  const handleColumnSearchBlur = (columnIndex: number) => {
+    const value = columnSearchInput[columnIndex] || "";
+    // Only apply if value changed or if clearing (empty string)
+    const currentApplied = columnSearch[columnIndex] || "";
+    if (value.trim() !== currentApplied.trim()) {
+      applyColumnSearch(columnIndex, value);
+    }
+  };
+
+  const totalPages = Math.ceil(recordsFiltered / length) || 1;
+  const currentPage = Math.floor(start / length) + 1;
+
+  // Export functions
+  const exportToExcel = (exportAll: boolean = false) => {
+    const dataToExport = data; // For now, same data. In future, fetch all data for exportAll
+    const visibleCols = visibleColumnsArray;
+    const headers = visibleCols.map(col => col.name || col.data);
+    const rows = dataToExport.map(row => 
+      visibleCols.map(col => {
+        const value = row[col.data];
+        // Strip HTML tags and decode entities
+        const textValue = value ? String(value).replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim() : '';
+        return textValue;
+      })
+    );
+    
+    // Create CSV content
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+    ].join('\n');
+    
+    // Create blob and download
+    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `${exportFileName}_${exportAll ? 'all' : 'page'}_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const toggleColumnVisibility = (columnIndex: number) => {
+    setVisibleColumns(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(columnIndex)) {
+        // Don't allow hiding all columns
+        if (newSet.size > 1) {
+          newSet.delete(columnIndex);
+        }
+      } else {
+        newSet.add(columnIndex);
+      }
+      return newSet;
+    });
+  };
+
+  // Log pagination state
+  useEffect(() => {
+    console.log(`[DataTable] Pagination State`, {
+      start,
+      length,
+      recordsFiltered,
+      recordsTotal,
+      totalPages,
+      currentPage,
+      dataLength: data.length,
+      callCount: callCountRef.current,
+    });
+  }, [start, length, recordsFiltered, recordsTotal, data.length]); // Removed totalPages and currentPage as they're derived values
+
+  return (
+    <div className="w-full" style={{ width: '100%', overflow: 'hidden', maxWidth: '100%' }}>
+      {/* Toolbar: Page Limit, Search, Export, Column Visibility */}
+      <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        {/* Page Limit - Moved to top */}
+        <div className="flex items-center">
+          <span className="text-sm text-gray-600 dark:text-gray-400">
+            Show
+            <select
+              value={length}
+              onChange={(e) => handleLengthChange(Number(e.target.value))}
+              className="mx-2 rounded border border-gray-300 bg-white px-2 py-1 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+            >
+              {menu.map((len) => (
+                <option key={len} value={len}>
+                  {len}
+                </option>
+              ))}
+            </select>
+            entries
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          {/* Search box beside export buttons */}
+          <Input
+            placeholder="Search all columns..."
+            value={globalSearch}
+            onChange={(e) => setGlobalSearch(e.target.value)}
+            className="max-w-md"
+          />
+          {showExport && (
+            <>
+              <button
+                onClick={() => exportToExcel(false)}
+                className="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700"
+                title="Export current page"
+              >
+                📥 Export Page
+              </button>
+              <button
+                onClick={() => exportToExcel(true)}
+                className="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700"
+                title="Export all data"
+              >
+                📥 Export All
+              </button>
+            </>
+          )}
+          {showColumnVisibility && (
+            <div className="relative" ref={columnMenuRef}>
+              <button
+                onClick={() => setShowColumnMenu(!showColumnMenu)}
+                className="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700"
+                title="Column visibility"
+              >
+                👁️ Columns
+              </button>
+              {showColumnMenu && (
+                <div className="absolute right-0 z-10 mt-1 w-48 rounded border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800">
+                  {columns.map((col, idx) => (
+                    <label key={idx} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={visibleColumns.has(idx)}
+                        onChange={() => toggleColumnVisibility(idx)}
+                        className="rounded border-gray-300"
+                      />
+                      <span className="text-sm text-gray-700 dark:text-gray-300">{col.name || col.data}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Table */}
+      <div 
+        className="border border-gray-200 rounded-lg dark:border-gray-700" 
+        style={{ 
+          overflowX: 'auto', 
+          overflowY: 'visible',
+          width: '100%',
+          maxWidth: '100%',
+          display: 'block',
+          position: 'relative'
+        }}
+      >
+        <div style={{ minWidth: 'max-content', display: 'inline-block' }}>
+          <Table className="border-collapse">
+          <TableHeader className="bg-gray-100 dark:bg-gray-800" style={{ position: 'sticky', top: 0, zIndex: 10 }}>
+            <TableRow>
+              {visibleColumnsArray.map((column) => {
+                const originalIndex = columns.indexOf(column);
+                return (
+                <TableCell
+                  key={originalIndex}
+                  isHeader
+                  className="px-4 py-3 text-left text-sm font-semibold text-gray-700 dark:text-gray-300"
+                >
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-2">
+                      <span
+                        onClick={() => column.orderable !== false && handleSort(originalIndex)}
+                        className={`cursor-pointer select-none ${
+                          column.orderable === false ? "" : "hover:text-brand-500"
+                        } ${order.column === originalIndex ? "text-brand-500" : ""}`}
+                      >
+                        {column.name || column.data}
+                        {order.column === originalIndex && (
+                          <span className="ml-1">
+                            {order.dir === "asc" ? "↑" : "↓"}
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                    {column.searchable !== false ? (
+                      <Input
+                        placeholder={`Search ${column.name || column.data}...`}
+                        value={columnSearchInput[originalIndex] || ""}
+                        onChange={(e) => handleColumnSearch(originalIndex, e.target.value)}
+                        onKeyDown={(e) => handleColumnSearchKeyDown(e, originalIndex)}
+                        onBlur={() => handleColumnSearchBlur(originalIndex)}
+                        className="w-full text-xs"
+                        size="sm"
+                      />
+                    ) : (
+                      <div className="text-xs text-gray-400 dark:text-gray-500 h-8 flex items-center">
+                        #
+                      </div>
+                    )}
+                  </div>
+                </TableCell>
+              );
+              })}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
+              <TableRow>
+                <TableCell
+                  colSpan={visibleColumnsArray.length}
+                  className="px-4 py-8 text-center text-sm text-gray-500"
+                >
+                  Loading...
+                </TableCell>
+              </TableRow>
+            ) : data.length > 0 ? (
+              data.map((row, rowIndex) => (
+                <TableRow
+                  key={rowIndex}
+                  className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                  onClick={() => onRowClick && onRowClick(row)}
+                >
+                  {visibleColumnsArray.map((column) => {
+                    const originalIndex = columns.indexOf(column);
+                    return (
+                      <TableCell
+                        key={originalIndex}
+                        className="px-4 py-3 text-sm text-gray-800 dark:text-gray-200"
+                      >
+                        {column.render
+                          ? column.render(row[column.data], row)
+                          : String(row[column.data] || "-")}
+                      </TableCell>
+                    );
+                  })}
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell
+                  colSpan={visibleColumnsArray.length}
+                  className="px-4 py-8 text-center text-sm text-gray-500"
+                >
+                  No data available
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+        </div>
+      </div>
+
+      {/* Pagination - Always show */}
+      {recordsFiltered > 0 && (
+        <div className="mt-4 flex flex-col gap-4 border-t border-gray-200 pt-4 dark:border-gray-700 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-4">
+          <span className="text-sm text-gray-600 dark:text-gray-400">
+            Showing {start + 1} to {Math.min(start + length, recordsFiltered)} of{" "}
+            {recordsFiltered} entries
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => handlePageChange(0)}
+            disabled={start === 0 || loading}
+            className="rounded border border-gray-300 bg-white px-3 py-1 text-sm disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+          >
+            First
+          </button>
+          <button
+            onClick={() => handlePageChange(Math.max(0, start - length))}
+            disabled={start === 0 || loading}
+            className="rounded border border-gray-300 bg-white px-3 py-1 text-sm disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+          >
+            Previous
+          </button>
+          {totalPages > 1 && (
+            <>
+              <span className="px-3 text-sm font-medium text-gray-700 dark:text-gray-300">
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                onClick={() => handlePageChange(Math.min(start + length, (totalPages - 1) * length))}
+                disabled={start + length >= recordsFiltered || loading}
+                className="rounded border border-gray-300 bg-white px-3 py-1 text-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700"
+              >
+                Next
+              </button>
+              <button
+                onClick={() => handlePageChange(Math.max(0, (totalPages - 1) * length))}
+                disabled={start + length >= recordsFiltered || loading}
+                className="rounded border border-gray-300 bg-white px-3 py-1 text-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700"
+              >
+                Last
+              </button>
+            </>
+          )}
+        </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const DataTable = forwardRef<DataTableRef, DataTableProps>(DataTableComponent);
+
+DataTable.displayName = "DataTable";
+
+export default DataTable;
+

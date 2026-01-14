@@ -125,7 +125,7 @@ export default function SkipKeywords() {
         )}
         <DataTable
           refreshTrigger={refreshTrigger}
-          ajaxUrl={`${API_BASE_URL}/api/skipkeywords/ajaxlist`}
+          ajaxUrl="/api/skipkeywords/ajaxlist"
           columns={[
             { data: "KEYWORD", name: "Keyword", searchable: true, orderable: true },
             { data: "FROM_COLUMN_NAME", name: "From Column Name", searchable: true, orderable: true },

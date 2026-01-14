@@ -131,7 +131,7 @@ export default function TermMapping() {
         )}
         <DataTable
           refreshTrigger={refreshTrigger}
-          ajaxUrl={`${API_BASE_URL}/api/termmapping/ajaxlist`}
+          ajaxUrl="/api/termmapping/ajaxlist"
           columns={[
             { data: "TERM", name: "Term", searchable: true, orderable: true },
             { data: "TERM_CODE", name: "Term Code", searchable: true, orderable: true },

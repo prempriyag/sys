@@ -4,7 +4,6 @@ from sqlalchemy import text
 from typing import Dict, Any
 import logging
 from config.constants import TBL_COURSES, TBL_INSTITUTION_MAPPING
-from helpers.common_helper import check_special_name
 
 logger = logging.getLogger(__name__)
 

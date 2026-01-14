@@ -155,7 +155,7 @@ export default function DegreeMapping() {
 
         <DataTable
           refreshTrigger={refreshTrigger}
-          ajaxUrl={`${API_BASE_URL}/api/degreemapping/ajaxlist`}
+          ajaxUrl="/api/degreemapping/ajaxlist"
           columns={[
             { data: "DEGREE_CD", name: "Degree Code", searchable: true, orderable: true },
             { data: "DEGREE_NAME", name: "Degree Name", searchable: true, orderable: true },

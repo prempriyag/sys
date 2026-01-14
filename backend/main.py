@@ -93,10 +93,25 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Import dashboard controller
+try:
+    from controllers import dashboard_controller
+    print("[MAIN] Successfully imported dashboard_controller")
+except Exception as e:
+    print(f"[MAIN] ERROR importing dashboard_controller: {e}")
+    import traceback
+    traceback.print_exc()
+    dashboard_controller = None
+
 # Include routers
 app.include_router(auth_controller.router)
 app.include_router(users_controller.router)
 app.include_router(transcriptreports_controller.router)
+
+# Include dashboard router if imported successfully
+if dashboard_controller is not None:
+    app.include_router(dashboard_controller.router)
+    print("[MAIN] Successfully registered dashboard_controller router")
 
 # Include digiscript reports router if imported successfully
 if digiscriptreports_controller is not None:
@@ -232,6 +247,51 @@ if skipkeywords_controller is not None:
     app.include_router(skipkeywords_controller.router)
     print("[MAIN] Successfully registered skipkeywords_controller router")
 
+# Import all remaining setup controllers
+try:
+    from controllers.college import skipcourses_controller, yearmapping_controller, botschedule_controller
+    from controllers.college import botstatusreport_controller, suffixname_controller, prefixname_controller
+    from controllers.college import combinedname_controller, acceptedgrades_controller, transfergrades_controller
+    from controllers.college import institutionmapping_controller, accreditedinstitution_controller, overrideeditmapping_controller
+    print("[MAIN] Successfully imported remaining setup controllers")
+except Exception as e:
+    print(f"[MAIN] ERROR importing remaining setup controllers: {e}")
+    import traceback
+    traceback.print_exc()
+    skipcourses_controller = None
+    yearmapping_controller = None
+    botschedule_controller = None
+    botstatusreport_controller = None
+    suffixname_controller = None
+    prefixname_controller = None
+    combinedname_controller = None
+    acceptedgrades_controller = None
+    transfergrades_controller = None
+    institutionmapping_controller = None
+    accreditedinstitution_controller = None
+    overrideeditmapping_controller = None
+
+# Register all remaining setup routers
+controllers_to_register = [
+    (skipcourses_controller, "skipcourses_controller"),
+    (yearmapping_controller, "yearmapping_controller"),
+    (botschedule_controller, "botschedule_controller"),
+    (botstatusreport_controller, "botstatusreport_controller"),
+    (suffixname_controller, "suffixname_controller"),
+    (prefixname_controller, "prefixname_controller"),
+    (combinedname_controller, "combinedname_controller"),
+    (acceptedgrades_controller, "acceptedgrades_controller"),
+    (transfergrades_controller, "transfergrades_controller"),
+    (institutionmapping_controller, "institutionmapping_controller"),
+    (accreditedinstitution_controller, "accreditedinstitution_controller"),
+    (overrideeditmapping_controller, "overrideeditmapping_controller"),
+]
+
+for controller, name in controllers_to_register:
+    if controller is not None:
+        app.include_router(controller.router)
+        print(f"[MAIN] Successfully registered {name} router")
+
 # Include articulation reports router if imported successfully
 if articulationreports_controller is not None:
     app.include_router(articulationreports_controller.router)
@@ -240,6 +300,70 @@ if articulationreports_controller is not None:
     print(f"[MAIN] Routes: {[r.path for r in articulationreports_controller.router.routes]}")
 else:
     print("[MAIN] WARNING: articulationreports_controller router NOT registered due to import error")
+
+# Import error log controller
+try:
+    from controllers.college import errorlog_controller
+    print("[MAIN] Successfully imported errorlog_controller")
+except Exception as e:
+    print(f"[MAIN] ERROR importing errorlog_controller: {e}")
+    import traceback
+    traceback.print_exc()
+    errorlog_controller = None
+
+# Include error log router if imported successfully
+if errorlog_controller is not None:
+    app.include_router(errorlog_controller.router)
+    print("[MAIN] Successfully registered errorlog_controller router")
+
+# Import SMTP controller
+try:
+    from controllers.college import smtp_controller
+    print("[MAIN] Successfully imported smtp_controller")
+except Exception as e:
+    print(f"[MAIN] ERROR importing smtp_controller: {e}")
+    import traceback
+    traceback.print_exc()
+    smtp_controller = None
+
+# Include SMTP router if imported successfully
+if smtp_controller is not None:
+    app.include_router(smtp_controller.router)
+    print("[MAIN] Successfully registered smtp_controller router")
+
+# Import master settings controller
+try:
+    from controllers.college import mastersettings_controller
+    print("[MAIN] Successfully imported mastersettings_controller")
+except Exception as e:
+    print(f"[MAIN] ERROR importing mastersettings_controller: {e}")
+    import traceback
+    traceback.print_exc()
+    mastersettings_controller = None
+
+# Include master settings router if imported successfully
+if mastersettings_controller is not None:
+    app.include_router(mastersettings_controller.router)
+    print("[MAIN] Successfully registered mastersettings_controller router")
+
+# Import permissions and roles controllers
+try:
+    from controllers.college import permissions_controller, roles_controller
+    print("[MAIN] Successfully imported permissions and roles controllers")
+except Exception as e:
+    print(f"[MAIN] ERROR importing permissions/roles controllers: {e}")
+    import traceback
+    traceback.print_exc()
+    permissions_controller = None
+    roles_controller = None
+
+# Include permissions and roles routers if imported successfully
+if permissions_controller is not None:
+    app.include_router(permissions_controller.router)
+    print("[MAIN] Successfully registered permissions_controller router")
+if roles_controller is not None:
+    app.include_router(roles_controller.router)
+    print("[MAIN] Successfully registered roles_controller router")
 
 
 @app.get("/")

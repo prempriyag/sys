@@ -119,7 +119,7 @@ export default function GradeMapping() {
         )}
         <DataTable
           refreshTrigger={refreshTrigger}
-          ajaxUrl={`${API_BASE_URL}/api/grademapping/ajaxlist`}
+          ajaxUrl="/api/grademapping/ajaxlist"
           columns={[
             { data: "EQUIVALENT_GRADE", name: "Equivalent Grade", searchable: true, orderable: true },
             { data: "TRANSCRIPT_GRADE", name: "Transcript Grade", searchable: true, orderable: true },

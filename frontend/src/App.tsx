@@ -18,7 +18,7 @@ import Blank from "./pages/Blank";
 import AppLayout from "./layout/AppLayout";
 import { ScrollToTop } from "./components/common/ScrollToTop";
 import Home from "./pages/Dashboard/Home";
-import CollegePage from "./pages/College/CollegePage";
+import CollegeDashboard from "./pages/Dashboard/CollegeDashboard";
 import TranscriptReports from "./pages/College/transcriptreports/TranscriptReports";
 import ArticulationReports from "./pages/College/ArticulationReports";
 import DigiScriptReports from "./pages/College/DigiScriptReports";
@@ -34,16 +34,35 @@ import StudentLogRerun from "./pages/College/StudentLogRerun";
 import StudentView from "./pages/College/StudentView";
 import TranscriptsUpload from "./pages/College/TranscriptsUpload";
 import TranscriptsList from "./pages/College/TranscriptsList";
-import PlaceholderPage from "./pages/College/PlaceholderPage";
 import StoredProcedure from "./pages/College/StoredProcedure";
 import DegreeMapping from "./pages/College/DegreeMapping";
 import TermMapping from "./pages/College/TermMapping";
 import TermNameMapping from "./pages/College/TermNameMapping";
 import GradeMapping from "./pages/College/GradeMapping";
 import SkipKeywords from "./pages/College/SkipKeywords";
+import SkipCourses from "./pages/College/SkipCourses";
+import YearMapping from "./pages/College/YearMapping";
+import BotSchedule from "./pages/College/BotSchedule";
+import BotStatusReport from "./pages/College/BotStatusReport";
+import SuffixName from "./pages/College/SuffixName";
+import PrefixName from "./pages/College/PrefixName";
+import CombinedName from "./pages/College/CombinedName";
+import AcceptedGradesMapping from "./pages/College/AcceptedGradesMapping";
+import TransferGradesMapping from "./pages/College/TransferGradesMapping";
+import InstitutionMapping from "./pages/College/InstitutionMapping";
+import AccreditedInstitution from "./pages/College/AccreditedInstitution";
+import OverrideEditMapping from "./pages/College/OverrideEditMapping";
+import ErrorLog from "./pages/College/ErrorLog";
+import SmtpSetup from "./pages/College/SmtpSetup";
+import MasterSettings from "./pages/College/MasterSettings";
+import Permissions from "./pages/College/Permissions";
+import Roles from "./pages/College/Roles";
+import AddRole from "./pages/College/AddRole";
+import EditRole from "./pages/College/EditRole";
 import UserManagement from "./pages/College/users/UserManagement";
 import AddUser from "./pages/College/users/AddUser";
 import EditUser from "./pages/College/users/EditUser";
+import Help from "./pages/College/Help";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import PermissionRoute from "./components/auth/PermissionRoute";
 
@@ -66,11 +85,11 @@ export default function App() {
             }
           >
             {/* Default route - college dashboard */}
-            <Route index element={<Home />} />
-            <Route path="/dashboard" element={<Home />} />
+            <Route index element={<CollegeDashboard />} />
+            <Route path="/dashboard" element={<CollegeDashboard />} />
             
             {/* College module routes (default module) */}
-            <Route path="/college/dashboard" element={<Home />} />
+            <Route path="/college/dashboard" element={<CollegeDashboard />} />
             
                     {/* College - User Management */}
                     <Route 
@@ -173,20 +192,20 @@ export default function App() {
                 </PermissionRoute>
               }
             />
-            <Route path="/college/osuskipkeywords" element={<CollegePage title="Skip Keywords" />} />
-            <Route path="/college/acceptGradeMapping" element={<CollegePage title="Accepted Grades Mapping" />} />
-            <Route path="/college/accreditedInstitution" element={<CollegePage title="Accredited Institution" />} />
-            <Route path="/college/transfergrademapping" element={<CollegePage title="Transfer Grades Mapping" />} />
-            <Route path="/college/yearmapping" element={<CollegePage title="Year Mapping" />} />
-            <Route path="/college/institutionmapping" element={<CollegePage title="Institution Mapping" />} />
-            <Route path="/college/techinstitutionmapping" element={<CollegePage title="Tech Center Mapping" />} />
-            <Route path="/college/skipcourses" element={<CollegePage title="Skip/Exclude Courses" />} />
-            <Route path="/college/overrideeditmapping" element={<CollegePage title="Override Edit Mapping" />} />
-            <Route path="/college/suffixname" element={<CollegePage title="Suffix Names" />} />
-            <Route path="/college/prefixname" element={<CollegePage title="Prefix Names" />} />
-            <Route path="/college/combinedname" element={<CollegePage title="Combined Names" />} />
-            <Route path="/college/botschedule" element={<CollegePage title="Bot Schedule" />} />
-            <Route path="/college/botstatusreport" element={<CollegePage title="Bot Status Report" />} />
+            <Route path="/college/osuskipkeywords" element={<PermissionRoute permission="osu_skip_keywords" action="VIEW"><SkipKeywords /></PermissionRoute>} />
+            <Route path="/college/acceptGradeMapping" element={<PermissionRoute permission="accepted_grades_mapping" action="VIEW"><AcceptedGradesMapping /></PermissionRoute>} />
+            <Route path="/college/accreditedInstitution" element={<PermissionRoute permission="accredited_institution" action="VIEW"><AccreditedInstitution /></PermissionRoute>} />
+            <Route path="/college/transfergrademapping" element={<PermissionRoute permission="transfer_grade_mapping" action="VIEW"><TransferGradesMapping /></PermissionRoute>} />
+            <Route path="/college/yearmapping" element={<PermissionRoute permission="year_mapping" action="VIEW"><YearMapping /></PermissionRoute>} />
+            <Route path="/college/institutionmapping" element={<PermissionRoute permission="institutions_mapping" action="VIEW"><InstitutionMapping /></PermissionRoute>} />
+            <Route path="/college/techinstitutionmapping" element={<PermissionRoute permission="institutions_mapping" action="VIEW"><InstitutionMapping instType="TECH" /></PermissionRoute>} />
+            <Route path="/college/skipcourses" element={<PermissionRoute permission="skip_exclude_courses" action="VIEW"><SkipCourses /></PermissionRoute>} />
+            <Route path="/college/overrideeditmapping" element={<PermissionRoute permission="override_edit_mapping" action="VIEW"><OverrideEditMapping /></PermissionRoute>} />
+            <Route path="/college/suffixname" element={<PermissionRoute permission="suffix_names" action="VIEW"><SuffixName /></PermissionRoute>} />
+            <Route path="/college/prefixname" element={<PermissionRoute permission="prefix_words" action="VIEW"><PrefixName /></PermissionRoute>} />
+            <Route path="/college/combinedname" element={<PermissionRoute permission="combine_words" action="VIEW"><CombinedName /></PermissionRoute>} />
+            <Route path="/college/botschedule" element={<PermissionRoute permission="bot_schedule" action="VIEW"><BotSchedule /></PermissionRoute>} />
+            <Route path="/college/botstatusreport" element={<PermissionRoute permission="bot_status_report" action="VIEW"><BotStatusReport /></PermissionRoute>} />
             
             {/* College - OCR [P1] */}
             <Route path="/college/transcripthdrocr" element={<PermissionRoute permission="college_transcript_header_ocr" action="VIEW"><TranscriptHdrOcr /></PermissionRoute>} />
@@ -211,14 +230,17 @@ export default function App() {
             />
             
             {/* College - Settings */}
-            <Route path="/college/permissions" element={<CollegePage title="Permissions" />} />
-            <Route path="/college/roles" element={<CollegePage title="Roles" />} />
-            <Route path="/college/Error_log" element={<CollegePage title="Error Logs" />} />
-            <Route path="/college/master_setup" element={<CollegePage title="Master Settings" />} />
-            <Route path="/college/smtp" element={<CollegePage title="SMTP Setup" />} />
+            <Route path="/college/permissions" element={<Permissions />} />
+            <Route path="/college/roles" element={<Roles />} />
+            <Route path="/college/roles/add" element={<AddRole />} />
+            <Route path="/college/roles/edit/:id" element={<EditRole />} />
+            <Route path="/college/roles/view/:id" element={<EditRole />} />
+            <Route path="/college/Error_log" element={<ErrorLog />} />
+            <Route path="/college/master_setup" element={<MasterSettings />} />
+            <Route path="/college/smtp" element={<SmtpSetup />} />
             
             {/* College - User Manual */}
-            <Route path="/college/Help" element={<CollegePage title="User Manual" />} />
+            <Route path="/college/Help" element={<Help />} />
             
             {/* School module routes */}
             <Route path="/school/dashboard" element={<Home />} />

@@ -16,9 +16,9 @@ class AcceptedGradesMappingModel:
         if search_value:
             search_safe = check_special_name(search_value)
             search_lower = check_special_name(search_value.lower())
-            search_conditions.append(f"""(INSTITUTION_ID like'%{search_safe}%'or
-                lower(ACCEPTED_GRADE) like'%{search_lower}%'or
-                lower(TRANSFER_GRADE) like'%{search_lower}%'or
+            search_conditions.append(f"""(INSTITUTION_ID like '%{search_safe}%' or
+                lower(ACCEPTED_GRADE) like '%{search_lower}%' or
+                lower(TRANSFER_GRADE) like '%{search_lower}%' or
                 lower(UPDATED_BY) like '%{search_lower}%')""")
         if search_conditions:
             return " AND ".join(search_conditions)
@@ -59,7 +59,13 @@ class AcceptedGradesMappingModel:
             where_clause = search_query if search_query else "1=1"
             count_query = text(f"SELECT count(*) as allcount FROM {TBL_ACCEPTED_GRADES_MAPPING} WITH(NOLOCK) WHERE {where_clause}")
             count_result = db.execute(count_query).fetchone()
-            total_records = count_result.allcount if hasattr(count_result, 'allcount') else (count_result[0] if count_result else 0)
+            if count_result:
+                try:
+                    total_records = count_result.allcount
+                except AttributeError:
+                    total_records = count_result[0] if count_result else 0
+            else:
+                total_records = 0
             records_filtered = total_records
             data_query_sql = f"""
                 SELECT ID, INSTITUTION_ID, ACCEPTED_GRADE, TRANSFER_GRADE, UPDATED_BY, UPDATED_ON
@@ -89,6 +95,8 @@ class AcceptedGradesMappingModel:
                 "data": data,
             }
         except Exception as e:
-            logger.error(f"Error in get_accepted_grades_mapping_data: {e}")
+            logger.exception(f"Error in get_accepted_grades_mapping_data: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
             raise
 

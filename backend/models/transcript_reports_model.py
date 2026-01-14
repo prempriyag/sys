@@ -343,26 +343,32 @@ class TranscriptReportsModel:
     @staticmethod
     def generate_transcript_pdf_url(transcript_link: str, base_url: str = "") -> str:
         """
-        Generate PDF URL for transcript file
+        Generate PDF URL for transcript file with encryption
         Matches CI3: SESSION_PATH . 'transcript_file?pdf=' . getencryptfilepath($record->TRANSCRIPT_LINK)
         """
         if not transcript_link:
             return ""
-        # For now, return the link as-is. In production, you'd encrypt it
-        # TODO: Implement encryption if needed
-        return f"{base_url}transcript_file?pdf={transcript_link}"
+        
+        from helpers.encryption_helper import get_encrypt_file_path
+        
+        # Encrypt the file path
+        encrypted_path = get_encrypt_file_path(transcript_link)
+        return f"{base_url}/api/viewfile/transcript_file?pdf={encrypted_path}"
 
     @staticmethod
     def generate_articulation_pdf_url(transfer_letter_link: str, base_url: str = "") -> str:
         """
-        Generate PDF URL for articulation/transfer letter file
+        Generate PDF URL for articulation/transfer letter file with encryption
         Matches CI3: SESSION_PATH . 'transcript_file?pdf=' . getencryptfilepath($record->TRANSFER_LETTER_FILE_LINK)
         """
         if not transfer_letter_link:
             return ""
-        # For now, return the link as-is. In production, you'd encrypt it
-        # TODO: Implement encryption if needed
-        return f"{base_url}transcript_file?pdf={transfer_letter_link}"
+        
+        from helpers.encryption_helper import get_encrypt_file_path
+        
+        # Encrypt the file path
+        encrypted_path = get_encrypt_file_path(transfer_letter_link)
+        return f"{base_url}/api/viewfile/transcript_file?pdf={encrypted_path}"
 
     @staticmethod
     def generate_error_screenshot_html(error_screenshot: str, batch_id: str, base_url: str = "") -> str:
@@ -372,8 +378,8 @@ class TranscriptReportsModel:
         """
         if not error_screenshot:
             return ""
-        image_url = f"{base_url}errorscreenshot/{batch_id}"
-        return f'<a href="{image_url}" target="_blank"><span class="fa fa-eye"></span></a>'
+        image_url = f"{base_url}/api/viewfile/errorscreenshot/{batch_id}"
+        return f'<a href="{image_url}" target="_blank" rel="noopener noreferrer"><span class="fa fa-eye"></span></a>'
 
     @staticmethod
     def generate_transcript_link_html(transcript_link: str, base_url: str = "") -> str:
@@ -384,7 +390,7 @@ class TranscriptReportsModel:
         if not transcript_link:
             return ""
         pdf_url = TranscriptReportsModel.generate_transcript_pdf_url(transcript_link, base_url)
-        return f'<a href="{pdf_url}" target="_blank"><span class="fa fa-link"></span></a>'
+        return f'<a href="{pdf_url}" target="_blank" rel="noopener noreferrer"><span class="fa fa-link"></span></a>'
 
     @staticmethod
     def generate_transfer_letter_link_html(transfer_letter_link: str, base_url: str = "") -> str:
@@ -395,7 +401,7 @@ class TranscriptReportsModel:
         if not transfer_letter_link:
             return ""
         pdf_url = TranscriptReportsModel.generate_articulation_pdf_url(transfer_letter_link, base_url)
-        return f'<a href="{pdf_url}" target="_blank"><span class="fa fa-link"></span></a>'
+        return f'<a href="{pdf_url}" target="_blank" rel="noopener noreferrer"><span class="fa fa-link"></span></a>'
 
     @staticmethod
     def generate_batch_id_html(batch_id: str, base_url: str = "") -> str:
@@ -755,8 +761,14 @@ class TranscriptReportsModel:
                     "STATUS_SOAPCOL": record_dict.get("STATUS_SOAPCOL", ""),
                     "STATUS_BDMS": record_dict.get("STATUS_BDMS", ""),
                     "ERROR_REASON": error_reason,  # Already formatted with <br> tags
-                    "ERROR_SCREENSHOT": error_screenshot,  # Raw value, frontend will generate HTML
-                    "TRANSCRIPT_LINK": transcript_link,  # Raw value, frontend will generate HTML
+                    # ERROR_SCREENSHOT: Return raw value if exists (frontend will check and construct URL from batch_id)
+                    # Matches CI3: if ($record->ERROR_SCREENSHOT != '' || !empty($record->ERROR_SCREENSHOT))
+                    # Return the raw error_screenshot value (file path) if it exists, empty string if not
+                    "ERROR_SCREENSHOT": error_screenshot if (error_screenshot and str(error_screenshot).strip()) else "",  # Raw value, frontend will check if not empty
+                    # TRANSCRIPT_LINK: Always generate encrypted URL if transcript_link exists
+                    # Matches CI3: $transcript_link .= '<a href="' . $pdfpath . '" target="_blank"><span class="fa fa-link"></span></a>';
+                    # Note: CI3 always shows the link structure, but we only show if transcript_link exists
+                    "TRANSCRIPT_LINK": TranscriptReportsModel.generate_transcript_pdf_url(transcript_link) if (transcript_link and str(transcript_link).strip()) else "",  # Encrypted URL or empty string
                     "STATUS_FLAG": record_dict.get("TRANSCRIPT_STATUS_FLAG", ""),
                     "ACTION": "",  # Frontend will generate dropdown based on permissions
                     "SCENARIO": (
@@ -769,7 +781,7 @@ class TranscriptReportsModel:
                     "LETTER_SENT_DATE": str(record_dict.get("LETTER_SENT_DATE", ""))
                     if record_dict.get("LETTER_SENT_DATE")
                     else "",
-                    "TRANSFER_LETTER_FILE_LINK": transfer_letter_link,  # Raw value, frontend will generate HTML
+                    "TRANSFER_LETTER_FILE_LINK": TranscriptReportsModel.generate_articulation_pdf_url(transfer_letter_link) if transfer_letter_link else "",  # Encrypted URL
                     "SOURCE_TYPE": record_dict.get("SOURCE_TYPE", ""),
                     "LAST_UPDATED_DATETIME": str(record_dict.get("LAST_UPDATED_DATETIME", ""))
                     if record_dict.get("LAST_UPDATED_DATETIME")

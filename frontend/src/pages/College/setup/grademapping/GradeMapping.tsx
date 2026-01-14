@@ -8,27 +8,27 @@ import { API_BASE_URL } from "../../../../config/api";
 import { RefreshIcon, PlusIcon, PencilIcon, TrashBinIcon } from "../../../../icons";
 import { useAuth } from "../../../../context/AuthContext";
 
-export default function TermNameMapping() {
+export default function GradeMapping() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const { hasPermission } = useAuth();
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [formData, setFormData] = useState({ OCR_TERM_NAME: "", TERM_NAME: "" });
+  const [formData, setFormData] = useState({ GRADE: "", GRADE_TO_CONSIDER: "" });
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
-  const hasAddPermission = hasPermission("college_term_names", "ADD");
-  const hasUpdatePermission = hasPermission("college_term_names", "UPDATE");
-  const hasDeletePermission = hasPermission("college_term_names", "DELETE");
+  const hasAddPermission = hasPermission("par_grade_mapping", "ADD");
+  const hasUpdatePermission = hasPermission("par_grade_mapping", "UPDATE");
+  const hasDeletePermission = hasPermission("par_grade_mapping", "DELETE");
 
   const handleAdd = () => {
-    setFormData({ OCR_TERM_NAME: "", TERM_NAME: "" });
+    setFormData({ GRADE: "", GRADE_TO_CONSIDER: "" });
     setShowAddModal(true);
     setMessage(null);
   };
 
   const handleEdit = async (id: number) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/termnamemapping/get`, {
+      const response = await fetch(`${API_BASE_URL}/api/grademapping/get`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -37,21 +37,21 @@ export default function TermNameMapping() {
         body: JSON.stringify({ id }),
       });
       const data = await response.json();
-      if (data.Id) {
-        setFormData({ OCR_TERM_NAME: data.OCR_TERM_NAME || "", TERM_NAME: data.TERM_NAME || "" });
-        setEditingId(id);
+      if (data.ID) {
+        setFormData({ GRADE: data.EQUIVALENT_GRADE || "", GRADE_TO_CONSIDER: data.TRANSCRIPT_GRADE || "" });
+        setEditingId(data.ID);
         setShowEditModal(true);
         setMessage(null);
       }
     } catch (error: any) {
-      setMessage({ type: "error", text: error.message || "Error loading term name data" });
+      setMessage({ type: "error", text: error.message || "Error loading grade data" });
     }
   };
 
   const handleDelete = async (id: number) => {
-    if (!window.confirm("Are you sure you want to delete this term name?")) return;
+    if (!window.confirm("Are you sure you want to delete this grade?")) return;
     try {
-      const response = await fetch(`${API_BASE_URL}/api/termnamemapping/delete`, {
+      const response = await fetch(`${API_BASE_URL}/api/grademapping/delete`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -61,20 +61,20 @@ export default function TermNameMapping() {
       });
       const data = await response.json();
       if (data.status === "Success") {
-        setMessage({ type: "success", text: "Term name deleted successfully" });
+        setMessage({ type: "success", text: "Grade deleted successfully" });
         setRefreshTrigger((prev) => prev + 1);
       } else {
-        setMessage({ type: "error", text: "Error deleting term name" });
+        setMessage({ type: "error", text: "Error deleting grade" });
       }
     } catch (error: any) {
-      setMessage({ type: "error", text: error.message || "Error deleting term name" });
+      setMessage({ type: "error", text: error.message || "Error deleting grade" });
     }
   };
 
   const handleSubmit = async (e: React.FormEvent, isEdit: boolean) => {
     e.preventDefault();
     try {
-      const endpoint = isEdit ? "/api/termnamemapping/update" : "/api/termnamemapping/insert";
+      const endpoint = isEdit ? "/api/grademapping/update" : "/api/grademapping/insert";
       const body = isEdit ? { Id: editingId, ...formData } : formData;
       const response = await fetch(`${API_BASE_URL}${endpoint}`, {
         method: "POST",
@@ -89,27 +89,27 @@ export default function TermNameMapping() {
         setMessage({ type: "success", text: data.message || "Success" });
         setShowAddModal(false);
         setShowEditModal(false);
-        setFormData({ OCR_TERM_NAME: "", TERM_NAME: "" });
+        setFormData({ GRADE: "", GRADE_TO_CONSIDER: "" });
         setEditingId(null);
         setRefreshTrigger((prev) => prev + 1);
       } else {
-        setMessage({ type: "error", text: data.message || "Error saving term name" });
+        setMessage({ type: "error", text: data.message || "Error saving grade" });
       }
     } catch (error: any) {
-      setMessage({ type: "error", text: error.message || "Error saving term name" });
+      setMessage({ type: "error", text: error.message || "Error saving grade" });
     }
   };
 
   return (
     <PageWrapper>
-      <PageMeta title="Term Name Mapping | College Module" description="Manage term name mappings" />
-      <PageBreadcrumb pageTitle="Term Name Mapping" />
+      <PageMeta title="Equivalent Grades Mapping | College Module" description="Manage equivalent grade mappings" />
+      <PageBreadcrumb pageTitle="Equivalent Grades Mapping" />
       <PageContainer>
         <div className="mb-3 flex items-center justify-between">
-          <h3 className="font-semibold text-gray-800 text-theme-xl dark:text-white/90 sm:text-2xl">View Term Names</h3>
+          <h3 className="font-semibold text-gray-800 text-theme-xl dark:text-white/90 sm:text-2xl">View Equivalent Grades</h3>
           <div className="flex items-center gap-2">
             <Button onClick={() => setRefreshTrigger((prev) => prev + 1)} variant="outline" startIcon={<RefreshIcon className="w-5 h-5" />}>Refresh Data</Button>
-            {hasAddPermission && <Button onClick={handleAdd} startIcon={<PlusIcon className="w-5 h-5" />}>Add Term Name</Button>}
+            {hasAddPermission && <Button onClick={handleAdd} startIcon={<PlusIcon className="w-5 h-5" />}>Add Grade</Button>}
           </div>
         </div>
         {message && (
@@ -119,18 +119,18 @@ export default function TermNameMapping() {
         )}
         <DataTable
           refreshTrigger={refreshTrigger}
-          ajaxUrl="/api/termnamemapping/ajaxlist"
+          ajaxUrl="/api/grademapping/ajaxlist"
           columns={[
-            { data: "OCR_TERM_NAME", name: "OCR Term Name", searchable: true, orderable: true },
-            { data: "TERM_NAME", name: "Term Name", searchable: true, orderable: true },
-            { data: "Updated_by", name: "Updated By", searchable: true, orderable: true },
-            { data: "Updated_on", name: "Updated On", searchable: false, orderable: true },
+            { data: "EQUIVALENT_GRADE", name: "Equivalent Grade", searchable: true, orderable: true },
+            { data: "TRANSCRIPT_GRADE", name: "Transcript Grade", searchable: true, orderable: true },
+            { data: "UPDATED_BY", name: "Updated By", searchable: true, orderable: true },
+            { data: "UPDATED_ON", name: "Updated On", searchable: false, orderable: true },
             ...(hasUpdatePermission || hasDeletePermission ? [{
               data: "actions", name: "Action", searchable: false, orderable: false,
               render: (data: any, row: any) => (
                 <div className="flex items-center gap-2">
-                  {hasUpdatePermission && <button onClick={() => handleEdit(row.Id)} className="text-brand-500 hover:text-brand-700" title="Edit"><PencilIcon className="w-5 h-5" /></button>}
-                  {hasDeletePermission && <button onClick={() => handleDelete(row.Id)} className="text-red-500 hover:text-red-700" title="Delete"><TrashBinIcon className="w-5 h-5" /></button>}
+                  {hasUpdatePermission && <button onClick={() => handleEdit(row.ID)} className="text-brand-500 hover:text-brand-700" title="Edit"><PencilIcon className="w-5 h-5" /></button>}
+                  {hasDeletePermission && <button onClick={() => handleDelete(row.ID)} className="text-red-500 hover:text-red-700" title="Delete"><TrashBinIcon className="w-5 h-5" /></button>}
                 </div>
               ),
             }] : []),
@@ -140,17 +140,17 @@ export default function TermNameMapping() {
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
             <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold">Add Term Name</h3>
+                <h3 className="text-lg font-semibold">Add Equivalent Grade</h3>
                 <button onClick={() => setShowAddModal(false)} className="text-gray-500 hover:text-gray-700">×</button>
               </div>
               <form onSubmit={(e) => handleSubmit(e, false)}>
                 <div className="mb-4">
-                  <label className="block text-sm font-medium mb-2">OCR Term Name *</label>
-                  <input type="text" value={formData.OCR_TERM_NAME} onChange={(e) => setFormData({ ...formData, OCR_TERM_NAME: e.target.value })} required className="w-full px-4 py-2 border rounded-lg" />
+                  <label className="block text-sm font-medium mb-2">Grade *</label>
+                  <input type="text" value={formData.GRADE} onChange={(e) => setFormData({ ...formData, GRADE: e.target.value })} required className="w-full px-4 py-2 border rounded-lg" />
                 </div>
                 <div className="mb-4">
-                  <label className="block text-sm font-medium mb-2">Term Name *</label>
-                  <input type="text" value={formData.TERM_NAME} onChange={(e) => setFormData({ ...formData, TERM_NAME: e.target.value })} required className="w-full px-4 py-2 border rounded-lg" />
+                  <label className="block text-sm font-medium mb-2">Grade To Consider *</label>
+                  <input type="text" value={formData.GRADE_TO_CONSIDER} onChange={(e) => setFormData({ ...formData, GRADE_TO_CONSIDER: e.target.value })} required className="w-full px-4 py-2 border rounded-lg" />
                 </div>
                 <div className="flex gap-2 justify-end">
                   <Button type="submit">Submit</Button>
@@ -164,17 +164,17 @@ export default function TermNameMapping() {
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
             <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold">Edit Term Name</h3>
+                <h3 className="text-lg font-semibold">Edit Equivalent Grade</h3>
                 <button onClick={() => setShowEditModal(false)} className="text-gray-500 hover:text-gray-700">×</button>
               </div>
               <form onSubmit={(e) => handleSubmit(e, true)}>
                 <div className="mb-4">
-                  <label className="block text-sm font-medium mb-2">OCR Term Name *</label>
-                  <input type="text" value={formData.OCR_TERM_NAME} onChange={(e) => setFormData({ ...formData, OCR_TERM_NAME: e.target.value })} required className="w-full px-4 py-2 border rounded-lg" />
+                  <label className="block text-sm font-medium mb-2">Grade *</label>
+                  <input type="text" value={formData.GRADE} onChange={(e) => setFormData({ ...formData, GRADE: e.target.value })} required className="w-full px-4 py-2 border rounded-lg" />
                 </div>
                 <div className="mb-4">
-                  <label className="block text-sm font-medium mb-2">Term Name *</label>
-                  <input type="text" value={formData.TERM_NAME} onChange={(e) => setFormData({ ...formData, TERM_NAME: e.target.value })} required className="w-full px-4 py-2 border rounded-lg" />
+                  <label className="block text-sm font-medium mb-2">Grade To Consider *</label>
+                  <input type="text" value={formData.GRADE_TO_CONSIDER} onChange={(e) => setFormData({ ...formData, GRADE_TO_CONSIDER: e.target.value })} required className="w-full px-4 py-2 border rounded-lg" />
                 </div>
                 <div className="flex gap-2 justify-end">
                   <Button type="submit">Update</Button>

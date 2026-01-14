@@ -1,0 +1,279 @@
+import { useState } from "react";
+import PageBreadcrumb from "../../../components/common/PageBreadCrumb";
+import PageMeta from "../../../components/common/PageMeta";
+import PageContainer, { PageWrapper } from "../../../components/common/PageContainer";
+import DataTable from "../../../components/ui/DataTable";
+import Button from "../../../components/ui/button/Button";
+import { API_ENDPOINTS, API_BASE_URL } from "../../../config/api";
+import { RefreshIcon, FilterIcon } from "../../../icons";
+import { useAuth } from "../../../context/AuthContext";
+
+export default function DigiScriptReports() {
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [showFilters, setShowFilters] = useState(false);
+  const { hasPermission } = useAuth();
+  
+  // Filter state
+  const [studentId, setStudentId] = useState<string>("");
+  const [studentName, setStudentName] = useState<string>("");
+  const [fromDate, setFromDate] = useState<string>("");
+  const [toDate, setToDate] = useState<string>("");
+
+  // Check if user has update permission
+  const hasUpdatePermission = hasPermission("college_digiscript_reports", "UPDATE");
+
+  // Helper function to copy text to clipboard
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      console.log("Copied to clipboard:", text);
+    });
+  };
+
+  // Helper function to generate PDF URL
+  const getPdfUrl = (filePath: string) => {
+    if (!filePath) return "";
+    const cleanPath = filePath.startsWith("/") ? filePath.substring(1) : filePath;
+    return `${API_BASE_URL.replace("/api", "")}/transcripts/${cleanPath}`;
+  };
+
+  // Clear all filters
+  const clearFilters = () => {
+    setStudentId("");
+    setStudentName("");
+    setFromDate("");
+    setToDate("");
+  };
+
+  // Build ajaxData object for DataTable
+  const ajaxData: any = {};
+  if (studentId) ajaxData.STUDENT_ID = studentId;
+  if (studentName) ajaxData.STUDENT_FULL_NAME = studentName;
+  if (fromDate) ajaxData.fromDate = fromDate;
+  if (toDate) ajaxData.toDate = toDate;
+
+  return (
+    <PageWrapper>
+      <PageMeta
+        title="DigiScript Reports | College Module"
+        description="DigiScript reports and management"
+      />
+      <PageBreadcrumb pageTitle="DigiScript Reports" />
+
+      <PageContainer>
+        {/* Header */}
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="font-semibold text-gray-800 text-theme-xl dark:text-white/90 sm:text-2xl">
+            DigiScript Reports
+          </h3>
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={() => setRefreshTrigger((prev) => prev + 1)}
+              variant="outline"
+              startIcon={<RefreshIcon className="w-5 h-5" />}
+            >
+              Refresh Data
+            </Button>
+            <Button
+              onClick={() => setShowFilters(!showFilters)}
+              variant="outline"
+              startIcon={<FilterIcon className="w-5 h-5" />}
+            >
+              Filter
+            </Button>
+          </div>
+        </div>
+
+        {/* Filters Section */}
+        {showFilters && (
+          <div className="mb-6 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-900/50">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Student ID
+                </label>
+                <input
+                  type="text"
+                  value={studentId}
+                  onChange={(e) => setStudentId(e.target.value)}
+                  placeholder="Enter Student ID"
+                  className="relative w-full appearance-none rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 outline-none focus:border-brand-500 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:focus:border-brand-800"
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Student Name
+                </label>
+                <input
+                  type="text"
+                  value={studentName}
+                  onChange={(e) => setStudentName(e.target.value)}
+                  placeholder="Enter Student Name"
+                  className="relative w-full appearance-none rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 outline-none focus:border-brand-500 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:focus:border-brand-800"
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  From Date
+                </label>
+                <input
+                  type="date"
+                  value={fromDate}
+                  onChange={(e) => setFromDate(e.target.value)}
+                  className="relative w-full appearance-none rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 outline-none focus:border-brand-500 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:focus:border-brand-800"
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  To Date
+                </label>
+                <input
+                  type="date"
+                  value={toDate}
+                  onChange={(e) => setToDate(e.target.value)}
+                  className="relative w-full appearance-none rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 outline-none focus:border-brand-500 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:focus:border-brand-800"
+                />
+              </div>
+              
+              <div className="flex items-end gap-2">
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    clearFilters();
+                    setShowFilters(false);
+                  }}
+                >
+                  Clear
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* DigiScript DataTable */}
+        <DataTable
+          refreshTrigger={refreshTrigger}
+          ajaxUrl={API_ENDPOINTS.DIGISCRIPT_REPORTS_LIST}
+          ajaxData={ajaxData}
+          columns={[
+            { data: "INSTITUTION_NAME", name: "College Name", searchable: true, orderable: true },
+            { 
+              data: "INSTITUTION_ID", 
+              name: "Institution ID", 
+              searchable: true, 
+              orderable: true,
+              render: (data: any) => {
+                if (!data) return "-";
+                return (
+                  <span 
+                    className="copyinstid cursor-pointer hover:text-brand-500" 
+                    onClick={() => copyToClipboard(data)}
+                  >
+                    <i className="btn-copy-icon fa-duotone fa-paste me-1"></i>
+                    {data}
+                  </span>
+                );
+              }
+            },
+            { 
+              data: "STUDENT_ID", 
+              name: "Student ID", 
+              searchable: true, 
+              orderable: true,
+              render: (data: any) => {
+                if (!data) return "-";
+                if (hasUpdatePermission) {
+                  return (
+                    <span 
+                      className="copyinstid cursor-pointer hover:text-brand-500" 
+                      onClick={() => copyToClipboard(data)}
+                    >
+                      <i className="btn-copy-icon fa-duotone fa-paste me-1"></i>
+                      {data}
+                    </span>
+                  );
+                }
+                return <span>{data}</span>;
+              }
+            },
+            { data: "STUDENT_FULL_NAME", name: "Student Name", searchable: true, orderable: true },
+            { 
+              data: "BATCH_ID", 
+              name: "Batch ID", 
+              searchable: true, 
+              orderable: true,
+              render: (data: any) => {
+                if (!data) return "-";
+                return (
+                  <span>
+                    <span 
+                      className="copyinstid cursor-pointer hover:text-brand-500 me-2" 
+                      onClick={() => copyToClipboard(data)}
+                    >
+                      <i className="btn-copy-icon fa-duotone fa-paste me-1"></i>
+                    </span>
+                    <a 
+                      href={`/college/batchdetails/${data}`}
+                      target="_blank"
+                      className="text-brand-500 hover:underline"
+                    >
+                      {data}
+                    </a>
+                  </span>
+                );
+              }
+            },
+            { 
+              data: "FILE_PATH", 
+              name: "Transcript", 
+              searchable: false, 
+              orderable: false,
+              render: (data: any) => {
+                if (!data) return "-";
+                const pdfUrl = getPdfUrl(data);
+                if (!pdfUrl) return "-";
+                return (
+                  <a href={pdfUrl} target="_blank" rel="noopener noreferrer" className="text-brand-500 hover:underline">
+                    <i className="fa fa-link me-1"></i>
+                    View PDF
+                  </a>
+                );
+              }
+            },
+            { data: "FOUND_IN_SLATE_YN", name: "Slate Status", searchable: false, orderable: false },
+            { data: "FOUND_IN_BANNER_YN", name: "Banner Status", searchable: false, orderable: false },
+            { data: "DEGREE_CD", name: "Degree", searchable: false, orderable: false },
+            { 
+              data: "DEGREE_RECEIVED_DATE", 
+              name: "Degree Date", 
+              searchable: false, 
+              orderable: false,
+              render: (data: any) => data || "-"
+            },
+            { data: "SECOND_DEGREE_CD", name: "Second Degree", searchable: false, orderable: false },
+            { 
+              data: "SECOND_DEGREE_RECEIVED_DATE", 
+              name: "Second Degree Date", 
+              searchable: false, 
+              orderable: false,
+              render: (data: any) => data || "-"
+            },
+            { data: "EFFECTIVE_TERM", name: "Effective Term", searchable: false, orderable: false },
+            { data: "OCR_MIN_START_TERM", name: "Start Term", searchable: false, orderable: false },
+            { data: "OCR_MAX_END_TERM", name: "End Term", searchable: false, orderable: false },
+            { data: "LEVEL", name: "Level", searchable: false, orderable: false },
+            { data: "COMMENTS", name: "Comments", searchable: false, orderable: false },
+            { 
+              data: "OCR_EXTRACTED_DATE", 
+              name: "OCR Date", 
+              searchable: false, 
+              orderable: true,
+              render: (data: any) => data || "-"
+            },
+            { data: "STATUS_FLAG", name: "Status", searchable: false, orderable: false },
+          ]}
+        />
+      </PageContainer>
+    </PageWrapper>
+  );
+}
+

@@ -20,49 +20,50 @@ import { ScrollToTop } from "./components/common/ScrollToTop";
 import Home from "./pages/Dashboard/Home";
 import CollegeDashboard from "./pages/Dashboard/CollegeDashboard";
 import TranscriptReports from "./pages/College/transcriptreports/TranscriptReports";
-import ArticulationReports from "./pages/College/ArticulationReports";
-import DigiScriptReports from "./pages/College/DigiScriptReports";
-import TranscriptHdrOcr from "./pages/College/TranscriptHdrOcr";
-import TranscriptLineOcr from "./pages/College/TranscriptLineOcr";
-import TranscriptHdrData from "./pages/College/TranscriptHdrData";
-import TranscriptLineData from "./pages/College/TranscriptLineData";
-import DigiScriptBotLog from "./pages/College/DigiScriptBotLog";
-import ArticulationBotLog from "./pages/College/ArticulationBotLog";
-import StudentLogKickouts from "./pages/College/StudentLogKickouts";
-import StudentLogProcessed from "./pages/College/StudentLogProcessed";
-import StudentLogRerun from "./pages/College/StudentLogRerun";
+import ArticulationReports from "./pages/College/articulationreports/ArticulationReports";
+import DigiScriptReports from "./pages/College/digiscriptreports/DigiScriptReports";
+import TranscriptHdrOcr from "./pages/College/ocr/transcripthdrocr/TranscriptHdrOcr";
+import TranscriptLineOcr from "./pages/College/ocr/transcriptlineocr/TranscriptLineOcr";
+import TranscriptHdrData from "./pages/College/data/transcripthdrdata/TranscriptHdrData";
+import TranscriptLineData from "./pages/College/data/transcriptlinedata/TranscriptLineData";
+import DigiScriptBotLog from "./pages/College/botlogs/digiscriptbotlog/DigiScriptBotLog";
+import ArticulationBotLog from "./pages/College/botlogs/articulationbotlog/ArticulationBotLog";
+import StudentLogKickouts from "./pages/College/studentlogs/kickouts/StudentLogKickouts";
+import StudentLogProcessed from "./pages/College/studentlogs/processed/StudentLogProcessed";
+import StudentLogRerun from "./pages/College/studentlogs/rerun/StudentLogRerun";
 import StudentView from "./pages/College/StudentView";
-import TranscriptsUpload from "./pages/College/TranscriptsUpload";
-import TranscriptsList from "./pages/College/TranscriptsList";
-import StoredProcedure from "./pages/College/StoredProcedure";
-import DegreeMapping from "./pages/College/DegreeMapping";
-import TermMapping from "./pages/College/TermMapping";
-import TermNameMapping from "./pages/College/TermNameMapping";
-import GradeMapping from "./pages/College/GradeMapping";
-import SkipKeywords from "./pages/College/SkipKeywords";
-import SkipCourses from "./pages/College/SkipCourses";
-import YearMapping from "./pages/College/YearMapping";
+import TranscriptsUpload from "./pages/College/transcripts/TranscriptsUpload";
+import TranscriptsList from "./pages/College/transcripts/TranscriptsList";
+import StoredProcedure from "./pages/College/setup/storedprocedure/StoredProcedure";
+import DegreeMapping from "./pages/College/setup/degreemapping/DegreeMapping";
+import TermMapping from "./pages/College/setup/termmapping/TermMapping";
+import TermNameMapping from "./pages/College/setup/termnamemapping/TermNameMapping";
+import GradeMapping from "./pages/College/setup/grademapping/GradeMapping";
+import SkipKeywords from "./pages/College/setup/skipkeywords/SkipKeywords";
+import SkipCourses from "./pages/College/setup/skipcourses/SkipCourses";
+import YearMapping from "./pages/College/setup/yearmapping/YearMapping";
 import BotSchedule from "./pages/College/BotSchedule";
 import BotStatusReport from "./pages/College/BotStatusReport";
-import SuffixName from "./pages/College/SuffixName";
-import PrefixName from "./pages/College/PrefixName";
-import CombinedName from "./pages/College/CombinedName";
-import AcceptedGradesMapping from "./pages/College/AcceptedGradesMapping";
-import TransferGradesMapping from "./pages/College/TransferGradesMapping";
-import InstitutionMapping from "./pages/College/InstitutionMapping";
-import AccreditedInstitution from "./pages/College/AccreditedInstitution";
-import OverrideEditMapping from "./pages/College/OverrideEditMapping";
-import ErrorLog from "./pages/College/ErrorLog";
-import SmtpSetup from "./pages/College/SmtpSetup";
-import MasterSettings from "./pages/College/MasterSettings";
-import Permissions from "./pages/College/Permissions";
-import Roles from "./pages/College/Roles";
-import AddRole from "./pages/College/AddRole";
-import EditRole from "./pages/College/EditRole";
+import SuffixName from "./pages/College/setup/suffixname/SuffixName";
+import PrefixName from "./pages/College/setup/prefixname/PrefixName";
+import CombinedName from "./pages/College/setup/combinedname/CombinedName";
+import AcceptedGradesMapping from "./pages/College/setup/acceptedgradesmapping/AcceptedGradesMapping";
+import TransferGradesMapping from "./pages/College/setup/transfergradesmapping/TransferGradesMapping";
+import InstitutionMapping from "./pages/College/setup/institutionmapping/InstitutionMapping";
+import AccreditedInstitution from "./pages/College/setup/accreditedinstitution/AccreditedInstitution";
+import OverrideEditMapping from "./pages/College/setup/overrideeditmapping/OverrideEditMapping";
+import ErrorLog from "./pages/College/settings/errorlog/ErrorLog";
+import SmtpSetup from "./pages/College/settings/smtpsetup/SmtpSetup";
+import MasterSettings from "./pages/College/settings/mastersettings/MasterSettings";
+import Permissions from "./pages/College/settings/permissions/Permissions";
+import Roles from "./pages/College/settings/roles/Roles";
+import AddRole from "./pages/College/settings/roles/AddRole";
+import EditRole from "./pages/College/settings/roles/EditRole";
 import UserManagement from "./pages/College/users/UserManagement";
 import AddUser from "./pages/College/users/AddUser";
 import EditUser from "./pages/College/users/EditUser";
 import Help from "./pages/College/Help";
+import BatchDetails from "./pages/College/BatchDetails";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import PermissionRoute from "./components/auth/PermissionRoute";
 
@@ -140,6 +141,7 @@ export default function App() {
             <Route path="/college/transcriptequivalenthours" element={<PermissionRoute permission="college_equivalent_roll_mismatch" action="VIEW"><TranscriptReports /></PermissionRoute>} />
             <Route path="/college/articulationreports" element={<ArticulationReports />} />
             <Route path="/college/digiscriptreports" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><DigiScriptReports /></PermissionRoute>} />
+            <Route path="/college/batchdetails/:batchId" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><BatchDetails /></PermissionRoute>} />
             
             {/* College - Uploads */}
             <Route

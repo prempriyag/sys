@@ -61,6 +61,17 @@ except Exception as e:
     traceback.print_exc()
     articulationreports_controller = None
 
+# Import viewfile and batchdetails controllers
+try:
+    from controllers.college import viewfile_controller, batchdetails_controller
+    print("[MAIN] Successfully imported viewfile_controller and batchdetails_controller")
+except Exception as e:
+    print(f"[MAIN] ERROR importing viewfile/batchdetails controllers: {e}")
+    import traceback
+    traceback.print_exc()
+    viewfile_controller = None
+    batchdetails_controller = None
+
 # Import all models to ensure SQLAlchemy relationships are configured
 # This must happen before any queries are made
 from models import User, Role, Permission, RolePermission, BusinessSettings
@@ -300,6 +311,19 @@ if articulationreports_controller is not None:
     print(f"[MAIN] Routes: {[r.path for r in articulationreports_controller.router.routes]}")
 else:
     print("[MAIN] WARNING: articulationreports_controller router NOT registered due to import error")
+
+# Include viewfile and batchdetails routers if imported successfully
+if viewfile_controller is not None:
+    app.include_router(viewfile_controller.router)
+    print("[MAIN] Successfully registered viewfile_controller router")
+else:
+    print("[MAIN] WARNING: viewfile_controller router NOT registered due to import error")
+
+if batchdetails_controller is not None:
+    app.include_router(batchdetails_controller.router)
+    print("[MAIN] Successfully registered batchdetails_controller router")
+else:
+    print("[MAIN] WARNING: batchdetails_controller router NOT registered due to import error")
 
 # Import error log controller
 try:

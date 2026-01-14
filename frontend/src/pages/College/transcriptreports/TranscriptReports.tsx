@@ -61,7 +61,23 @@ export default function TranscriptReports() {
 
   // Helper function to generate PDF URL
   const getPdfUrl = (filePath: string, type: "transcript" | "articulation" = "transcript") => {
-    if (!filePath) return "";
+    if (!filePath || filePath === "" || filePath === null || filePath === undefined) {
+      return "";
+    }
+    
+    // If backend already returns a full URL (starts with http), use it as-is
+    if (filePath.startsWith("http://") || filePath.startsWith("https://")) {
+      return filePath;
+    }
+    
+    // If backend returns a relative URL starting with /api/viewfile, prepend base URL
+    if (filePath.startsWith("/api/viewfile")) {
+      // API_BASE_URL is already "http://localhost:8000" (without /api)
+      // So we can use it directly
+      return `${API_BASE_URL}${filePath}`;
+    }
+    
+    // For backward compatibility: if we get a raw file path (shouldn't happen now)
     // Remove leading slash if present
     const cleanPath = filePath.startsWith("/") ? filePath.substring(1) : filePath;
     // Construct URL - adjust base path as needed
@@ -131,7 +147,9 @@ export default function TranscriptReports() {
           if ((!searchField || searchField === "Processed" || searchField === "equivalenthours") && hasUpdatePermission) {
             return (
               <a 
-                href={`/college/transcriptreports?batch_id=${row.BATCH_ID}&student_id=${data}`}
+                href={`/college/studentview?student_id=${data}`}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="text-brand-500 hover:underline"
               >
                 {data}
@@ -154,6 +172,8 @@ export default function TranscriptReports() {
             return (
               <a 
                 href={`/college/transcriptreports?batch_id=${row.BATCH_ID}&slate_ref_number=${data}`}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="text-brand-500 hover:underline"
               >
                 {data}
@@ -172,17 +192,22 @@ export default function TranscriptReports() {
         render: (data: any) => {
           if (!data) return "-";
           return (
-            <span>
+            <span className="copyinstid" id={data}>
+              <i 
+                className="btn-copy-icon fa-duotone fa-paste me-1 cursor-pointer hover:text-brand-500" 
+                onClick={() => copyToClipboard(data)}
+                style={{ cursor: "pointer" }}
+                title="Copy to clipboard"
+              ></i>
               <a 
-                href={`/college/transcriptreports?batch_id=${data}`}
-                className="text-brand-500 hover:underline me-2"
+                href={`/college/batchdetails/${data}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-brand-500 hover:underline"
               >
                 {data}
               </a>
-              <i 
-                className="btn-copy-icon fa-duotone fa-paste cursor-pointer hover:text-brand-500" 
-                onClick={() => copyToClipboard(data)}
-              ></i>
+              <input type="hidden" className="record_batch_id" value={data} />
             </span>
           );
         }
@@ -217,12 +242,27 @@ export default function TranscriptReports() {
         name: "Error Screenshot", 
         searchable: false, 
         orderable: false,
-        render: (data: any) => {
-          if (!data) return "-";
-          const imageUrl = data.startsWith("http") ? data : `${API_BASE_URL.replace("/api", "")}/screenshots/${data}`;
+        render: (data: any, row: any) => {
+          // Check if ERROR_SCREENSHOT exists (matches CI3: if ($record->ERROR_SCREENSHOT != '' || !empty($record->ERROR_SCREENSHOT))
+          // Backend returns raw ERROR_SCREENSHOT value (file path) or None/null if empty
+          // We need to check if it's not empty, then construct URL from batch ID
+          if (!data || data === "" || data === null || data === undefined) {
+            return "-";
+          }
+          
+          // Backend returns raw ERROR_SCREENSHOT value, construct URL from batch ID
+          // Matches CI3: $imageurl = base_url() . 'errorscreenshot/' . $record->BATCH_ID;
+          const batchId = row?.BATCH_ID || "";
+          if (!batchId) {
+            return "-";
+          }
+          
+          // Construct URL: API_BASE_URL is "http://localhost:8000", so we need /api/viewfile/errorscreenshot/{batchId}
+          const imageUrl = `${API_BASE_URL}/api/viewfile/errorscreenshot/${batchId}`;
+          
           return (
             <a href={imageUrl} target="_blank" rel="noopener noreferrer" className="text-brand-500 hover:underline">
-              View Screenshot
+              <span className="fa fa-eye"></span>
             </a>
           );
         }
@@ -236,12 +276,23 @@ export default function TranscriptReports() {
         searchable: false, 
         orderable: false,
         render: (data: any, _row: any) => {
-          if (!data) return "-";
+          // Backend returns encrypted URL or None/null if transcript_link is empty
+          // Matches CI3 line 693: always shows link structure if transcript_link exists
+          if (!data || data === "" || data === null || data === undefined) {
+            return "-";
+          }
+          
+          // Backend already returns encrypted URL like: /api/viewfile/transcript_file?pdf={encrypted}
+          // getPdfUrl will prepend API_BASE_URL to make it a full URL
           const pdfUrl = getPdfUrl(data, "transcript");
-          if (!pdfUrl) return "-";
+          
+          if (!pdfUrl || pdfUrl === "") {
+            return "-";
+          }
+          
           return (
             <a href={pdfUrl} target="_blank" rel="noopener noreferrer" className="text-brand-500 hover:underline">
-              View PDF
+              <span className="fa fa-link"></span>
             </a>
           );
         }
@@ -302,12 +353,20 @@ export default function TranscriptReports() {
         searchable: false, 
         orderable: false,
         render: (data: any) => {
-          if (!data) return "-";
+          // Backend returns encrypted URL or None/null if transfer_letter_link is empty
+          // Matches CI3: only shows link if TRANSFER_LETTER_FILE_LINK is not empty
+          if (!data || data === "" || data === null || data === undefined) {
+            return "-";
+          }
+          
           const pdfUrl = getPdfUrl(data, "articulation");
-          if (!pdfUrl) return "-";
+          if (!pdfUrl || pdfUrl === "") {
+            return "-";
+          }
+          
           return (
             <a href={pdfUrl} target="_blank" rel="noopener noreferrer" className="text-brand-500 hover:underline">
-              View PDF
+              <span className="fa fa-link"></span>
             </a>
           );
         }

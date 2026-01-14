@@ -9,6 +9,20 @@ export const API_ENDPOINTS = {
   TRANSCRIPT_REPORTS: "/api/transcriptreports",
   TRANSCRIPT_REPORTS_LIST: "/api/transcriptreports/ajaxlist",
   ARTICULATION_REPORTS_LIST: "/api/articulationreports/ajaxlist",
+  DIGISCRIPT_REPORTS_LIST: "/api/digiscriptreports/ajaxlist",
+  TRANSCRIPT_HDR_OCR_LIST: "/api/transcripthdrocr/ajaxlist",
+  TRANSCRIPT_LINE_OCR_LIST: "/api/transcriptlineocr/ajaxlist",
+  TRANSCRIPT_HDR_DATA_LIST: "/api/transcripthdrdata/ajaxlist",
+  TRANSCRIPT_LINE_DATA_LIST: "/api/transcriptlinedata/ajaxlist",
+  DIGISCRIPT_BOT_LOG_LIST: "/api/digiscriptbotlog/ajaxlist",
+  ARTICULATION_BOT_LOG_LIST: "/api/articulationbotlog/ajaxlist",
+  TRANSCRIPTS_LIST: "/api/transcripts/ajaxlist",
+  TRANSCRIPTS_UPLOAD: "/api/transcripts/upload",
+  TRANSCRIPTS_SOURCES: "/api/transcripts/sources",
+  DEGREE_MAPPING_LIST: "/api/degreemapping/ajaxlist",
+  TERM_MAPPING_LIST: "/api/termmapping/ajaxlist",
+  TERM_NAME_MAPPING_LIST: "/api/termnamemapping/ajaxlist",
+  GRADE_MAPPING_LIST: "/api/grademapping/ajaxlist",
   TRANSCRIPTS_LIST: "/api/transcripts/ajaxlist",
   // Users endpoints
   USERS: "/api/users",
@@ -59,12 +73,6 @@ export const apiRequest = async (
   });
 
   if (!response.ok) {
-    if (response.status === 401) {
-      // Unauthorized - clear token and redirect to login
-      removeAuthToken();
-      window.location.href = "/signin";
-    }
-    
     // Try to get error message from response
     let errorMessage = `API Error: ${response.status} ${response.statusText}`;
     try {
@@ -74,6 +82,20 @@ export const apiRequest = async (
       }
     } catch {
       // If JSON parsing fails, use default message
+    }
+    
+    // Only redirect on 401 if we're NOT on the login page
+    // This prevents page refresh when login fails
+    if (response.status === 401) {
+      const currentPath = window.location.pathname;
+      // Don't redirect if we're already on login page (allows error to be displayed)
+      if (currentPath !== "/login" && !currentPath.includes("/login")) {
+        removeAuthToken();
+        window.location.href = "/login";
+        return response; // Return early to prevent throwing error during redirect
+      }
+      // If on login page, just clear token but don't redirect
+      removeAuthToken();
     }
     
     const error = new Error(errorMessage);

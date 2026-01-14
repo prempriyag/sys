@@ -19,54 +19,54 @@ export const collegeMenu: MenuConfig = {
     {
       name: "Transcripts",
       icon: "file-text",
-      permissions: ["college_transcripts_kickouts", "transcript_articulationkickouts", "college_processed", "college_rerun"],
+      permissions: ["college_transcripts_kickouts", "transcript_articulationkickouts", "college_processed", "college_rerun","college_digiscript_reports"],
       subItems: [
         {
           name: "Transcript Kickouts",
           path: "/college/transcriptkickouts",
-          permission: "college_transcripts_kickouts",
+          permission: "college_digiscript_reports",
         },
         {
           name: "Articulation Kickouts",
           path: "/college/transcript_articulationkickouts",
-          permission: "college_transcripts_kickouts",
+          permission: "college_digiscript_reports",
         },
         {
           name: "Processed",
           path: "/college/transcriptprocessed",
-          permission: "college_processed",
+          permission: "college_digiscript_reports",
         },
         {
           name: "Rerun",
-          path: "/college/reprocessed",
-          permission: "college_rerun",
+          path: "/college/transcriptrerun",
+          permission: "college_digiscript_reports",
         },
       ],
     },
     {
       name: "Articulation",
       icon: "settings",
-      permissions: ["articulation_kickouts", "articulation_phase2_kickouts", "articulation_processed", "articulation_rerun"],
+      permissions: ["articulation_kickouts", "articulation_phase2_kickouts", "articulation_processed", "articulation_rerun","college_digiscript_reports"],
       subItems: [
         {
           name: "Kickouts",
           path: "/college/articulationkickouts",
-          permission: "articulation_kickouts",
+          permission: "college_digiscript_reports",
         },
         {
           name: "Phase-2 Kickouts",
           path: "/college/articulationphase2kickouts",
-          permission: "articulation_phase2_kickouts",
+          permission: "college_digiscript_reports",
         },
         {
           name: "Processed",
           path: "/college/articulationprocessed",
-          permission: "articulation_processed",
+          permission: "college_digiscript_reports",
         },
         {
           name: "Rerun",
           path: "/college/articulationrerun",
-          permission: "articulation_rerun",
+          permission: "college_digiscript_reports",
         },
       ],
     },

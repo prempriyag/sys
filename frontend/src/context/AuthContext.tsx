@@ -134,7 +134,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     localStorage.removeItem("user_permissions");
     setUser(null);
     setPermissions(null);
-    navigate("/signin");
+    navigate("/login");
   };
 
   // Check if user has a specific permission (similar to checkpermission in PHP)

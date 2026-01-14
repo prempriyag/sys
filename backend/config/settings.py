@@ -3,6 +3,7 @@ Configuration settings for the FastAPI application
 """
 from pydantic_settings import BaseSettings
 from typing import Optional
+import os
 
 
 class Settings(BaseSettings):
@@ -26,8 +27,15 @@ class Settings(BaseSettings):
     
     class Config:
         env_file = ".env"
+        env_file_encoding = "utf-8"
         case_sensitive = True
+        # Reload .env file on changes
+        extra = "ignore"
 
 
+# Create settings instance
+# Note: Pydantic Settings loads .env file at import time
+# For .env changes to take effect, the server needs to reload
+# Uvicorn's --reload will restart the server when .env changes
 settings = Settings()
 

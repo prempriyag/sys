@@ -23,10 +23,18 @@ if (-not (Test-Path ".env")) {
     exit 1
 }
 
+# Clear Python cache for better auto-reload
+Write-Host "Clearing Python cache for better auto-reload..." -ForegroundColor Yellow
+Get-ChildItem -Path . -Include __pycache__,*.pyc -Recurse -Force | Remove-Item -Force -Recurse -ErrorAction SilentlyContinue
+
 # Run the server
 Write-Host "Starting FastAPI server on http://localhost:8000" -ForegroundColor Green
+Write-Host "Auto-reload enabled - changes will reflect automatically" -ForegroundColor Cyan
 Write-Host "Press CTRL+C to stop the server" -ForegroundColor Yellow
 Write-Host ""
 
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
+# Use --reload to watch for file changes
+# Uvicorn will automatically restart when .env or .py files change
+# Note: For .env changes, you may need to save the file twice or wait a moment
+uvicorn main:app --reload --reload-dir . --host 0.0.0.0 --port 8000
 

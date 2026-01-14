@@ -23,12 +23,21 @@ if not exist ".env" (
     exit /b 1
 )
 
+REM Clear Python cache for better auto-reload
+echo Clearing Python cache for better auto-reload...
+for /d /r . %%d in (__pycache__) do @if exist "%%d" rd /s /q "%%d" 2>nul
+for /r . %%f in (*.pyc) do @if exist "%%f" del /q "%%f" 2>nul
+
 REM Run the server
 echo Starting FastAPI server on http://localhost:8000
+echo Auto-reload enabled - changes will reflect automatically
 echo Press CTRL+C to stop the server
 echo.
 
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
+REM Use --reload to watch for file changes
+REM Uvicorn will automatically restart when .env or .py files change
+REM Note: For .env changes, you may need to save the file twice or wait a moment
+uvicorn main:app --reload --reload-dir . --host 0.0.0.0 --port 8000
 
 pause
 

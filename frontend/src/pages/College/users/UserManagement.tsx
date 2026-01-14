@@ -27,7 +27,7 @@ export default function UserManagement() {
       setError("You are not authenticated. Please login again.");
       // Redirect will be handled by ProtectedRoute, but we can also do it here
       setTimeout(() => {
-        navigate("/signin");
+        navigate("/login");
       }, 2000);
     }
   }, [isAuthenticated, navigate]);

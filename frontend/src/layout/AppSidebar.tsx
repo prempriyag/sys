@@ -28,19 +28,6 @@ const AppSidebar: React.FC = () => {
   // Similar to how PHP sidebar filters menu items using checkpermission and checkallpermission
   const filterMenuItems = useCallback((items: MenuItem[]): MenuItem[] => {
     if (!user) return []; // If no user, no permissions, so no menu items
-console.log('myuser:',user);
-    // Debug: Log permissions for troubleshooting
-    const storedPermissions = localStorage.getItem("user_permissions");
-    if (storedPermissions) {
-      try {
-        const parsedPerms = JSON.parse(storedPermissions);
-        console.log("[AppSidebar] User permissions loaded:", Object.keys(parsedPerms).length, "permissions");
-      } catch (e) {
-        console.error("[AppSidebar] Error parsing permissions:", e);
-      }
-    } else {
-      console.warn("[AppSidebar] No permissions found in localStorage");
-    }
 
     return items.filter((item) => {
       // If item has NO permission requirement, show it (like Dashboard and User Manual)
@@ -52,7 +39,6 @@ console.log('myuser:',user);
       if (item.permissions && item.permissions.length > 0) {
         const hasAny = checkAnyPermission(user, item.permissions, "VIEW");
         if (!hasAny) {
-          console.log(`[AppSidebar] Filtering out "${item.name}" - missing permissions:`, item.permissions);
           return false; // Hide item if user doesn't have any of the permissions
         }
       }
@@ -61,7 +47,6 @@ console.log('myuser:',user);
       if (item.permission) {
         const hasPerm = checkPermission(user, item.permission, "VIEW");
         if (!hasPerm) {
-          console.log(`[AppSidebar] Filtering out "${item.name}" - missing permission:`, item.permission);
           return false; // Hide item if user doesn't have permission
         }
       }
@@ -71,7 +56,6 @@ console.log('myuser:',user);
         const filteredSubItems = filterMenuItems(item.subItems);
         // Keep parent item only if it has at least one visible subItem
         if (filteredSubItems.length === 0) {
-          console.log(`[AppSidebar] Filtering out parent "${item.name}" - all subitems filtered`);
           return false;
         }
         item.subItems = filteredSubItems;

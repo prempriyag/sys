@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from "react";
 import { Table, TableHeader, TableBody, TableRow, TableCell } from "./table";
 import Input from "../form/input/InputField";
-import { getAuthToken, removeAuthToken } from "../../config/api";
+import { getAuthToken, removeAuthToken, API_BASE_URL } from "../../config/api";
 
 interface Column {
   data: string;
@@ -33,10 +33,7 @@ interface DataTableResponse {
   draw: number;
   recordsTotal?: number;
   recordsFiltered?: number;
-  iTotalRecords?: number; // Alternative format
-  iTotalDisplayRecords?: number; // Alternative format
   data?: any[];
-  aaData?: any[]; // Alternative data format
 }
 
 const DataTableComponent = (props: DataTableProps, ref: React.ForwardedRef<DataTableRef>): React.ReactElement => {
@@ -105,28 +102,18 @@ const DataTableComponent = (props: DataTableProps, ref: React.ForwardedRef<DataT
   const fetchData = useCallback(async () => {
     const startTime = performance.now();
     callCountRef.current += 1;
-    const callId = callCountRef.current;
     const currentDraw = drawRef.current;
     
     // Check token before making request
     const token = getAuthToken();
     if (!token) {
-      console.error(`[DataTable] AJAX Call #${callId} - No token found`);
+      // No token found - will be handled by API
       removeAuthToken();
-      window.location.href = "/signin";
+      window.location.href = "/login";
       return;
     }
     
-    console.log(`[DataTable] AJAX Call #${callId} - Starting`, {
-      draw: currentDraw,
-      start,
-      length,
-      order,
-      globalSearch,
-      columnSearch,
-      timestamp: new Date().toISOString(),
-      tokenPresent: !!token,
-    });
+    // Starting AJAX call
 
     setLoading(true);
     try {
@@ -138,7 +125,7 @@ const DataTableComponent = (props: DataTableProps, ref: React.ForwardedRef<DataT
         columns: columns.map((col, idx) => {
           const searchValue = columnSearch[idx] || "";
           if (searchValue) {
-            console.log(`[DataTable] Sending column search in request: idx=${idx}, data="${col.data}", value="${searchValue}"`);
+            // Sending column search
           }
           return {
             data: col.data,
@@ -159,7 +146,10 @@ const DataTableComponent = (props: DataTableProps, ref: React.ForwardedRef<DataT
         ...(ajaxData || {}),
       };
 
-      const response = await fetch(ajaxUrl, {
+      // Construct full URL - if ajaxUrl is relative, prepend API_BASE_URL
+      const fullUrl = ajaxUrl.startsWith("http") ? ajaxUrl : `${API_BASE_URL}${ajaxUrl}`;
+      
+      const response = await fetch(fullUrl, {
         method: method,
         headers: {
           "Content-Type": "application/json",
@@ -175,7 +165,7 @@ const DataTableComponent = (props: DataTableProps, ref: React.ForwardedRef<DataT
         // Handle 401 Unauthorized
         if (response.status === 401) {
           removeAuthToken();
-          window.location.href = "/signin";
+          window.location.href = "/login";
           throw new Error("Session expired. Please login again.");
         }
         // Try to get error message from response
@@ -194,30 +184,15 @@ const DataTableComponent = (props: DataTableProps, ref: React.ForwardedRef<DataT
       }
 
       const result: DataTableResponse = await response.json();
-      setData(result.aaData || result.data || []);
-      // Support both formats: recordsTotal/recordsFiltered and iTotalRecords/iTotalDisplayRecords
-      setRecordsTotal(result.recordsTotal || result.iTotalRecords || 0);
-      setRecordsFiltered(result.recordsFiltered || result.iTotalDisplayRecords || 0);
+      setData(result.data || []);
+      setRecordsTotal(result.recordsTotal || 0);
+      setRecordsFiltered(result.recordsFiltered || 0);
       drawRef.current += 1;
 
-      console.log(`[DataTable] AJAX Call #${callId} - Completed`, {
-        duration: `${duration.toFixed(2)}ms`,
-        recordsReturned: result.aaData?.length || result.data?.length || 0,
-        recordsTotal: result.recordsTotal,
-        recordsFiltered: result.recordsFiltered,
-        timestamp: new Date().toISOString(),
-      });
+      // AJAX call completed
     } catch (error) {
-      const endTime = performance.now();
-      const duration = endTime - startTime;
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      const currentToken = getAuthToken();
-      console.error(`[DataTable] AJAX Call #${callId} - Failed`, {
-        duration: `${duration.toFixed(2)}ms`,
-        error: errorMessage,
-        timestamp: new Date().toISOString(),
-        token: currentToken ? "Present" : "Missing",
-      });
+      // AJAX call failed
       
       // If it's an authentication error, the redirect should have already happened
       // But we still need to clear the data
@@ -230,7 +205,7 @@ const DataTableComponent = (props: DataTableProps, ref: React.ForwardedRef<DataT
     } finally {
       setLoading(false);
     }
-  }, [start, length, order, globalSearch, columnSearch, columns, ajaxUrl, method]);
+  }, [start, length, order, globalSearch, columnSearch, columns, ajaxUrl, method, ajaxData]);
 
   // Track previous values to detect actual changes
   const prevValuesRef = useRef({
@@ -240,6 +215,7 @@ const DataTableComponent = (props: DataTableProps, ref: React.ForwardedRef<DataT
     orderDir: order.dir,
     globalSearch,
     columnSearch: JSON.stringify(columnSearch),
+    ajaxData: JSON.stringify(ajaxData || {}),
     refreshTrigger,
     isInitialMount: true,
   });
@@ -253,12 +229,14 @@ const DataTableComponent = (props: DataTableProps, ref: React.ForwardedRef<DataT
       orderDir: order.dir,
       globalSearch,
       columnSearch: JSON.stringify(columnSearch),
+      ajaxData: JSON.stringify(ajaxData || {}),
       refreshTrigger,
     };
 
     const prev = prevValuesRef.current;
     const isGlobalSearchChange = prev.globalSearch !== currentValues.globalSearch;
     const isColumnSearchChange = prev.columnSearch !== currentValues.columnSearch;
+    const isAjaxDataChange = prev.ajaxData !== currentValues.ajaxData;
     const isPaginationChange = prev.start !== currentValues.start || 
                               prev.length !== currentValues.length;
     const isSortChange = prev.orderColumn !== currentValues.orderColumn || 
@@ -287,13 +265,17 @@ const DataTableComponent = (props: DataTableProps, ref: React.ForwardedRef<DataT
 
     // Handle column search changes immediately (Enter/blur from column inputs)
     if (isColumnSearchChange && !isInitialMount) {
-      console.log(`[DataTable] Column search changed, triggering fetch:`, {
-        prev: prev.columnSearch,
-        current: currentValues.columnSearch,
-        columnSearch: columnSearch
-      });
       prevValuesRef.current = { ...currentValues, isInitialMount: false };
       setStart(0); // Reset to first page when search changes
+      drawRef.current = 1;
+      fetchData();
+      return;
+    }
+
+    // Handle ajaxData changes (filter changes from parent)
+    if (isAjaxDataChange && !isInitialMount) {
+      prevValuesRef.current = { ...currentValues, isInitialMount: false };
+      setStart(0); // Reset to first page when filters change
       drawRef.current = 1;
       fetchData();
       return;
@@ -327,7 +309,7 @@ const DataTableComponent = (props: DataTableProps, ref: React.ForwardedRef<DataT
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [start, length, order.column, order.dir, globalSearch, columnSearch, refreshTrigger]);
+  }, [start, length, order.column, order.dir, globalSearch, columnSearch, refreshTrigger, ajaxData]);
 
   // Sync input values with applied search values when search is cleared externally
   useEffect(() => {
@@ -402,7 +384,7 @@ const DataTableComponent = (props: DataTableProps, ref: React.ForwardedRef<DataT
 
   const applyColumnSearch = (columnIndex: number, value: string) => {
     const trimmedValue = value.trim();
-    console.log(`[DataTable] Applying column search: columnIndex=${columnIndex}, value="${trimmedValue}"`);
+    // Applying column search
     
     // Apply the search value (triggers API call via useEffect)
     setColumnSearch((prev) => {
@@ -413,7 +395,7 @@ const DataTableComponent = (props: DataTableProps, ref: React.ForwardedRef<DataT
         // Remove key if value is empty
         delete newSearch[columnIndex];
       }
-      console.log(`[DataTable] Updated columnSearch:`, newSearch);
+      // Updated column search
       return newSearch;
     });
     // Update input value to match applied value
@@ -496,20 +478,6 @@ const DataTableComponent = (props: DataTableProps, ref: React.ForwardedRef<DataT
       return newSet;
     });
   };
-
-  // Log pagination state
-  useEffect(() => {
-    console.log(`[DataTable] Pagination State`, {
-      start,
-      length,
-      recordsFiltered,
-      recordsTotal,
-      totalPages,
-      currentPage,
-      dataLength: data.length,
-      callCount: callCountRef.current,
-    });
-  }, [start, length, recordsFiltered, recordsTotal, data.length]); // Removed totalPages and currentPage as they're derived values
 
   return (
     <div className="w-full" style={{ width: '100%', overflow: 'hidden', maxWidth: '100%' }}>
@@ -675,7 +643,14 @@ const DataTableComponent = (props: DataTableProps, ref: React.ForwardedRef<DataT
                       >
                         {column.render
                           ? column.render(row[column.data], row)
-                          : String(row[column.data] || "-")}
+                          : (() => {
+                              const value = row[column.data];
+                              // Check if value contains HTML tags
+                              if (value && typeof value === 'string' && /<[^>]+>/.test(value)) {
+                                return <span dangerouslySetInnerHTML={{ __html: value }} />;
+                              }
+                              return String(value || "-");
+                            })()}
                       </TableCell>
                     );
                   })}

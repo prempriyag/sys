@@ -16,7 +16,6 @@ import { useAuth } from "../context/AuthContext";
  */
 export const checkPermission = (user: any, permission: string, action: string = "VIEW", currentModule?: string): boolean => {
   if (!user || !permission) {
-    console.log(`[checkPermission] Missing user or permission:`, { user: !!user, permission });
     return false;
   }
 
@@ -32,14 +31,12 @@ export const checkPermission = (user: any, permission: string, action: string = 
       try {
         userPermissions = JSON.parse(storedPermissions);
       } catch (error) {
-        console.error("[checkPermission] Error parsing permissions from localStorage:", error);
         return false;
       }
     }
   }
 
   if (!userPermissions) {
-    console.log(`[checkPermission] No permissions found for user`);
     return false;
   }
 
@@ -47,13 +44,11 @@ export const checkPermission = (user: any, permission: string, action: string = 
   
   // Check if permission exists
   if (!userPermissions[permission]) {
-    console.log(`[checkPermission] Permission "${permission}" not found in user permissions. Available:`, Object.keys(userPermissions));
     return false;
   }
 
   // Check if action is allowed
   if (userPermissions[permission][actionUpper] === undefined) {
-    console.log(`[checkPermission] Action "${actionUpper}" not found for permission "${permission}"`);
     return false;
   }
 
@@ -67,15 +62,6 @@ export const checkPermission = (user: any, permission: string, action: string = 
   const pagePerm = userMainPermission(user, currentModule);
   
   const result = isAllowed && pagePerm;
-  console.log(`[checkPermission] Permission check:`, { 
-    permission, 
-    action: actionUpper, 
-    actionValue,
-    isAllowed, 
-    pagePerm, 
-    result 
-  });
-  
   return result;
 };
 
@@ -94,7 +80,6 @@ export const checkAnyPermission = (
   action: string = "VIEW"
 ): boolean => {
   if (!user || !Array.isArray(permissions) || permissions.length === 0) {
-    console.log(`[checkAnyPermission] Invalid input:`, { user: !!user, permissionsLength: permissions?.length });
     return false;
   }
 
@@ -109,14 +94,12 @@ export const checkAnyPermission = (
       try {
         userPermissions = JSON.parse(storedPermissions);
       } catch (error) {
-        console.error("[checkAnyPermission] Error parsing permissions from localStorage:", error);
         return false;
       }
     }
   }
 
   if (!userPermissions) {
-    console.log(`[checkAnyPermission] No permissions object found. Checking:`, permissions);
     return false;
   }
 
@@ -131,25 +114,11 @@ export const checkAnyPermission = (
       // Check if value is 1 (number) or '1' (string) - matching PHP behavior
       const isAllowed = actionValue === 1 || String(actionValue) === '1';
       if (isAllowed) {
-        console.log(`[checkAnyPermission] Found allowed permission:`, permission, `(${actionUpper}=${actionValue})`);
         return true;
       }
     }
     return false;
   });
-  
-  if (!result) {
-    console.log(`[checkAnyPermission] No matching permissions found. Checking:`, permissions);
-    console.log(`[checkAnyPermission] Available permissions:`, Object.keys(userPermissions));
-    // Log what values we found for the requested permissions
-    permissions.forEach(perm => {
-      if (userPermissions![perm]) {
-        console.log(`[checkAnyPermission] Permission "${perm}" exists with ${actionUpper}=${userPermissions![perm][actionUpper]}`);
-      } else {
-        console.log(`[checkAnyPermission] Permission "${perm}" NOT found in user permissions`);
-      }
-    });
-  }
   
   return result;
 };
@@ -164,7 +133,6 @@ export const checkAnyPermission = (
  */
 export const userMainPermission = (user: any, currentModule: string = 'college'): boolean => {
   if (!user) {
-    console.log("[userMainPermission] No user provided");
     return false;
   }
 
@@ -183,15 +151,6 @@ export const userMainPermission = (user: any, currentModule: string = 'college')
     hasAccess = true;
   } else if (moduleType === 'ocrverify' && (user.ocr_perm === 1 || user.ocr_perm === '1')) {
     hasAccess = true;
-  }
-  
-  if (!hasAccess) {
-    console.log("[userMainPermission] User has no access to module:", {
-      moduleType,
-      college_perm: user.college_perm,
-      hs_perm: user.hs_perm,
-      ocr_perm: user.ocr_perm
-    });
   }
   
   return hasAccess;

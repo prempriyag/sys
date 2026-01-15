@@ -2,6 +2,9 @@ import { useEffect, useRef, useState } from "react";
 
 import { Link } from "react-router";
 import { useSidebar } from "../context/SidebarContext";
+import { useThemeColor } from "../context/ThemeColorContext";
+import { useMenuLayout } from "../context/MenuLayoutContext";
+import { useModule } from "../context/ModuleContext";
 import { ThemeToggleButton } from "../components/common/ThemeToggleButton";
 import NotificationDropdown from "../components/header/NotificationDropdown";
 import UserDropdown from "../components/header/UserDropdown";
@@ -12,6 +15,10 @@ const AppHeader: React.FC = () => {
   const [isApplicationMenuOpen, setApplicationMenuOpen] = useState(false);
 
   const { isMobileOpen, toggleSidebar, toggleMobileSidebar } = useSidebar();
+  const { headerBgColor, headerTextColor } = useThemeColor();
+  const { menuLayout } = useMenuLayout();
+  const { currentModule } = useModule();
+  const { logoLightUrl, logoDarkUrl } = useThemeColor();
 
   const handleToggle = () => {
     if (window.innerWidth >= 1024) {
@@ -43,9 +50,39 @@ const AppHeader: React.FC = () => {
   }, []);
 
   return (
-    <header className="sticky top-0 flex w-full bg-white border-gray-200 z-99999 dark:border-gray-800 dark:bg-gray-900 lg:border-b">
+    <header 
+      className="sticky top-0 flex w-full border-gray-200 z-99999 dark:border-gray-800 lg:border-b"
+      style={{
+        backgroundColor: headerBgColor,
+        color: headerTextColor,
+      }}
+    >
       <div className="flex flex-col items-center justify-between grow lg:flex-row lg:px-4">
         <div className="flex items-center justify-between w-full gap-2 px-3 py-3 border-b border-gray-200 dark:border-gray-800 sm:gap-4 lg:justify-normal lg:border-b-0 lg:px-0 lg:py-4">
+          {/* Logo for horizontal menu - before hamburger */}
+          {menuLayout === "horizontal" && (
+            <Link
+              to={currentModule === "college" ? "/dashboard" : `/${currentModule}/dashboard`}
+              className="mr-4 hidden lg:block"
+            >
+              <img
+                className="dark:hidden object-contain h-10"
+                src={logoLightUrl}
+                alt="Logo"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = "/images/logo/connors-color.png";
+                }}
+              />
+              <img
+                className="hidden dark:block object-contain h-10"
+                src={logoDarkUrl}
+                alt="Logo"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = "/images/logo/connors-white.png";
+                }}
+              />
+            </Link>
+          )}
           <button
             className="items-center justify-center w-10 h-10 text-gray-500 border-gray-200 rounded-lg z-99999 dark:border-gray-800 lg:flex dark:text-gray-400 lg:h-11 lg:w-11 lg:border"
             onClick={handleToggle}

@@ -110,9 +110,9 @@ export default function UserManagement() {
       <PageContainer>
         {/* Header */}
         <div className="mb-3 flex items-center justify-between">
-          {/* <h3 className="font-semibold text-gray-800 text-theme-xl dark:text-white/90 sm:text-2xl">
+          <h3 className="font-semibold text-gray-800 text-theme-xl dark:text-white/90 sm:text-2xl">
             User Management
-          </h3> */}
+          </h3>
           <Button
             onClick={() => navigate("/college/users/add")}
           >

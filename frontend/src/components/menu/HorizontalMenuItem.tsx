@@ -27,68 +27,179 @@ export default function HorizontalMenuItem({
   const key = `${index}`;
   const isSubmenuOpen = openSubmenu[key] || false;
 
-  // Check permission for this item
-  if (item.permission && !checkPermission(item.permission, user)) {
-    return null;
-  }
-
   const isActive = (path?: string) => {
     if (!path) return false;
     const pathWithoutQuery = path.split("?")[0];
     return location.pathname === pathWithoutQuery || location.pathname.startsWith(pathWithoutQuery + "/");
   };
 
-  // Check permission for this item
-  if (item.permission && !checkPermission(item.permission, user)) {
+  // Check permission for this item (single permission)
+  if (item.permission && !checkPermission(user, item.permission, "VIEW")) {
     return null;
+  }
+  
+  // Check permissions array (show if user has ANY of the permissions)
+  if (item.permissions && item.permissions.length > 0) {
+    const hasAnyPermission = item.permissions.some(perm => checkPermission(user, perm, "VIEW"));
+    if (!hasAnyPermission) {
+      return null;
+    }
   }
 
   const isItemActive = isActive(item.path);
   const hasSubItems = item.subItems && item.subItems.length > 0;
 
-  // Calculate dropdown position
+  // Calculate dropdown position - update on scroll and resize
   useEffect(() => {
     if (isSubmenuOpen && buttonRef.current && dropdownRef.current) {
-      const buttonRect = buttonRef.current.getBoundingClientRect();
-      dropdownRef.current.style.position = "fixed";
-      dropdownRef.current.style.top = `${buttonRect.bottom + 4}px`;
-      dropdownRef.current.style.left = `${buttonRect.left}px`;
+      const updatePosition = () => {
+        if (buttonRef.current && dropdownRef.current) {
+          const buttonRect = buttonRef.current.getBoundingClientRect();
+          dropdownRef.current.style.position = "fixed";
+          dropdownRef.current.style.top = `${buttonRect.bottom + 4}px`;
+          dropdownRef.current.style.left = `${buttonRect.left}px`;
+        }
+      };
+      
+      // Initial position
+      updatePosition();
+      
+      // Update on scroll
+      window.addEventListener('scroll', updatePosition, true);
+      window.addEventListener('resize', updatePosition);
+      
+      return () => {
+        window.removeEventListener('scroll', updatePosition, true);
+        window.removeEventListener('resize', updatePosition);
+      };
     }
   }, [isSubmenuOpen]);
 
   if (!hasSubItems) {
+    // Show icon only for Dashboard and User Management
+    const showIconOnly = item.name === "Dashboard" || item.name === "User Management";
+    const tooltipRef = useRef<HTMLDivElement>(null);
+    const iconRef = useRef<HTMLSpanElement>(null);
+    const [showTooltip, setShowTooltip] = useState(false);
+    const [tooltipPosition, setTooltipPosition] = useState<{ top: number; left: number; placement: "top" | "bottom" } | null>(null);
+    
+    // Check tooltip position on hover - use portal to escape scroll container
+    useEffect(() => {
+      if (showIconOnly && iconRef.current) {
+        const updateTooltipPosition = () => {
+          if (!iconRef.current) return;
+          const iconRect = iconRef.current.getBoundingClientRect();
+          const viewportHeight = window.innerHeight;
+          const spaceAbove = iconRect.top;
+          const spaceBelow = viewportHeight - iconRect.bottom;
+          const tooltipHeight = 32; // Approximate tooltip height
+          
+          // Calculate position
+          let top: number;
+          let placement: "top" | "bottom";
+          
+          if (spaceBelow >= tooltipHeight + 8 || spaceAbove < tooltipHeight + 8) {
+            // Show below
+            top = iconRect.bottom + 8;
+            placement = "bottom";
+          } else {
+            // Show above
+            top = iconRect.top - tooltipHeight - 8;
+            placement = "top";
+          }
+          
+          setTooltipPosition({
+            top,
+            left: iconRect.left + iconRect.width / 2,
+            placement
+          });
+        };
+        
+        const linkElement = iconRef.current.closest('a');
+        if (linkElement) {
+          const handleMouseEnter = () => {
+            updateTooltipPosition();
+            setShowTooltip(true);
+          };
+          
+          const handleMouseLeave = () => {
+            setShowTooltip(false);
+          };
+          
+          linkElement.addEventListener('mouseenter', handleMouseEnter);
+          linkElement.addEventListener('mouseleave', handleMouseLeave);
+          window.addEventListener('scroll', updateTooltipPosition, true);
+          window.addEventListener('resize', updateTooltipPosition);
+          
+          return () => {
+            linkElement.removeEventListener('mouseenter', handleMouseEnter);
+            linkElement.removeEventListener('mouseleave', handleMouseLeave);
+            window.removeEventListener('scroll', updateTooltipPosition, true);
+            window.removeEventListener('resize', updateTooltipPosition);
+          };
+        }
+      }
+    }, [showIconOnly]);
+    
     return (
-      <li>
+      <li className="flex-shrink-0">
         <Link
           to={item.path || "#"}
-          className={`flex items-center gap-2 px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
+          className={`group/link flex items-center ${showIconOnly ? 'justify-center px-3' : 'gap-2 px-4'} py-3 text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${
             isItemActive
               ? "bg-brand-50 text-brand-600 dark:bg-brand-900/20 dark:text-brand-400"
               : "text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
           }`}
+          title={!showIconOnly ? item.name : undefined}
         >
-          {getIcon(item.icon)}
-          <span>{item.name}</span>
+          <span ref={iconRef} className="relative">
+            {getIcon(item.icon)}
+          </span>
+          {!showIconOnly && <span>{item.name}</span>}
         </Link>
+        {showIconOnly && showTooltip && tooltipPosition && createPortal(
+          <div
+            ref={tooltipRef}
+            className="fixed bg-gray-900 text-white text-xs rounded px-2 py-1 pointer-events-none z-[10001] whitespace-nowrap opacity-100 transition-opacity"
+            style={{
+              top: `${tooltipPosition.top}px`,
+              left: `${tooltipPosition.left}px`,
+              transform: 'translateX(-50%)',
+            }}
+          >
+            {item.name}
+            <span 
+              className={`absolute left-1/2 -translate-x-1/2 border-4 border-transparent ${
+                tooltipPosition.placement === "top"
+                  ? "top-full border-t-gray-900"
+                  : "bottom-full border-b-gray-900"
+              }`}
+              style={{
+                [tooltipPosition.placement === "top" ? "top" : "bottom"]: "100%"
+              }}
+            ></span>
+          </div>,
+          document.body
+        )}
       </li>
     );
   }
 
   return (
-    <li className="relative group" style={{ position: "relative" }}>
+    <li className="relative group flex-shrink-0" style={{ position: "relative" }}>
       <button
         ref={buttonRef}
         onClick={() => onSubmenuToggle(key)}
-        className={`flex items-center gap-2 px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
+        className={`flex items-center gap-0 px-2 py-3 text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${
           isItemActive || isSubmenuOpen
             ? "bg-brand-50 text-brand-600 dark:bg-brand-900/20 dark:text-brand-400"
             : "text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
         }`}
       >
         {getIcon(item.icon)}
-        <span>{item.name}</span>
+        <span className="whitespace-nowrap">{item.name}</span>
         <ChevronDownIcon
-          className={`w-4 h-4 transition-transform ${isSubmenuOpen ? "rotate-180" : ""}`}
+          className={`w-4 h-4 me-1 transition-transform flex-shrink-0 ${isSubmenuOpen ? "rotate-180" : ""}`}
         />
       </button>
       {isSubmenuOpen &&

@@ -537,7 +537,7 @@ const DataTableComponent = (props: DataTableProps, ref: React.ForwardedRef<DataT
                 👁️ Columns
               </button>
               {showColumnMenu && (
-                <div className="absolute right-0 z-10 mt-1 w-48 rounded border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800">
+                <div className="absolute right-0 z-[9999] mt-1 w-48 rounded border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800">
                   {columns.map((col, idx) => (
                     <label key={idx} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer">
                       <input

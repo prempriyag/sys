@@ -5,6 +5,7 @@ import { useSidebar } from "../context/SidebarContext";
 import { useModule } from "../context/ModuleContext";
 import { useMenuLayout } from "../context/MenuLayoutContext";
 import { useAuth } from "../context/AuthContext";
+import { useThemeColor } from "../context/ThemeColorContext";
 import { getMenuByModule } from "../config/menus";
 import { MenuItem } from "../types/menu";
 import { getIcon } from "../utils/iconMapper";
@@ -17,81 +18,102 @@ const AppSidebar: React.FC = () => {
   const { currentModule } = useModule();
   const { menuLayout } = useMenuLayout();
   const { user } = useAuth();
+  const { logoIconUrl, logoLightUrl, logoDarkUrl, sidebarBgColor, sidebarTextColor } = useThemeColor();
   const location = useLocation();
   const menuConfig = getMenuByModule(currentModule);
 
   const [openSubmenu, setOpenSubmenu] = useState<Record<string, boolean>>({});
-  const [subMenuHeights, setSubMenuHeights] = useState<Record<string, number>>({});
+  const [subMenuHeights, setSubMenuHeights] = useState<Record<string, number>>(
+    {}
+  );
   const subMenuRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   // Filter menu items based on permissions
   // Similar to how PHP sidebar filters menu items using checkpermission and checkallpermission
-  const filterMenuItems = useCallback((items: MenuItem[]): MenuItem[] => {
-    if (!user) return []; // If no user, no permissions, so no menu items
+  const filterMenuItems = useCallback(
+    (items: MenuItem[]): MenuItem[] => {
+      if (!user) return []; // If no user, no permissions, so no menu items
 
-    return items.filter((item) => {
-      // If item has NO permission requirement, show it (like Dashboard and User Manual)
-      if (!item.permission && (!item.permissions || item.permissions.length === 0)) {
-        return true; // Show items without permission requirements
-      }
-
-      // If item has permissions array (checkallpermission equivalent - show if user has ANY)
-      if (item.permissions && item.permissions.length > 0) {
-        const hasAny = checkAnyPermission(user, item.permissions, "VIEW");
-        if (!hasAny) {
-          return false; // Hide item if user doesn't have any of the permissions
+      return items.filter((item) => {
+        // If item has NO permission requirement, show it (like Dashboard and User Manual)
+        if (
+          !item.permission &&
+          (!item.permissions || item.permissions.length === 0)
+        ) {
+          return true; // Show items without permission requirements
         }
-      }
-      
-      // If item has single permission (checkpermission equivalent)
-      if (item.permission) {
-        const hasPerm = checkPermission(user, item.permission, "VIEW");
-        if (!hasPerm) {
-          return false; // Hide item if user doesn't have permission
-        }
-      }
 
-      // If item has subItems, filter them recursively
-      if (item.subItems && item.subItems.length > 0) {
-        const filteredSubItems = filterMenuItems(item.subItems);
-        // Keep parent item only if it has at least one visible subItem
-        if (filteredSubItems.length === 0) {
-          return false;
+        // If item has permissions array (checkallpermission equivalent - show if user has ANY)
+        if (item.permissions && item.permissions.length > 0) {
+          const hasAny = checkAnyPermission(user, item.permissions, "VIEW");
+          if (!hasAny) {
+            return false; // Hide item if user doesn't have any of the permissions
+          }
         }
-        item.subItems = filteredSubItems;
-        return true;
-      }
 
-      return true; // Keep item if no permission or permission granted
-    });
-  }, [user]);
+        // If item has single permission (checkpermission equivalent)
+        if (item.permission) {
+          const hasPerm = checkPermission(user, item.permission, "VIEW");
+          if (!hasPerm) {
+            return false; // Hide item if user doesn't have permission
+          }
+        }
+
+        // If item has subItems, filter them recursively
+        if (item.subItems && item.subItems.length > 0) {
+          const filteredSubItems = filterMenuItems(item.subItems);
+          // Keep parent item only if it has at least one visible subItem
+          if (filteredSubItems.length === 0) {
+            return false;
+          }
+          item.subItems = filteredSubItems;
+          return true;
+        }
+
+        return true; // Keep item if no permission or permission granted
+      });
+    },
+    [user]
+  );
 
   // Filter menu items based on permissions (similar to PHP sidebar filtering)
-  const filteredMenuConfigItems = useMemo(() => filterMenuItems(menuConfig.items), [filterMenuItems, menuConfig.items]);
+  const filteredMenuConfigItems = useMemo(
+    () => filterMenuItems(menuConfig.items),
+    [filterMenuItems, menuConfig.items]
+  );
 
   const isActive = useCallback(
     (path?: string) => {
       if (!path) return false;
       // Handle query params in path
       const pathWithoutQuery = path.split("?")[0];
-      return location.pathname === pathWithoutQuery || location.pathname.startsWith(pathWithoutQuery + "/");
+      return (
+        location.pathname === pathWithoutQuery ||
+        location.pathname.startsWith(pathWithoutQuery + "/")
+      );
     },
     [location.pathname]
   );
 
   // Initialize open submenus based on active route
   useEffect(() => {
-    const checkActiveMenu = (items: MenuItem[], parentKey: string = ""): void => {
+    const checkActiveMenu = (
+      items: MenuItem[],
+      parentKey: string = ""
+    ): void => {
       items.forEach((item, index) => {
         const key = parentKey ? `${parentKey}-${index}` : `${index}`;
-        
+
         if (item.subItems) {
           // Check if any subitem is active (including nested subitems)
           const hasActiveSubItem = item.subItems.some((subItem, subIndex) => {
             if (subItem.subItems && subItem.subItems.length > 0) {
               // Recursively check nested submenus
               const nestedKey = `${key}-${subIndex}`;
-              const hasNestedActive = checkActiveMenuRecursive(subItem, nestedKey);
+              const hasNestedActive = checkActiveMenuRecursive(
+                subItem,
+                nestedKey
+              );
               if (hasNestedActive) {
                 setOpenSubmenu((prev) => ({ ...prev, [nestedKey]: true }));
               }
@@ -99,17 +121,17 @@ const AppSidebar: React.FC = () => {
             }
             return isActive(subItem.path);
           });
-          
+
           if (hasActiveSubItem) {
             setOpenSubmenu((prev) => ({ ...prev, [key]: true }));
           }
-          
+
           // Recursively process all subitems
           checkActiveMenu(item.subItems, key);
         }
       });
     };
-    
+
     const checkActiveMenuRecursive = (item: MenuItem, key: string): boolean => {
       if (item.subItems && item.subItems.length > 0) {
         // Check if any nested subitem is active
@@ -195,20 +217,26 @@ const AppSidebar: React.FC = () => {
     });
   };
 
-
-  const renderMenuItem = (item: MenuItem, index: number, parentKey: string = ""): React.ReactNode => {
+  const renderMenuItem = (
+    item: MenuItem,
+    index: number,
+    parentKey: string = ""
+  ): React.ReactNode => {
     // Permission check for individual menu items
     if (!user) return null; // No user, no permissions
-    
+
     // Check if item has permissions array (checkallpermission equivalent)
     if (item.permissions && item.permissions.length > 0) {
       if (!checkAnyPermission(user, item.permissions, "VIEW")) {
         return null; // Hide if user doesn't have any of the permissions
       }
     }
-    
+
     // Check if item has single permission (checkpermission equivalent)
-    if (item.permission && !checkPermission(user, item.permission, "VIEW", currentModule)) {
+    if (
+      item.permission &&
+      !checkPermission(user, item.permission, "VIEW", currentModule)
+    ) {
       return null; // Hide if user doesn't have permission
     }
 
@@ -216,7 +244,7 @@ const AppSidebar: React.FC = () => {
     const hasSubItems = item.subItems && item.subItems.length > 0;
     const isItemActive = isActive(item.path);
     const isSubmenuOpen = openSubmenu[key] || false;
-    
+
     if (hasSubItems) {
       return (
         <li key={key}>
@@ -274,7 +302,11 @@ const AppSidebar: React.FC = () => {
                           isActive(subItem.path)
                             ? "menu-dropdown-item-active"
                             : "menu-dropdown-item-inactive"
-                        }`}
+                        } cursor-pointer ${
+              !isExpanded && !isHovered
+                ? "lg:justify-center"
+                : "lg:justify-start"
+            }`}
                       >
                         {subItem.name}
                       </Link>
@@ -295,6 +327,10 @@ const AppSidebar: React.FC = () => {
             to={item.path}
             className={`menu-item group ${
               isItemActive ? "menu-item-active" : "menu-item-inactive"
+            } cursor-pointer ${
+              !isExpanded && !isHovered
+                ? "lg:justify-center"
+                : "lg:justify-start"
             }`}
           >
             <span
@@ -337,9 +373,18 @@ const AppSidebar: React.FC = () => {
   // Horizontal menu layout
   if (menuLayout === "horizontal") {
     return (
-      <nav className="w-full bg-white border-b border-gray-200 dark:bg-gray-900 dark:border-gray-800 shadow-sm" style={{ position: 'relative', zIndex: 100, overflow: 'visible' }}>
-        <div className="px-4" style={{ overflow: 'visible', position: 'relative' }}>
-          <ul className="flex items-center gap-1 overflow-x-auto no-scrollbar" style={{ overflowY: 'visible', position: 'relative' }}>
+      <nav
+        className="w-full bg-white border-b border-gray-200 dark:bg-gray-900 dark:border-gray-800 shadow-sm"
+        style={{ position: "relative", zIndex: 100, overflow: "visible" }}
+      >
+        <div
+          className="px-4"
+          style={{ overflow: "visible", position: "relative" }}
+        >
+          <ul
+            className="flex items-center gap-1 overflow-x-auto overflow-y-visible"
+            style={{ position: "relative", scrollbarWidth: "thin" }}
+          >
             {filteredMenuConfigItems.map((item, index) => (
               <HorizontalMenuItem
                 key={index}
@@ -358,7 +403,7 @@ const AppSidebar: React.FC = () => {
   // Vertical menu layout (default)
   return (
     <aside
-      className={`fixed mt-16 flex flex-col lg:mt-0 top-0 px-2 left-0 bg-white dark:bg-gray-900 dark:border-gray-800 text-gray-900 h-screen transition-all duration-300 ease-in-out z-50 border-r border-gray-200 
+      className={`fixed mt-16 flex flex-col lg:mt-0 top-0 px-2 left-0 dark:border-gray-800 h-screen transition-all duration-300 ease-in-out z-50 border-r border-gray-200 
         ${
           isExpanded || isMobileOpen
             ? "w-[290px]"
@@ -368,6 +413,10 @@ const AppSidebar: React.FC = () => {
         }
         ${isMobileOpen ? "translate-x-0" : "-translate-x-full"}
         lg:translate-x-0`}
+      style={{
+        backgroundColor: sidebarBgColor,
+        color: sidebarTextColor,
+      }}
       onMouseEnter={() => !isExpanded && setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -376,30 +425,46 @@ const AppSidebar: React.FC = () => {
           !isExpanded && !isHovered ? "lg:justify-center" : "justify-center"
         }`}
       >
-        <Link to={currentModule === "college" ? "/dashboard" : `/${currentModule}/dashboard`}>
+        <Link
+          to={
+            currentModule === "college"
+              ? "/dashboard"
+              : `/${currentModule}/dashboard`
+          }
+        >
           {isExpanded || isHovered || isMobileOpen ? (
             <>
               <img
-                className="dark:hidden"
-                src="/images/logo/logo.jpg"
+                className="dark:hidden object-contain"
+                src={logoLightUrl}
                 alt="Logo"
-                width={150}
+                width={220}
                 height={40}
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = "/images/logo/connors-color.png";
+                }}
               />
               <img
-                className="hidden dark:block"
-                src="/images/logo/logo.jpg"
+                className="hidden dark:block object-contain"
+                src={logoDarkUrl}
                 alt="Logo"
-                width={150}
+                width={220}
                 height={40}
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = "/images/logo/connors-white.png";
+                }}
               />
             </>
           ) : (
             <img
-              src="/images/logo/logo-icon.svg"
+              src={logoIconUrl}
               alt="Logo"
               width={32}
               height={32}
+              className="object-contain"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = "/images/logo/logo-icon.svg";
+              }}
             />
           )}
         </Link>
@@ -409,7 +474,7 @@ const AppSidebar: React.FC = () => {
           <div className="flex flex-col gap-4">
             <div>
               <h2
-                className={`mb-4 text-xs uppercase flex leading-[20px] text-gray-400 ${
+                className={`mb-4 text-xs uppercase flex leading-[20px] text-gray-400 visibility-hidden ${
                   !isExpanded && !isHovered
                     ? "lg:justify-center"
                     : "justify-start"
@@ -422,9 +487,9 @@ const AppSidebar: React.FC = () => {
                 )}
               </h2>
               <ul className="flex flex-col">
-                {filteredMenuConfigItems.map((item, index) =>
-                  renderMenuItem(item, index)
-                ).filter((item) => item !== null)}
+                {filteredMenuConfigItems
+                  .map((item, index) => renderMenuItem(item, index))
+                  .filter((item) => item !== null)}
               </ul>
             </div>
           </div>

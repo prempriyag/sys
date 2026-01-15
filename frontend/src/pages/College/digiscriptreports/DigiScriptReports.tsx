@@ -4,6 +4,7 @@ import PageMeta from "../../../components/common/PageMeta";
 import PageContainer, { PageWrapper } from "../../../components/common/PageContainer";
 import DataTable from "../../../components/ui/DataTable";
 import Button from "../../../components/ui/button/Button";
+import StatusBadge from "../../../components/common/StatusBadge";
 import { API_ENDPOINTS, API_BASE_URL } from "../../../config/api";
 import { RefreshIcon, FilterIcon } from "../../../icons";
 import { useAuth } from "../../../context/AuthContext";
@@ -239,8 +240,26 @@ export default function DigiScriptReports() {
                 );
               }
             },
-            { data: "FOUND_IN_SLATE_YN", name: "Slate Status", searchable: false, orderable: false },
-            { data: "FOUND_IN_BANNER_YN", name: "Banner Status", searchable: false, orderable: false },
+            { 
+              data: "FOUND_IN_SLATE_YN", 
+              name: "Slate Status", 
+              searchable: false, 
+              orderable: false,
+              render: (data: any) => {
+                if (!data) return "-";
+                return <StatusBadge status={data} size="sm" />;
+              }
+            },
+            { 
+              data: "FOUND_IN_BANNER_YN", 
+              name: "Banner Status", 
+              searchable: false, 
+              orderable: false,
+              render: (data: any) => {
+                if (!data) return "-";
+                return <StatusBadge status={data} size="sm" />;
+              }
+            },
             { data: "DEGREE_CD", name: "Degree", searchable: false, orderable: false },
             { 
               data: "DEGREE_RECEIVED_DATE", 
@@ -269,7 +288,16 @@ export default function DigiScriptReports() {
               orderable: true,
               render: (data: any) => data || "-"
             },
-            { data: "STATUS_FLAG", name: "Status", searchable: false, orderable: false },
+            { 
+              data: "STATUS_FLAG", 
+              name: "Status", 
+              searchable: false, 
+              orderable: false,
+              render: (data: any) => {
+                if (!data) return "-";
+                return <StatusBadge status={data} size="sm" />;
+              }
+            },
           ]}
         />
       </PageContainer>

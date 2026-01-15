@@ -5,6 +5,7 @@ import PageMeta from "../../../components/common/PageMeta";
 import PageContainer, { PageWrapper } from "../../../components/common/PageContainer";
 import DataTable from "../../../components/ui/DataTable";
 import Button from "../../../components/ui/button/Button";
+import StatusBadge from "../../../components/common/StatusBadge";
 import { api, API_ENDPOINTS, API_BASE_URL, getAuthToken } from "../../../config/api";
 import { useAuth } from "../../../context/AuthContext";
 import { PencilIcon, TrashBinIcon, LockIcon } from "../../../icons";
@@ -56,7 +57,7 @@ export default function UserManagement() {
     }
   };
 
-  // Parse HTML status to get user ID and status value
+  // Parse HTML status to get user ID, status value, and status text
   const parseStatusClick = (htmlString: string) => {
     const match = htmlString.match(/statusid.*?id="(\d+)".*?data-val="(\d+)"/);
     if (match) {
@@ -66,13 +67,24 @@ export default function UserManagement() {
     }
   };
 
-  // Sanitize HTML by removing onclick handlers and other event handlers
-  const sanitizeHTML = (htmlString: string): string => {
+  // Extract status text from HTML for display
+  const extractStatusText = (htmlString: string): string => {
     if (!htmlString) return "";
-    // Remove onclick, onmouseover, onmouseout, and other event handlers
-    return htmlString
-      .replace(/\s*on\w+\s*=\s*["'][^"']*["']/gi, "") // Remove all on* event handlers
-      .replace(/\s*on\w+\s*=\s*{[^}]*}/gi, ""); // Remove React-style event handlers
+    // Extract text content from HTML (e.g., "Active", "Inactive", "Blocked")
+    const textMatch = htmlString.match(/>([^<]+)</);
+    return textMatch ? textMatch[1].trim() : "";
+  };
+
+  // Extract user ID from status HTML
+  const extractStatusUserId = (htmlString: string): number | null => {
+    const match = htmlString.match(/statusid.*?id="(\d+)"/);
+    return match ? parseInt(match[1]) : null;
+  };
+
+  // Extract status value from status HTML
+  const extractStatusValue = (htmlString: string): number | null => {
+    const match = htmlString.match(/data-val="(\d+)"/);
+    return match ? parseInt(match[1]) : null;
   };
 
   // Handle edit click - navigate to edit page
@@ -164,15 +176,28 @@ export default function UserManagement() {
               name: "Status",
               searchable: false,
               orderable: false,
-              render: (data: string) => (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    parseStatusClick(data);
-                  }}
-                  dangerouslySetInnerHTML={{ __html: sanitizeHTML(data) }}
-                />
-              ),
+              render: (data: string) => {
+                const statusText = extractStatusText(data);
+                const userId = extractStatusUserId(data);
+                const newStatus = extractStatusValue(data);
+                
+                if (!statusText || !userId || newStatus === null) {
+                  return <span>-</span>;
+                }
+
+                return (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleStatusUpdate(userId, newStatus);
+                    }}
+                    className="cursor-pointer hover:opacity-80 transition-opacity"
+                    title={newStatus === 1 ? "Click to make Inactive" : "Click to make Active"}
+                  >
+                    <StatusBadge status={statusText} size="sm" />
+                  </button>
+                );
+              },
             },
             { data: "created_by", name: "Created By", searchable: true, orderable: true },
             { data: "created_at", name: "Created At", searchable: false, orderable: true },

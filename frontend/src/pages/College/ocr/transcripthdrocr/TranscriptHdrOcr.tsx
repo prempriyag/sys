@@ -4,6 +4,7 @@ import PageMeta from "../../../../components/common/PageMeta";
 import PageContainer, { PageWrapper } from "../../../../components/common/PageContainer";
 import DataTable from "../../../../components/ui/DataTable";
 import Button from "../../../../components/ui/button/Button";
+import StatusBadge from "../../../../components/common/StatusBadge";
 import { API_ENDPOINTS } from "../../../../config/api";
 import { RefreshIcon, FilterIcon } from "../../../../icons";
 import { useAuth } from "../../../../context/AuthContext";
@@ -165,7 +166,16 @@ export default function TranscriptHdrOcr() {
             { data: "DEGREE_RECEIVED_DATE", name: "Degree Received Date", searchable: false, orderable: false },
             { data: "TOTAL_CREDITS_EARNED", name: "Total Credits Earned", searchable: false, orderable: false },
             { data: "TOTAL_CREDITS_ATTENDED", name: "Total Credits Attended", searchable: false, orderable: false },
-            { data: "STATUS_FLAG", name: "Status Flag", searchable: false, orderable: false },
+            { 
+              data: "STATUS_FLAG", 
+              name: "Status Flag", 
+              searchable: false, 
+              orderable: false,
+              render: (data: any) => {
+                if (!data) return "-";
+                return <StatusBadge status={data} size="sm" />;
+              }
+            },
           ]}
         />
       </PageContainer>

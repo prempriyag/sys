@@ -9,6 +9,11 @@ interface Column {
   searchable?: boolean;
   orderable?: boolean;
   render?: (data: any, row: any) => React.ReactNode;
+  visible?: boolean; // Initial visibility (default: true, false for notvisible columns)
+  exportable?: boolean; // Whether column should be exported (default: true, false for notexport columns)
+  className?: string; // CSS classes for the column
+  defaultOrder?: boolean; // Whether this column should be used for default ordering
+  textCenter?: boolean; // Whether text should be center-aligned
 }
 
 interface DataTableProps {
@@ -55,10 +60,19 @@ const DataTableComponent = (props: DataTableProps, ref: React.ForwardedRef<DataT
   const pageLen = pageLength || 10;
   const menu = lengthMenu || [10, 25, 50, 100];
   
-  // Column visibility state
-  const [visibleColumns, setVisibleColumns] = useState<Set<number>>(
-    new Set(columns.map((_, idx) => idx))
-  );
+  // Column visibility state - initialize based on visible property
+  // Columns with visible: false (notvisible) are hidden by default
+  const [visibleColumns, setVisibleColumns] = useState<Set<number>>(() => {
+    const initial = new Set<number>();
+    columns.forEach((col, idx) => {
+      // If visible is explicitly false, don't include it
+      // Otherwise, include it (default behavior)
+      if (col.visible !== false) {
+        initial.add(idx);
+      }
+    });
+    return initial;
+  });
   const [showColumnMenu, setShowColumnMenu] = useState(false);
   const columnMenuRef = useRef<HTMLDivElement>(null);
   
@@ -87,8 +101,12 @@ const DataTableComponent = (props: DataTableProps, ref: React.ForwardedRef<DataT
   const [length, setLength] = useState(pageLen);
   const [recordsTotal, setRecordsTotal] = useState(0);
   const [recordsFiltered, setRecordsFiltered] = useState(0);
+  // Find default order column (defaultOrderby) or use first column
+  const defaultOrderColumn = columns.findIndex(col => col.defaultOrder === true);
+  const initialOrderColumn = defaultOrderColumn >= 0 ? defaultOrderColumn : 0;
+  
   const [order, setOrder] = useState<{ column: number; dir: "asc" | "desc" }>({
-    column: 0,
+    column: initialOrderColumn,
     dir: "desc",
   });
   const [globalSearch, setGlobalSearch] = useState("");
@@ -434,10 +452,11 @@ const DataTableComponent = (props: DataTableProps, ref: React.ForwardedRef<DataT
   // Export functions
   const exportToExcel = (exportAll: boolean = false) => {
     const dataToExport = data; // For now, same data. In future, fetch all data for exportAll
-    const visibleCols = visibleColumnsArray;
-    const headers = visibleCols.map(col => col.name || col.data);
+    // Filter to only exportable columns (exportable !== false) and visible columns
+    const exportableCols = visibleColumnsArray.filter(col => col.exportable !== false);
+    const headers = exportableCols.map(col => col.name || col.data);
     const rows = dataToExport.map(row => 
-      visibleCols.map(col => {
+      exportableCols.map(col => {
         const value = row[col.data];
         // Strip HTML tags and decode entities
         const textValue = value ? String(value).replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim() : '';
@@ -636,10 +655,12 @@ const DataTableComponent = (props: DataTableProps, ref: React.ForwardedRef<DataT
                 >
                   {visibleColumnsArray.map((column) => {
                     const originalIndex = columns.indexOf(column);
+                    // Apply text-center class if textCenter is true
+                    const cellClassName = `px-4 py-3 text-sm text-gray-800 dark:text-gray-200 ${column.textCenter ? 'text-center' : ''}`;
                     return (
                       <TableCell
                         key={originalIndex}
-                        className="px-4 py-3 text-sm text-gray-800 dark:text-gray-200"
+                        className={cellClassName}
                       >
                         {column.render
                           ? column.render(row[column.data], row)

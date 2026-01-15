@@ -187,6 +187,38 @@ class ArticulationReportsModel:
         return order_map.get(column_name, "k.LAST_UPDATED_DATETIME")
 
     @staticmethod
+    def generate_transcript_pdf_url(transcript_link: str) -> str:
+        """
+        Generate PDF URL for transcript file with encryption
+        Same as batchdetails_controller - returns encrypted URL ready for frontend
+        """
+        if not transcript_link or not str(transcript_link).strip():
+            return ""
+        
+        from helpers.encryption_helper import get_encrypt_file_path
+        
+        # Encrypt the file path
+        encrypted_path = get_encrypt_file_path(transcript_link)
+        # Return the encrypted URL in the same format as batchdetails
+        return f"/api/viewfile/transcript_file?pdf={encrypted_path}"
+
+    @staticmethod
+    def generate_transcript_pdf_url(transcript_link: str) -> str:
+        """
+        Generate PDF URL for transcript file with encryption
+        Same as batchdetails_controller - returns encrypted URL ready for frontend
+        """
+        if not transcript_link or not str(transcript_link).strip():
+            return ""
+        
+        from helpers.encryption_helper import get_encrypt_file_path
+        
+        # Encrypt the file path
+        encrypted_path = get_encrypt_file_path(transcript_link)
+        # Return the encrypted URL in the same format as batchdetails
+        return f"/api/viewfile/transcript_file?pdf={encrypted_path}"
+
+    @staticmethod
     def get_institution_name_for_000000(db: Session, batch_id: str) -> str:
         """
         Get institution name from TRANSCRIPTHDROCR table for INSTITUTION_ID = '000000'
@@ -439,7 +471,8 @@ class ArticulationReportsModel:
                     "TERM": record_dict.get("TERM", ""),
                     "ERROR_REASON": ArticulationReportsModel.format_error_reason(record_dict.get("ERROR_REASON", "")),
                     "ERROR_SCREENSHOT": error_screenshot,
-                    "TRANSCRIPT_LINK": transcript_link,
+                    # TRANSCRIPT_LINK: Generate encrypted URL if transcript_link exists (same as batchdetails)
+                    "TRANSCRIPT_LINK": ArticulationReportsModel.generate_transcript_pdf_url(transcript_link) if (transcript_link and str(transcript_link).strip()) else "",
                     "USER_COMMENTS": user_comments,
                     "CREDIT_HOURS_EARNED": credit_hours,
                     "GRADE": grade,

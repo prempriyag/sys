@@ -56,6 +56,7 @@ import { ReactComponent as AlertHexaIcon } from "./alert-hexa.svg?react";
 import { ReactComponent as ErrorHexaIcon } from "./info-hexa.svg?react";
 import { RefreshIcon } from "./refresh";
 import { FilterIcon } from "./filter";
+import { SearchIcon } from "./search";
 
 export {
   ErrorHexaIcon,
@@ -116,4 +117,5 @@ export {
   AngleRightIcon,
   RefreshIcon,
   FilterIcon,
+  SearchIcon,
 };

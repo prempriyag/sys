@@ -5,13 +5,15 @@ Matches CI3 Viewfile.php functionality
 from fastapi import APIRouter, Query, HTTPException, Depends
 from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.orm import Session
-from typing import Optional, Dict, Any
+from sqlalchemy import text
+from typing import Optional, Dict, Any, List
 from pydantic import BaseModel
 import os
 import logging
 from helpers.encryption_helper import file_decrypt, get_encrypt_file_path
 from database.connection import get_db
 from config.settings import Settings
+from config.constants import TBL_KICKOUT
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/viewfile", tags=["viewfile"])
@@ -189,4 +191,79 @@ async def show_transcripts(
     except Exception as e:
         logger.exception(f"Error serving transcript: {e}")
         raise HTTPException(status_code=500, detail=f"Error serving file: {str(e)}")
+
+@router.get("/global_search", response_model=Dict[str, Any])
+async def global_search(
+    query: str = Query(..., description="Search query (minimum 4 characters)"),
+    db: Session = Depends(get_db)
+):
+    """
+    Global search for students and batches
+    Matches CI3 Viewfile::global_search()
+    """
+    try:
+        query = query.strip()
+        if len(query) < 4:
+            return {"students": [], "batches": []}
+        
+        result = {"students": [], "batches": []}
+        
+        if query.isdigit():
+            # Numeric query - search both Student ID and Batch ID
+            # Search students
+            student_query = text(f"""
+                SELECT DISTINCT STUDENT_ID, STUDENT_FULL_NAME, BATCH_ID, PROJECT_ID
+                FROM {TBL_KICKOUT}
+                WHERE STUDENT_ID LIKE :query
+                ORDER BY STUDENT_ID
+            """)
+            students = db.execute(student_query, {"query": f"%{query}%"}).fetchall()
+            result["students"] = [
+                {
+                    "STUDENT_ID": str(row.STUDENT_ID) if row.STUDENT_ID else "",
+                    "STUDENT_FULL_NAME": row.STUDENT_FULL_NAME or "",
+                    "BATCH_ID": str(row.BATCH_ID) if row.BATCH_ID else "",
+                    "PROJECT_ID": str(row.PROJECT_ID) if row.PROJECT_ID else "2"
+                }
+                for row in students
+            ]
+            
+            # Search batches
+            batch_query = text(f"""
+                SELECT DISTINCT BATCH_ID, PROJECT_ID
+                FROM {TBL_KICKOUT}
+                WHERE BATCH_ID LIKE :query
+                ORDER BY BATCH_ID
+            """)
+            batches = db.execute(batch_query, {"query": f"%{query}%"}).fetchall()
+            result["batches"] = [
+                {
+                    "BATCH_ID": str(row.BATCH_ID) if row.BATCH_ID else "",
+                    "PROJECT_ID": str(row.PROJECT_ID) if row.PROJECT_ID else "2"
+                }
+                for row in batches
+            ]
+        else:
+            # Text query - search only student names
+            student_query = text(f"""
+                SELECT DISTINCT STUDENT_ID, STUDENT_FULL_NAME, BATCH_ID, PROJECT_ID
+                FROM {TBL_KICKOUT}
+                WHERE STUDENT_FULL_NAME LIKE :query
+                ORDER BY STUDENT_FULL_NAME
+            """)
+            students = db.execute(student_query, {"query": f"%{query}%"}).fetchall()
+            result["students"] = [
+                {
+                    "STUDENT_ID": str(row.STUDENT_ID) if row.STUDENT_ID else "",
+                    "STUDENT_FULL_NAME": row.STUDENT_FULL_NAME or "",
+                    "BATCH_ID": str(row.BATCH_ID) if row.BATCH_ID else "",
+                    "PROJECT_ID": str(row.PROJECT_ID) if row.PROJECT_ID else "2"
+                }
+                for row in students
+            ]
+        
+        return result
+    except Exception as e:
+        logger.exception(f"Error in global_search: {e}")
+        raise HTTPException(status_code=500, detail=f"Error performing search: {str(e)}")
 

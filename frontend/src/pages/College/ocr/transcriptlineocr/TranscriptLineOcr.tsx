@@ -4,6 +4,7 @@ import PageMeta from "../../../../components/common/PageMeta";
 import PageContainer, { PageWrapper } from "../../../../components/common/PageContainer";
 import DataTable from "../../../../components/ui/DataTable";
 import Button from "../../../../components/ui/button/Button";
+import StatusBadge from "../../../../components/common/StatusBadge";
 import { API_ENDPOINTS } from "../../../../config/api";
 import { RefreshIcon, FilterIcon } from "../../../../icons";
 import { useAuth } from "../../../../context/AuthContext";
@@ -152,7 +153,16 @@ export default function TranscriptLineOcr() {
             { data: "COURSE_TITLE", name: "Course Title", searchable: true, orderable: true },
             { data: "CREDIT_HOURS_EARNED", name: "Credit Hours Earned", searchable: true, orderable: true },
             { data: "GRADE", name: "Grade", searchable: true, orderable: true },
-            { data: "STATUS_FLAG", name: "Status Flag", searchable: true, orderable: true },
+            { 
+              data: "STATUS_FLAG", 
+              name: "Status Flag", 
+              searchable: true, 
+              orderable: true,
+              render: (data: any) => {
+                if (!data) return "-";
+                return <StatusBadge status={data} size="sm" />;
+              }
+            },
             { data: "PAGE_NBR", name: "Page NBR", searchable: true, orderable: true },
             { data: "AUTO_SEQNO", name: "Auto SEQ No", searchable: true, orderable: true },
           ]}

@@ -4,6 +4,7 @@ import PageMeta from "../../../../components/common/PageMeta";
 import PageContainer, { PageWrapper } from "../../../../components/common/PageContainer";
 import DataTable from "../../../../components/ui/DataTable";
 import Button from "../../../../components/ui/button/Button";
+import StatusBadge from "../../../../components/common/StatusBadge";
 import { API_ENDPOINTS } from "../../../../config/api";
 import { RefreshIcon, FilterIcon } from "../../../../icons";
 import { useAuth } from "../../../../context/AuthContext";
@@ -193,7 +194,16 @@ export default function TranscriptHdrData() {
             { data: "EFFECTIVE_TERM", name: "Effective Term", searchable: false, orderable: false },
             { data: "LEVEL", name: "Level", searchable: false, orderable: false },
             { data: "COMMENTS", name: "Comments", searchable: false, orderable: false },
-            { data: "STATUS_FLAG", name: "Status Flag", searchable: false, orderable: false },
+            { 
+              data: "STATUS_FLAG", 
+              name: "Status Flag", 
+              searchable: false, 
+              orderable: false,
+              render: (data: any) => {
+                if (!data) return "-";
+                return <StatusBadge status={data} size="sm" />;
+              }
+            },
             { data: "FILE_PATH", name: "Formatted TRSC Filename", searchable: false, orderable: false },
             { data: "OCR_EXTRACTED_DATE", name: "OCR Extracted Date", searchable: false, orderable: true },
             { data: "OCR_START_TERM_DT", name: "OCR Start Term", searchable: false, orderable: false },

@@ -4,6 +4,8 @@ import PageMeta from "../../../../components/common/PageMeta";
 import PageContainer, { PageWrapper } from "../../../../components/common/PageContainer";
 import DataTable from "../../../../components/ui/DataTable";
 import Button from "../../../../components/ui/button/Button";
+import StatusBadge from "../../../../components/common/StatusBadge";
+import { useNavigate } from "react-router";
 import { API_ENDPOINTS, API_BASE_URL } from "../../../../config/api";
 import { RefreshIcon, FilterIcon } from "../../../../icons";
 import { useAuth } from "../../../../context/AuthContext";
@@ -12,6 +14,7 @@ export default function DigiScriptBotLog() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [showFilters, setShowFilters] = useState(false);
   const { hasPermission } = useAuth();
+  const navigate = useNavigate();
   
   const [fieldType, setFieldType] = useState<string>("");
   const [fieldName, setFieldName] = useState<string>("");
@@ -24,10 +27,34 @@ export default function DigiScriptBotLog() {
     });
   };
 
-  const getPdfUrl = (filePath: string) => {
-    if (!filePath) return "";
+  // Helper function to generate PDF URL
+  // Backend now returns encrypted URLs in format: /api/viewfile/transcript_file?pdf={encrypted}
+  // Same as batchdetails - just prepend API_BASE_URL
+  const getPdfUrl = (filePath: string, type: "transcript" | "articulation" = "transcript") => {
+    if (!filePath || filePath === "" || filePath === null || filePath === undefined) {
+      return "";
+    }
+    
+    // If backend already returns a full URL (starts with http), use it as-is
+    if (filePath.startsWith("http://") || filePath.startsWith("https://")) {
+      return filePath;
+    }
+    
+    // Backend now returns encrypted URL in format: /api/viewfile/transcript_file?pdf={encrypted}
+    // Just prepend API_BASE_URL (same as batchdetails)
+    if (filePath.startsWith("/api/viewfile")) {
+      return `${API_BASE_URL}${filePath}`;
+    }
+    
+    // For backward compatibility: if we get a raw file path (shouldn't happen now)
+    // Remove leading slash if present
     const cleanPath = filePath.startsWith("/") ? filePath.substring(1) : filePath;
-    return `${API_BASE_URL.replace("/api", "")}/transcripts/${cleanPath}`;
+    // Construct URL - adjust base path as needed
+    if (type === "transcript") {
+      return `${API_BASE_URL.replace("/api", "")}/transcripts/${cleanPath}`;
+    } else {
+      return `${API_BASE_URL.replace("/api", "")}/articulation/${cleanPath}`;
+    }
   };
 
   const clearFilters = () => {
@@ -181,12 +208,66 @@ export default function DigiScriptBotLog() {
             },
             { data: "STUDENT_FULL_NAME", name: "Student Name", searchable: true, orderable: true },
             { data: "AUDIT_DATE", name: "Audit Date", searchable: false, orderable: true },
-            { data: "STATUS_BDMS", name: "Status BDMS", searchable: false, orderable: false },
-            { data: "STATUS_SOAPCOL", name: "Status SOAPCOL", searchable: false, orderable: false },
-            { data: "STATUS_SAAADMS", name: "Status SAAADMS", searchable: false, orderable: false },
-            { data: "STATUS_SOAHOLD", name: "Status SOAHOLD", searchable: false, orderable: false },
-            { data: "STATUS_SLATE", name: "Status Slate", searchable: false, orderable: false },
-            { data: "STATUS_SLATE_UPLOAD", name: "Status Slate Upload", searchable: false, orderable: false },
+            { 
+              data: "STATUS_BDMS", 
+              name: "Status BDMS", 
+              searchable: false, 
+              orderable: false,
+              render: (data: any) => {
+                if (!data) return "-";
+                return <StatusBadge status={data} size="sm" />;
+              }
+            },
+            { 
+              data: "STATUS_SOAPCOL", 
+              name: "Status SOAPCOL", 
+              searchable: false, 
+              orderable: false,
+              render: (data: any) => {
+                if (!data) return "-";
+                return <StatusBadge status={data} size="sm" />;
+              }
+            },
+            { 
+              data: "STATUS_SAAADMS", 
+              name: "Status SAAADMS", 
+              searchable: false, 
+              orderable: false,
+              render: (data: any) => {
+                if (!data) return "-";
+                return <StatusBadge status={data} size="sm" />;
+              }
+            },
+            { 
+              data: "STATUS_SOAHOLD", 
+              name: "Status SOAHOLD", 
+              searchable: false, 
+              orderable: false,
+              render: (data: any) => {
+                if (!data) return "-";
+                return <StatusBadge status={data} size="sm" />;
+              }
+            },
+            { 
+              data: "STATUS_SLATE", 
+              name: "Status Slate", 
+              searchable: false, 
+              orderable: false,
+              render: (data: any) => {
+                if (!data) return "-";
+                return <StatusBadge status={data} size="sm" />;
+              }
+            },
+            { 
+              data: "STATUS_SLATE_UPLOAD", 
+              name: "Status Slate Upload", 
+              searchable: false, 
+              orderable: false,
+              render: (data: any) => {
+                if (!data) return "-";
+                return <StatusBadge status={data} size="sm" />;
+              }
+            },
             { data: "STATUS_SPACMNT", name: "Status SPACMNT", searchable: false, orderable: false },
             { data: "TRANSCRIPT_STATUS_FLAG", name: "Transcript Status", searchable: false, orderable: false },
             { data: "ARTICULATION_STATUS_FLAG", name: "Articulation Status", searchable: false, orderable: false },
@@ -208,13 +289,23 @@ export default function DigiScriptBotLog() {
               searchable: false, 
               orderable: false,
               render: (data: any, row: any) => {
-                if (!data && !row.BATCH_ID) return "-";
-                const imageUrl = `/errorscreenshot/${row.BATCH_ID}`;
+                // Check if ERROR_SCREENSHOT exists or if we have BATCH_ID to show link
+                const batchId = row?.BATCH_ID || "";
+                if (!batchId) return "-";
+                
+                // If data exists, show link; if not but batchId exists, still show link (backend will handle)
+                // Navigate to error screenshot page (similar to batchdetails page)
                 return (
-                  <a href={imageUrl} target="_blank" rel="noopener noreferrer" className="text-brand-500 hover:underline">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate(`/college/errorscreenshot/${batchId}`);
+                    }}
+                    className="text-brand-500 hover:underline inline-flex items-center"
+                  >
                     <i className="fa fa-eye me-1"></i>
                     View
-                  </a>
+                  </button>
                 );
               }
             },
@@ -224,9 +315,11 @@ export default function DigiScriptBotLog() {
               searchable: false, 
               orderable: false,
               render: (data: any) => {
-                if (!data) return "-";
-                const pdfUrl = getPdfUrl(data);
-                if (!pdfUrl) return "-";
+                if (!data || data === "" || data === null || data === undefined) return "-";
+                // Backend already returns encrypted URL like: /api/viewfile/transcript_file?pdf={encrypted}
+                // getPdfUrl will prepend API_BASE_URL to make it a full URL
+                const pdfUrl = getPdfUrl(data, "transcript");
+                if (!pdfUrl || pdfUrl === "") return "-";
                 return (
                   <a href={pdfUrl} target="_blank" rel="noopener noreferrer" className="text-brand-500 hover:underline">
                     <i className="fa fa-link me-1"></i>

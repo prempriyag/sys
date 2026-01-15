@@ -1,17 +1,22 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { useLocation, useSearchParams } from "react-router";
 import PageBreadcrumb from "../../../components/common/PageBreadCrumb";
 import PageMeta from "../../../components/common/PageMeta";
 import PageContainer, { PageWrapper } from "../../../components/common/PageContainer";
 import DataTable from "../../../components/ui/DataTable";
 import Button from "../../../components/ui/button/Button";
+import { useNavigate } from "react-router";
 import { API_ENDPOINTS, API_BASE_URL } from "../../../config/api";
 import { RefreshIcon, FilterIcon } from "../../../icons";
 import { useAuth } from "../../../context/AuthContext";
+import { createTranscriptReportColumns } from "./columnConfig";
+import BulkUpdateButton from "../../../components/transcriptreports/BulkUpdateButton";
+import { api } from "../../../config/api";
 
 export default function TranscriptReports() {
   const location = useLocation();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   
   // Determine type from URL path (matching CI3 route structure)
   // Routes: /college/transcriptkickouts -> "Failed"
@@ -60,6 +65,8 @@ export default function TranscriptReports() {
   };
 
   // Helper function to generate PDF URL
+  // Backend now returns encrypted URLs in format: /api/viewfile/transcript_file?pdf={encrypted}
+  // Same as batchdetails - just prepend API_BASE_URL
   const getPdfUrl = (filePath: string, type: "transcript" | "articulation" = "transcript") => {
     if (!filePath || filePath === "" || filePath === null || filePath === undefined) {
       return "";
@@ -70,10 +77,9 @@ export default function TranscriptReports() {
       return filePath;
     }
     
-    // If backend returns a relative URL starting with /api/viewfile, prepend base URL
+    // Backend now returns encrypted URL in format: /api/viewfile/transcript_file?pdf={encrypted}
+    // Just prepend API_BASE_URL (same as batchdetails)
     if (filePath.startsWith("/api/viewfile")) {
-      // API_BASE_URL is already "http://localhost:8000" (without /api)
-      // So we can use it directly
       return `${API_BASE_URL}${filePath}`;
     }
     
@@ -113,298 +119,160 @@ export default function TranscriptReports() {
 
   const pageTitle = getPageTitle();
 
-  // Define columns based on type (matching CI3 view logic)
-  const getColumns = () => {
-    const baseColumns = [
-      { data: "INSTITUTION_NAME", name: "College Name", searchable: true, orderable: true },
-      { 
-        data: "INSTITUTION_ID", 
-        name: "Institution ID", 
-        searchable: true, 
-        orderable: true,
-        render: (data: any) => {
-          if (!data) return "-";
-          return (
-            <span 
-              className="copyinstid cursor-pointer hover:text-brand-500" 
-              onClick={() => copyToClipboard(data)}
-            >
-              <i className="btn-copy-icon fa-duotone fa-paste me-1"></i>
-              {data}
-            </span>
-          );
-        }
-      },
-      { 
-        data: "STUDENT_ID", 
-        name: "Student ID", 
-        searchable: true, 
-        orderable: true,
-        render: (data: any, row: any) => {
-          if (!data) return "-";
-          const searchField = row._search_field || "";
-          // If search_field is empty or "Processed" or "equivalenthours", show as link if has permission
-          if ((!searchField || searchField === "Processed" || searchField === "equivalenthours") && hasUpdatePermission) {
-            return (
-              <a 
-                href={`/college/studentview?student_id=${data}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-brand-500 hover:underline"
-              >
-                {data}
-              </a>
-            );
-          }
-          return <span>{data}</span>;
-        }
-      },
-      { 
-        data: "SLATE_REF_NUMBER", 
-        name: "Slate ID", 
-        searchable: true, 
-        orderable: true,
-        render: (data: any, row: any) => {
-          if (!data) return "-";
-          const searchField = row._search_field || "";
-          // If search_field is empty or "Processed" or "equivalenthours", show as link if has permission
-          if ((!searchField || searchField === "Processed" || searchField === "equivalenthours") && hasUpdatePermission) {
-            return (
-              <a 
-                href={`/college/transcriptreports?batch_id=${row.BATCH_ID}&slate_ref_number=${data}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-brand-500 hover:underline"
-              >
-                {data}
-              </a>
-            );
-          }
-          return <span>{data}</span>;
-        }
-      },
-      { data: "STUDENT_FULL_NAME", name: "Student Name", searchable: true, orderable: true },
-      { 
-        data: "BATCH_ID", 
-        name: "Batch ID", 
-        searchable: true, 
-        orderable: true,
-        render: (data: any) => {
-          if (!data) return "-";
-          return (
-            <span className="copyinstid" id={data}>
-              <i 
-                className="btn-copy-icon fa-duotone fa-paste me-1 cursor-pointer hover:text-brand-500" 
-                onClick={() => copyToClipboard(data)}
-                style={{ cursor: "pointer" }}
-                title="Copy to clipboard"
-              ></i>
-              <a 
-                href={`/college/batchdetails/${data}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-brand-500 hover:underline"
-              >
-                {data}
-              </a>
-              <input type="hidden" className="record_batch_id" value={data} />
-            </span>
-          );
-        }
-      },
-      { data: "STATUS_SLATE", name: "Slate Status", searchable: false, orderable: false },
-      { data: "STATUS_SLATE_UPLOAD", name: "Transcript Upload to Slate", searchable: false, orderable: false },
-      { data: "STATUS_BANNER", name: "Banner Status", searchable: false, orderable: false },
-      { data: "STATUS_BDMS", name: "BDMS Status", searchable: false, orderable: false },
-      { data: "TRANSCRIPT_STATUS_FLAG", name: "Transcript Status", searchable: false, orderable: false },
-    ];
-
-    // Add Articulation Status if type is not "Failed" (matching CI3 line 150-152)
-    if (type !== "Failed") {
-      baseColumns.push({ data: "ARTICULATION_STATUS_FLAG", name: "Articulation Status", searchable: false, orderable: false });
+  // Table ref for refreshing
+  const tableRef = React.useRef<any>(null);
+  
+  // State for tracking row changes (for bulk update)
+  const [rowChanges, setRowChanges] = React.useState<Map<string, any>>(new Map());
+  
+  // Validate institution ID
+  const validateInstitution = async (value: string, batchId: string): Promise<{ valid: boolean; message?: string }> => {
+    if (!value || !batchId) {
+      return { valid: false, message: "Institution ID and Batch ID are required" };
     }
-
-    // Add Error Reason and Error Screenshot if not Processed or equivalenthours (matching CI3 line 142-146)
-    if (type !== "Processed" && type !== "equivalenthours") {
-      baseColumns.push({ 
-        data: "ERROR_REASON", 
-        name: "Error Reason / Action", 
-        searchable: false, 
-        orderable: false,
-        render: (data: any) => {
-          if (!data) return "-";
-          // Data already contains <br> tags from backend, render as HTML
-          return <span dangerouslySetInnerHTML={{ __html: data }} />;
-        }
+    
+    try {
+      const response = await api.post("/api/transcriptreports/chckinstid", {
+        instid: value,
+        batchId: batchId,
       });
-      baseColumns.push({ 
-        data: "ERROR_SCREENSHOT", 
-        name: "Error Screenshot", 
-        searchable: false, 
-        orderable: false,
-        render: (data: any, row: any) => {
-          // Check if ERROR_SCREENSHOT exists (matches CI3: if ($record->ERROR_SCREENSHOT != '' || !empty($record->ERROR_SCREENSHOT))
-          // Backend returns raw ERROR_SCREENSHOT value (file path) or None/null if empty
-          // We need to check if it's not empty, then construct URL from batch ID
-          if (!data || data === "" || data === null || data === undefined) {
-            return "-";
-          }
-          
-          // Backend returns raw ERROR_SCREENSHOT value, construct URL from batch ID
-          // Matches CI3: $imageurl = base_url() . 'errorscreenshot/' . $record->BATCH_ID;
-          const batchId = row?.BATCH_ID || "";
-          if (!batchId) {
-            return "-";
-          }
-          
-          // Construct URL: API_BASE_URL is "http://localhost:8000", so we need /api/viewfile/errorscreenshot/{batchId}
-          const imageUrl = `${API_BASE_URL}/api/viewfile/errorscreenshot/${batchId}`;
-          
-          return (
-            <a href={imageUrl} target="_blank" rel="noopener noreferrer" className="text-brand-500 hover:underline">
-              <span className="fa fa-eye"></span>
-            </a>
-          );
-        }
-      });
-    }
-
-    // Add Transcript Link (always present)
-      baseColumns.push({ 
-        data: "TRANSCRIPT_LINK", 
-        name: "Transcript", 
-        searchable: false, 
-        orderable: false,
-        render: (data: any, _row: any) => {
-          // Backend returns encrypted URL or None/null if transcript_link is empty
-          // Matches CI3 line 693: always shows link structure if transcript_link exists
-          if (!data || data === "" || data === null || data === undefined) {
-            return "-";
-          }
-          
-          // Backend already returns encrypted URL like: /api/viewfile/transcript_file?pdf={encrypted}
-          // getPdfUrl will prepend API_BASE_URL to make it a full URL
-          const pdfUrl = getPdfUrl(data, "transcript");
-          
-          if (!pdfUrl || pdfUrl === "") {
-            return "-";
-          }
-          
-          return (
-            <a href={pdfUrl} target="_blank" rel="noopener noreferrer" className="text-brand-500 hover:underline">
-              <span className="fa fa-link"></span>
-            </a>
-          );
-        }
-      });
-
-    // Add Action column if not Processed, equivalenthours, or empty (matching CI3 line 153-155)
-    if (type !== "Processed" && type !== "equivalenthours" && type !== "") {
-      baseColumns.push({ 
-        data: "ACTION", 
-        name: "Action", 
-        searchable: false, 
-        orderable: false,
-        render: (_data: any, row: any) => {
-          if (!hasUpdatePermission) return "-";
-          const batchId = row.BATCH_ID || "";
-          const searchField = row._search_field || "";
-          const articulationStatus = row.ARTICULATION_STATUS_FLAG || "";
-          
-          // Generate action dropdown based on search_field and articulation status
-          const actions = [];
-          
-          if (searchField === "Articulation-Kickouts" || searchField === "ArticulationKickouts") {
-            if (articulationStatus !== "Processed") {
-              actions.push({ label: "Process", value: "process", url: `/college/transcriptreports?action=process&batch_id=${batchId}` });
-            }
-          } else {
-            actions.push({ label: "Rerun", value: "rerun", url: `/college/transcriptreports?action=rerun&batch_id=${batchId}` });
-            actions.push({ label: "View Details", value: "view", url: `/college/transcriptreports?batch_id=${batchId}` });
-          }
-          
-          if (actions.length === 0) return "-";
-          
-          return (
-            <select 
-              className="rounded border border-gray-300 bg-white px-2 py-1 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-              onChange={(e) => {
-                if (e.target.value) {
-                  window.location.href = e.target.value;
-                }
-              }}
-            >
-              <option value="">Select Action</option>
-              {actions.map((action, idx) => (
-                <option key={idx} value={action.url}>{action.label}</option>
-              ))}
-            </select>
-          );
-        }
-      });
-    }
-
-    // Add Letter Sent Date and Transfer Letter File Link for Processed or equivalenthours (matching CI3 line 156-159)
-    if (type === "Processed" || type === "equivalenthours") {
-      baseColumns.push({ data: "LETTER_SENT_DATE", name: "Letter Sent Date", searchable: false, orderable: false });
-      baseColumns.push({ 
-        data: "TRANSFER_LETTER_FILE_LINK", 
-        name: "Transfer Letter File Link", 
-        searchable: false, 
-        orderable: false,
-        render: (data: any) => {
-          // Backend returns encrypted URL or None/null if transfer_letter_link is empty
-          // Matches CI3: only shows link if TRANSFER_LETTER_FILE_LINK is not empty
-          if (!data || data === "" || data === null || data === undefined) {
-            return "-";
-          }
-          
-          const pdfUrl = getPdfUrl(data, "articulation");
-          if (!pdfUrl || pdfUrl === "") {
-            return "-";
-          }
-          
-          return (
-            <a href={pdfUrl} target="_blank" rel="noopener noreferrer" className="text-brand-500 hover:underline">
-              <span className="fa fa-link"></span>
-            </a>
-          );
-        }
-      });
-    }
-
-    // Common columns
-    baseColumns.push({ 
-      data: "USER_COMMENTS", 
-      name: "User Comment", 
-      searchable: false, 
-      orderable: false,
-      render: (data: any, row: any) => {
-        const searchField = row._search_field || "";
-        // If not Processed or equivalenthours, show as textarea if has permission
-        if (searchField !== "Processed" && searchField !== "equivalenthours" && hasUpdatePermission) {
-          return (
-            <textarea 
-              className="w-full rounded border border-gray-300 px-2 py-1 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-              rows={2}
-              defaultValue={data || ""}
-              onBlur={(e) => {
-                // Handle save on blur - you can implement API call here
-                console.log("Save comment:", e.target.value, row.BATCH_ID);
-              }}
-            />
-          );
-        }
-        return <span>{data || "-"}</span>;
+      
+      const result = response.data?.result;
+      if (result === 1) {
+        return { valid: true };
+      } else if (result === 2) {
+        return { valid: false, message: "Institution ID does not exist in the Institution Mapping." };
+      } else if (result === 3) {
+        return { valid: false, message: "Transcript Institution Name and External Institution Name must be same." };
       }
-    });
-    baseColumns.push({ data: "LAST_UPDATED_DATETIME", name: "Updated On", searchable: false, orderable: true });
-    baseColumns.push({ data: "UPDATED_BY", name: "Updated By", searchable: true, orderable: true });
-    baseColumns.push({ data: "PROCESS_STATUS", name: "Process Status", searchable: false, orderable: false });
-
-    return baseColumns;
+      return { valid: false, message: "Validation failed" };
+    } catch (error: any) {
+      console.error("Institution validation error:", error);
+      return { valid: false, message: error.response?.data?.detail || "Validation error occurred" };
+    }
   };
-
+  
+  // Handle inline edit (for Student ID, Slate ID, Institution ID)
+  const handleInlineEdit = (batchId: string, field: string, value: string) => {
+    // Track changes for bulk update
+    const changes = rowChanges.get(batchId) || {};
+    if (field === "STUDENT_ID") {
+      changes.osuid = value;
+    } else if (field === "SLATE_REF_NUMBER") {
+      changes.slateid = value;
+    } else if (field === "INSTITUTION_ID") {
+      changes.instid = value;
+    }
+    // Only add to rowChanges if there's an action selected or other changes
+    if (changes.reprocessTranscript || changes.articulationProcess || value) {
+      setRowChanges(new Map(rowChanges.set(batchId, changes)));
+    }
+  };
+  
+  // Handle action change (transcriptreprocess, articulationreprocess)
+  const handleActionChange = (batchId: string, action: string, data: any) => {
+    const changes = rowChanges.get(batchId) || {};
+    if (data.type === "transcript") {
+      changes.reprocessTranscript = action;
+      changes.processTranscript_articulated = data.dataType || "";
+    } else if (data.type === "articulation") {
+      changes.articulationProcess = action;
+    }
+    // Only add to rowChanges if action is not "0"
+    if (action && action !== "0" && String(action) !== "0") {
+      setRowChanges(new Map(rowChanges.set(batchId, changes)));
+    } else {
+      // Remove from rowChanges if action is reset to "0"
+      const newChanges = new Map(rowChanges);
+      newChanges.delete(batchId);
+      setRowChanges(newChanges);
+    }
+  };
+  
+  // Handle comment change
+  const handleCommentChange = (batchId: string, comment: string) => {
+    const changes = rowChanges.get(batchId) || {};
+    changes.comment = comment;
+    setRowChanges(new Map(rowChanges.set(batchId, changes)));
+  };
+  
+  // Handle scenario change
+  const handleScenarioChange = (batchId: string, scenario: string) => {
+    const changes = rowChanges.get(batchId) || {};
+    changes.scenario = scenario;
+    // Only add to rowChanges if there's an action selected
+    if (changes.reprocessTranscript || changes.articulationProcess) {
+      setRowChanges(new Map(rowChanges.set(batchId, changes)));
+    }
+  };
+  
+  // Handle bulk update
+  const handleBulkUpdate = async () => {
+    if (rowChanges.size === 0) {
+      return;
+    }
+    
+    try {
+      // Process each row's changes
+      const updatePromises = Array.from(rowChanges.entries()).map(async ([batchId, changes]) => {
+        const updateData = {
+          batchId,
+          comment: changes.comment || "",
+          reprocessTranscript: changes.reprocessTranscript || "0",
+          articulationProcess: changes.articulationProcess || "0",
+          processTranscript_articulated: changes.processTranscript_articulated || "",
+          osuid: changes.STUDENT_ID || "",
+          slateid: changes.SLATE_REF_NUMBER || "",
+          scenario: changes.scenario || "",
+          instid: changes.INSTITUTION_ID || "",
+        };
+        
+        return api.post("/api/transcriptreports/updatechkstatus", updateData);
+      });
+      
+      await Promise.all(updatePromises);
+      
+      // Clear changes and refresh table
+      setRowChanges(new Map());
+      if (tableRef.current) {
+        tableRef.current.refresh();
+      } else {
+        setRefreshTrigger((prev) => prev + 1);
+      }
+    } catch (error: any) {
+      console.error("Bulk update error:", error);
+      // You could add toast notification here
+      alert(error.response?.data?.detail || "Error updating records. Please try again.");
+    }
+  };
+  
+  // Define columns based on type (matching CI3 view logic)
+  // Using columnConfig.ts for complete column definitions matching CI3 list.php
+  const getColumns = () => {
+    return createTranscriptReportColumns(
+      type,
+      hasUpdatePermission,
+      {
+        copyToClipboard,
+        getPdfUrl,
+        navigate,
+        refreshTable: () => {
+          if (tableRef.current) {
+            tableRef.current.refresh();
+          } else {
+            setRefreshTrigger((prev) => prev + 1);
+          }
+        },
+        handleInlineEdit,
+        validateInstitution: (value: string, batchId: string) => validateInstitution(value, batchId),
+        handleActionChange,
+        handleCommentChange,
+        handleScenarioChange,
+        rowChanges, // Pass rowChanges so columns can check if actions are selected
+      }
+    );
+  };
+  
   // Get export file name based on type
   const getExportFileName = () => {
     if (type === "Failed") {
@@ -456,6 +324,13 @@ export default function TranscriptReports() {
             {pageTitle}
           </h3>
           <div className="flex items-center gap-2">
+            <BulkUpdateButton
+              isVisible={Array.from(rowChanges.values()).some((changes: any) => 
+                (changes.reprocessTranscript && changes.reprocessTranscript !== "0") ||
+                (changes.articulationProcess && changes.articulationProcess !== "0")
+              )}
+              onClick={handleBulkUpdate}
+            />
             <Button
               onClick={() => setRefreshTrigger((prev) => prev + 1)}
               variant="outline"

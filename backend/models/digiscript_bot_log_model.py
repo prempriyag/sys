@@ -87,6 +87,22 @@ class DigiScriptBotLogModel:
         return ""
 
     @staticmethod
+    def generate_transcript_pdf_url(transcript_link: str) -> str:
+        """
+        Generate PDF URL for transcript file with encryption
+        Same as batchdetails_controller - returns encrypted URL ready for frontend
+        """
+        if not transcript_link or not str(transcript_link).strip():
+            return ""
+        
+        from helpers.encryption_helper import get_encrypt_file_path
+        
+        # Encrypt the file path
+        encrypted_path = get_encrypt_file_path(transcript_link)
+        # Return the encrypted URL in the same format as batchdetails
+        return f"/api/viewfile/transcript_file?pdf={encrypted_path}"
+
+    @staticmethod
     def get_order_by_column(column_name: str) -> str:
         """Map frontend column name to SQL column for ordering"""
         column_mapping = {
@@ -216,7 +232,8 @@ class DigiScriptBotLogModel:
                     "SCENARIO": record_dict.get("SCENARIO", ""),
                     "COMMENTS": record_dict.get("COMMENTS", ""),
                     "ERROR_REASON": record_dict.get("ERROR_REASON", ""),
-                    "TRANSCRIPT_LINK": transcript_link,
+                    # TRANSCRIPT_LINK: Generate encrypted URL if transcript_link exists (same as batchdetails)
+                    "TRANSCRIPT_LINK": DigiScriptBotLogModel.generate_transcript_pdf_url(transcript_link) if (transcript_link and str(transcript_link).strip()) else "",
                     "USER_COMMENTS": record_dict.get("USER_COMMENTS", ""),
                     "ERROR_SCREENSHOT": error_screenshot,
                     "LAST_UPDATED_DATETIME": str(record_dict.get("LAST_UPDATED_DATETIME", "")) if record_dict.get("LAST_UPDATED_DATETIME") else "",

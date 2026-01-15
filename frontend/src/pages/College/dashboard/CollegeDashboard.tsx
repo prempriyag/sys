@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
-import PageBreadcrumb from "../../components/common/PageBreadCrumb";
-import PageMeta from "../../components/common/PageMeta";
-import PageContainer, { PageWrapper } from "../../components/common/PageContainer";
-import Button from "../../components/ui/button/Button";
-import { API_BASE_URL } from "../../config/api";
+import PageBreadcrumb from "../../../components/common/PageBreadCrumb";
+import PageMeta from "../../../components/common/PageMeta";
+import PageContainer, { PageWrapper } from "../../../components/common/PageContainer";
+import Button from "../../../components/ui/button/Button";
+import { API_BASE_URL } from "../../../config/api";
 import Chart from "react-apexcharts";
-import { RefreshIcon } from "../../icons";
+import { RefreshIcon } from "../../../icons";
 import { ApexOptions } from "apexcharts";
 
 export default function CollegeDashboard() {

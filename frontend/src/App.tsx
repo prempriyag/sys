@@ -17,8 +17,11 @@ import FormElements from "./pages/Forms/FormElements";
 import Blank from "./pages/Blank";
 import AppLayout from "./layout/AppLayout";
 import { ScrollToTop } from "./components/common/ScrollToTop";
+import ToastContainer from "./components/ui/toast/ToastContainer";
 import Home from "./pages/Dashboard/Home";
-import CollegeDashboard from "./pages/Dashboard/CollegeDashboard";
+import CollegeDashboard from "./pages/College/dashboard/CollegeDashboard";
+import Dashboard2 from "./pages/College/dashboard/dashboard2";
+import Dashboard3 from "./pages/College/dashboard/dashboard3";
 import TranscriptReports from "./pages/College/transcriptreports/TranscriptReports";
 import ArticulationReports from "./pages/College/articulationreports/ArticulationReports";
 import DigiScriptReports from "./pages/College/digiscriptreports/DigiScriptReports";
@@ -64,6 +67,7 @@ import AddUser from "./pages/College/users/AddUser";
 import EditUser from "./pages/College/users/EditUser";
 import Help from "./pages/College/Help";
 import BatchDetails from "./pages/College/BatchDetails";
+import ErrorScreenshot from "./pages/College/ErrorScreenshot";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import PermissionRoute from "./components/auth/PermissionRoute";
 
@@ -71,6 +75,7 @@ export default function App() {
   return (
     <>
       <ScrollToTop />
+      <ToastContainer />
         <Routes>
           {/* Auth Layout - Public Routes */}
           {/* <Route path="/signin" element={<SignIn />} /> */}
@@ -91,6 +96,8 @@ export default function App() {
             
             {/* College module routes (default module) */}
             <Route path="/college/dashboard" element={<CollegeDashboard />} />
+            <Route path="/college/dashboard2" element={<Dashboard2 />} />
+            <Route path="/college/dashboard3" element={<Dashboard3 />} />
             
                     {/* College - User Management */}
                     <Route 
@@ -138,10 +145,11 @@ export default function App() {
             
             {/* College - Reports */}
             <Route path="/college/transcriptreports" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><TranscriptReports /></PermissionRoute>} />
-            <Route path="/college/transcriptequivalenthours" element={<PermissionRoute permission="college_equivalent_roll_mismatch" action="VIEW"><TranscriptReports /></PermissionRoute>} />
+            <Route path="/college/transcriptequivalenthours" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><TranscriptReports /></PermissionRoute>} />
             <Route path="/college/articulationreports" element={<ArticulationReports />} />
             <Route path="/college/digiscriptreports" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><DigiScriptReports /></PermissionRoute>} />
             <Route path="/college/batchdetails/:batchId" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><BatchDetails /></PermissionRoute>} />
+            <Route path="/college/errorscreenshot/:batchId" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><ErrorScreenshot /></PermissionRoute>} />
             
             {/* College - Uploads */}
             <Route

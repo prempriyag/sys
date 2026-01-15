@@ -344,16 +344,18 @@ class TranscriptReportsModel:
     def generate_transcript_pdf_url(transcript_link: str, base_url: str = "") -> str:
         """
         Generate PDF URL for transcript file with encryption
+        Same as batchdetails_controller - returns encrypted URL ready for frontend
         Matches CI3: SESSION_PATH . 'transcript_file?pdf=' . getencryptfilepath($record->TRANSCRIPT_LINK)
         """
-        if not transcript_link:
+        if not transcript_link or not str(transcript_link).strip():
             return ""
         
         from helpers.encryption_helper import get_encrypt_file_path
         
         # Encrypt the file path
         encrypted_path = get_encrypt_file_path(transcript_link)
-        return f"{base_url}/api/viewfile/transcript_file?pdf={encrypted_path}"
+        # Return the encrypted URL in the same format as batchdetails (without base_url for consistency)
+        return f"/api/viewfile/transcript_file?pdf={encrypted_path}"
 
     @staticmethod
     def generate_articulation_pdf_url(transfer_letter_link: str, base_url: str = "") -> str:

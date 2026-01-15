@@ -5,6 +5,7 @@ import PageMeta from "../../../components/common/PageMeta";
 import PageContainer, { PageWrapper } from "../../../components/common/PageContainer";
 import DataTable from "../../../components/ui/DataTable";
 import Button from "../../../components/ui/button/Button";
+import { useNavigate } from "react-router";
 import { API_ENDPOINTS, API_BASE_URL } from "../../../config/api";
 import { RefreshIcon, FilterIcon } from "../../../icons";
 import { useAuth } from "../../../context/AuthContext";
@@ -55,10 +56,33 @@ export default function ArticulationReports() {
   };
 
   // Helper function to generate PDF URL
-  const getPdfUrl = (filePath: string) => {
-    if (!filePath) return "";
+  // Backend now returns encrypted URLs in format: /api/viewfile/transcript_file?pdf={encrypted}
+  // Same as batchdetails - just prepend API_BASE_URL
+  const getPdfUrl = (filePath: string, type: "transcript" | "articulation" = "transcript") => {
+    if (!filePath || filePath === "" || filePath === null || filePath === undefined) {
+      return "";
+    }
+    
+    // If backend already returns a full URL (starts with http), use it as-is
+    if (filePath.startsWith("http://") || filePath.startsWith("https://")) {
+      return filePath;
+    }
+    
+    // Backend now returns encrypted URL in format: /api/viewfile/transcript_file?pdf={encrypted}
+    // Just prepend API_BASE_URL (same as batchdetails)
+    if (filePath.startsWith("/api/viewfile")) {
+      return `${API_BASE_URL}${filePath}`;
+    }
+    
+    // For backward compatibility: if we get a raw file path (shouldn't happen now)
+    // Remove leading slash if present
     const cleanPath = filePath.startsWith("/") ? filePath.substring(1) : filePath;
-    return `${API_BASE_URL.replace("/api", "")}/transcripts/${cleanPath}`;
+    // Construct URL - adjust base path as needed
+    if (type === "transcript") {
+      return `${API_BASE_URL.replace("/api", "")}/transcripts/${cleanPath}`;
+    } else {
+      return `${API_BASE_URL.replace("/api", "")}/articulation/${cleanPath}`;
+    }
   };
 
   const getPageTitle = () => {
@@ -561,13 +585,21 @@ export default function ArticulationReports() {
                 orderable: false,
                 render: (data: any, row: any) => {
                   // Show link if ERROR_SCREENSHOT exists (matches CI3 line 237-239)
-                  if (!data || data === "") return "-";
+                  if (!data || data === "" || data === null || data === undefined) return "-";
                   const batchId = row.BATCH_ID || "";
-                  const imageUrl = `${API_BASE_URL.replace("/api", "")}/errorscreenshot/${batchId}`;
+                  if (!batchId) return "-";
+                  // Navigate to error screenshot page (similar to batchdetails page)
                   return (
-                    <a href={imageUrl} target="_blank" rel="noopener noreferrer" className="text-brand-500 hover:underline">
-                      <span className="fa fa-eye"></span>
-                    </a>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/college/errorscreenshot/${batchId}`);
+                      }}
+                      className="text-brand-500 hover:underline inline-flex items-center"
+                    >
+                      <i className="fa fa-eye me-1"></i>
+                      View
+                    </button>
                   );
                 }
               },
@@ -577,12 +609,15 @@ export default function ArticulationReports() {
                 searchable: false, 
                 orderable: false,
                 render: (data: any) => {
-                  if (!data) return "-";
-                  const pdfUrl = getPdfUrl(data);
-                  if (!pdfUrl) return "-";
+                  if (!data || data === "" || data === null || data === undefined) return "-";
+                  // Backend already returns encrypted URL like: /api/viewfile/transcript_file?pdf={encrypted}
+                  // getPdfUrl will prepend API_BASE_URL to make it a full URL
+                  const pdfUrl = getPdfUrl(data, "transcript");
+                  if (!pdfUrl || pdfUrl === "") return "-";
                   return (
                     <a href={pdfUrl} target="_blank" rel="noopener noreferrer" className="text-brand-500 hover:underline">
-                      <span className="fa fa-link"></span>
+                      <i className="fa fa-link me-1"></i>
+                      View PDF
                     </a>
                   );
                 }

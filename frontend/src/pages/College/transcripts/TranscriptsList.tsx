@@ -4,6 +4,7 @@ import PageMeta from "../../../components/common/PageMeta";
 import PageContainer, { PageWrapper } from "../../../components/common/PageContainer";
 import DataTable from "../../../components/ui/DataTable";
 import Button from "../../../components/ui/button/Button";
+import StatusBadge from "../../../components/common/StatusBadge";
 import { API_ENDPOINTS, API_BASE_URL } from "../../../config/api";
 import { RefreshIcon, FilterIcon } from "../../../icons";
 import { useAuth } from "../../../context/AuthContext";
@@ -206,8 +207,26 @@ export default function TranscriptsList() {
               }
             },
             { data: "INSTITUTION_NAME", name: "Institution Name", searchable: true, orderable: true },
-            { data: "STATUS", name: "Status", searchable: true, orderable: true },
-            { data: "ARTICULATION_STATUS_FLAG", name: "Articulation Status", searchable: true, orderable: true },
+            { 
+              data: "STATUS", 
+              name: "Status", 
+              searchable: true, 
+              orderable: true,
+              render: (data: any) => {
+                if (!data) return "-";
+                return <StatusBadge status={data} size="sm" />;
+              }
+            },
+            { 
+              data: "ARTICULATION_STATUS_FLAG", 
+              name: "Articulation Status", 
+              searchable: true, 
+              orderable: true,
+              render: (data: any) => {
+                if (!data) return "-";
+                return <StatusBadge status={data} size="sm" />;
+              }
+            },
             { data: "UPLOADED_BY", name: "Uploaded By", searchable: true, orderable: true },
             { 
               data: "BATCH_ID", 

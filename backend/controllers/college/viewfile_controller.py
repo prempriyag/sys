@@ -5,16 +5,21 @@ Matches CI3 Viewfile.php functionality
 from fastapi import APIRouter, Query, HTTPException, Depends
 from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.orm import Session
-from typing import Optional
+from typing import Optional, Dict, Any
+from pydantic import BaseModel
 import os
 import logging
-from helpers.encryption_helper import file_decrypt
+from helpers.encryption_helper import file_decrypt, get_encrypt_file_path
 from database.connection import get_db
 from config.settings import Settings
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/viewfile", tags=["viewfile"])
 settings = Settings()
+
+class EncryptRequest(BaseModel):
+    """Request model for encrypting file paths"""
+    file_path: str
 
 # File path constants (should match CI3 constants)
 # These should be in .env or config
@@ -65,7 +70,7 @@ async def transcript_file(
         
         # Decrypt the file path
         path = file_decrypt(pdf)
-        
+        print(path)
         # Handle Ubuntu path conversion
         if IS_UBUNTU:
             path = path.replace('\\', '/')

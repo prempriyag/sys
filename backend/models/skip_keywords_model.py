@@ -91,3 +91,5 @@ class SkipKeywordsModel:
             logger.error(f"Error in get_skip_keywords_data: {e}")
             raise
 
+
+

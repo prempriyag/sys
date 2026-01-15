@@ -38,3 +38,5 @@ async def ajaxlist(request: DataTableRequest, db: Session = Depends(get_db)):
         logger.exception("Bot status report ajaxlist error")
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
+
+

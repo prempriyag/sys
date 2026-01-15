@@ -29,7 +29,7 @@ HOT_FOLDER = os.getenv('HOT_FOLDER', 'osucsc_dev')
 HOT_PATH = os.getenv('HOT_PATH', 'OSUCSC')
 SHARE_PATH = os.getenv('SHARE_PATH', f'\\\\172.16.2.22\\{HOT_FOLDER}\\')
 SHARE_PATH_REPLACE = os.getenv('SHARE_PATH_REPLACE', f'//172.16.2.22/{HOT_FOLDER}/')
-IS_UBUNTU = os.getenv('IS_UBUNTU', 'False').lower() == 'true'
+IS_UBUNTU = os.getenv('IS_UBUNTU', 'False').lower() == 'false'
 
 # Institution Name
 INS_NAME = os.getenv('INS_NAME', 'OSUCSC')
@@ -243,4 +243,6 @@ TABLES = {
     'GPA_PICK_MAPPING': TBL_GPA_PICK_MAPPING,
     'GPA_SCALE_MAPPING': TBL_GPA_SCALE_MAPPING,
 }
+
+
 

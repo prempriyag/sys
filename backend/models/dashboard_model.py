@@ -678,3 +678,5 @@ class DashboardModel:
             logger.exception("Error in get_colleges_list")
             return []
 
+
+

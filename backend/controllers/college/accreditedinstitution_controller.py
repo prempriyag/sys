@@ -126,3 +126,5 @@ async def delete(request: DeleteRequest, db: Session = Depends(get_db)):
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
+
+

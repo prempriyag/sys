@@ -150,3 +150,5 @@ class DegreeMappingModel:
             logger.error(f"Error in get_degree_mapping_data: {e}")
             raise
 
+
+

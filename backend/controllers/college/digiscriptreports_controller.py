@@ -87,3 +87,5 @@ async def ajaxlist(
         logger.exception("DigiScript reports ajaxlist error")
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
+
+

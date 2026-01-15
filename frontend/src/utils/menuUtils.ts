@@ -20,3 +20,5 @@ export const extractMenuPaths = (items: MenuItem[]): Array<{ path: string; name:
   traverse(items);
   return paths;
 };
+
+

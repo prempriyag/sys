@@ -72,3 +72,5 @@ async def ajaxlist(
         logger.exception("Articulation Bot Log ajaxlist error")
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
+
+

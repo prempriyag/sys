@@ -95,3 +95,5 @@ class SmtpModel:
             logger.exception(f"Error in get_smtp_data: {e}")
             raise
 
+
+

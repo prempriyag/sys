@@ -104,3 +104,5 @@ class AccreditedInstitutionModel:
             logger.error(f"Error in get_accredited_institution_data: {e}")
             raise
 
+
+

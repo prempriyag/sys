@@ -61,3 +61,5 @@ async def update_settings(request: SystemSettingsRequest, db: Session = Depends(
         logger.exception("Master settings update error")
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
+
+

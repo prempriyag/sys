@@ -235,3 +235,5 @@ class ArticulationBotLogModel:
             logger.error(f"Error in get_reports_data: {e}")
             raise
 
+
+

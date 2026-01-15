@@ -38,3 +38,5 @@ class MasterSettingsModel:
             db.rollback()
             raise
 
+
+

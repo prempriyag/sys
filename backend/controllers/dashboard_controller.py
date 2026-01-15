@@ -95,3 +95,5 @@ async def get_colleges_list(
         logger.exception("Get colleges list error")
         raise HTTPException(status_code=500, detail=f"Error fetching colleges: {str(e)}")
 
+
+

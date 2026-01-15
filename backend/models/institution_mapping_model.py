@@ -124,3 +124,5 @@ class InstitutionMappingModel:
             logger.error(f"Error in get_institution_mapping_data: {e}")
             raise
 
+
+

@@ -94,3 +94,5 @@ async def delete_role(request: DeleteRequest, db: Session = Depends(get_db)):
         logger.exception("Role delete error")
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
+
+

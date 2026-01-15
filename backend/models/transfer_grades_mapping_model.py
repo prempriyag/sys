@@ -85,3 +85,5 @@ class TransferGradesMappingModel:
             logger.error(f"Error in get_transfer_grades_mapping_data: {e}")
             raise
 
+
+

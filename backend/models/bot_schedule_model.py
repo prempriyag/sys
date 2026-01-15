@@ -118,3 +118,5 @@ class BotScheduleModel:
             logger.error(f"Error in get_bot_schedule_data: {e}")
             raise
 
+
+

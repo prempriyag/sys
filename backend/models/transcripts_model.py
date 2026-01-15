@@ -225,3 +225,5 @@ class TranscriptsModel:
             logger.error(f"Error in get_transcripts_data: {e}")
             raise
 
+
+

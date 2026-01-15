@@ -94,11 +94,12 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:5174",  # React frontend (Vite default port)
         "http://localhost:5173",  # React frontend (Vite default port)
+        "http://localhost:5174",  # React frontend (Vite alternative port)
         "http://localhost:3000",  # Alternative React port
-        "http://127.0.0.1:5174",
-        "http://127.0.0.1:3000",
+        "http://127.0.0.1:5173",  # React frontend (127.0.0.1)
+        "http://127.0.0.1:5174",  # React frontend (127.0.0.1)
+        "http://127.0.0.1:3000",  # Alternative React port (127.0.0.1)
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -370,6 +371,21 @@ except Exception as e:
 if mastersettings_controller is not None:
     app.include_router(mastersettings_controller.router)
     print("[MAIN] Successfully registered mastersettings_controller router")
+
+# Import settings controller (SMS and SMTP endpoints)
+try:
+    from controllers.college import settings_controller
+    print("[MAIN] Successfully imported settings_controller")
+except Exception as e:
+    print(f"[MAIN] ERROR importing settings_controller: {e}")
+    import traceback
+    traceback.print_exc()
+    settings_controller = None
+
+# Include settings router if imported successfully
+if settings_controller is not None:
+    app.include_router(settings_controller.router)
+    print("[MAIN] Successfully registered settings_controller router")
 
 # Import permissions and roles controllers
 try:

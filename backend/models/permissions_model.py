@@ -20,8 +20,11 @@ class PermissionsModel:
             for parent in parents:
                 parent_dict = dict(parent._mapping)
                 # Get children for this parent (matching CI3 structure - uses 'childs' not 'children')
-                child_query = text(f"SELECT * FROM {TBL_PERMISSIONS} WHERE TYPE = :parent_id ORDER BY PERMISSION_NAME")
-                children = db.execute(child_query, {"parent_id": parent_dict.get("ID")}).fetchall()
+                # TYPE column is nvarchar, so convert parent_id to string for comparison
+                parent_id = str(parent_dict.get("ID"))
+                # Use CAST on parameter to ensure SQL Server treats it as string
+                child_query = text(f"SELECT * FROM {TBL_PERMISSIONS} WHERE TYPE = CAST(:parent_id AS NVARCHAR(50)) ORDER BY PERMISSION_NAME")
+                children = db.execute(child_query, {"parent_id": parent_id}).fetchall()
                 parent_dict["childs"] = [dict(child._mapping) for child in children]  # CI3 uses 'childs'
                 tree.append(parent_dict)
             

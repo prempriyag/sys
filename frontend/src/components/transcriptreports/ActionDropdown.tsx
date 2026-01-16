@@ -56,15 +56,19 @@ export default function ActionDropdown({
     const selectedOption = e.target.selectedOptions[0];
     const dataType = selectedOption?.getAttribute("data-type") || "";
     
+    console.log('ActionDropdown handleChange:', { value, batchId, type, dataType });
+    
     setSelectedValue(value);
     
     // Always call onActionChange, even for "0" to properly track state
+    console.log('ActionDropdown calling onActionChange with:', { value, batchId, type, searchField, articulationStatus, dataType });
     onActionChange(value, batchId, {
       type,
       searchField,
       articulationStatus,
       dataType, // Pass data-type for Processed options
     });
+    console.log('ActionDropdown onActionChange called');
   };
 
   return (

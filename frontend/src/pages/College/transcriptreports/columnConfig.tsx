@@ -38,7 +38,7 @@ export const createTranscriptReportColumns = (
     rowChanges?: Map<string, any>; // Track pending changes per row
   }
 ): ColumnConfig[] => {
-  const { copyToClipboard, getPdfUrl, navigate } = helpers;
+  const { copyToClipboard, getPdfUrl, navigate, handleInlineEdit, validateInstitution, handleActionChange, handleCommentChange, handleScenarioChange, rowChanges } = helpers || {};
   
   const columns: ColumnConfig[] = [
     // Column 0: INSTITUTION_NAME
@@ -55,10 +55,9 @@ export const createTranscriptReportColumns = (
       name: "Institution ID",
       searchable: true,
       orderable: true,
-      render: (data: any, row: any, helpers: any) => {
+      render: (data: any, row: any) => {
         const batchId = row.BATCH_ID || "";
         const searchField = row._search_field || "";
-        const { handleInlineEdit, validateInstitution, rowChanges } = helpers || {};
         
         // Check if this row has pending changes (action selected)
         const hasPendingChanges = rowChanges?.get?.(batchId);
@@ -145,10 +144,11 @@ export const createTranscriptReportColumns = (
       searchable: true,
       orderable: true,
       textCenter: true,
-      render: (data: any, row: any, helpers: any) => {
+      render: (data: any, row: any) => {
         const batchId = row.BATCH_ID || "";
         const studentName = row.STUDENT_FULL_NAME || "";
         const searchField = row._search_field || "";
+        const refreshTable = helpers?.refreshTable;
         
         if (!data) {
           return <span>-</span>;
@@ -162,7 +162,7 @@ export const createTranscriptReportColumns = (
             searchField={searchField}
             hasUpdatePermission={hasUpdatePermission}
             onSuccess={() => {
-              if (helpers?.refreshTable) helpers.refreshTable();
+              if (refreshTable) refreshTable();
             }}
           />
         );
@@ -177,10 +177,11 @@ export const createTranscriptReportColumns = (
       searchable: true,
       orderable: true,
       textCenter: true,
-      render: (data: any, row: any, helpers: any) => {
+      render: (data: any, row: any) => {
         const batchId = row.BATCH_ID || "";
         const studentName = row.STUDENT_FULL_NAME || "";
         const searchField = row._search_field || "";
+        const refreshTable = helpers?.refreshTable;
         
         if (!data) {
           return <span>-</span>;
@@ -194,7 +195,7 @@ export const createTranscriptReportColumns = (
             searchField={searchField}
             hasUpdatePermission={hasUpdatePermission}
             onSuccess={() => {
-              if (helpers?.refreshTable) helpers.refreshTable();
+              if (refreshTable) refreshTable();
             }}
           />
         );
@@ -514,21 +515,31 @@ export const createTranscriptReportColumns = (
   
   // Column 30: ACTION (notexport, noorder) - only if not Processed, equivalenthours, or empty
   if (type !== "Processed" && type !== "equivalenthours" && type !== "") {
+    // Debug: Check if handlers are provided (helpers are already captured in closure from line 41)
+    if (!handleActionChange) {
+      console.error('columnConfig: handleActionChange is missing in helpers!', { 
+        helpersKeys: helpers ? Object.keys(helpers) : 'helpers is undefined',
+        helpers 
+      });
+    }
+    
     columns.push({
       data: "ACTION",
       name: "Action",
       searchable: false,
       orderable: false, // noorder
       exportable: false, // notexport
-      render: (_data: any, row: any, helpers: any) => {
+      render: (_data: any, row: any) => {
         if (!hasUpdatePermission) return "-";
-        const { handleActionChange, handleCommentChange, handleScenarioChange } = helpers || {};
+        
         return (
           <RowActions
             row={row}
             type={type}
             hasUpdatePermission={hasUpdatePermission}
-            onActionChange={handleActionChange || (() => {})}
+            onActionChange={handleActionChange || ((action: string, batchId: string, data: any) => {
+              console.error('RowActions: Using fallback empty handler!', { action, batchId, data });
+            })}
             onCommentChange={handleCommentChange || (() => {})}
             onScenarioChange={handleScenarioChange || (() => {})}
           />
@@ -573,10 +584,9 @@ export const createTranscriptReportColumns = (
     name: "User Comment",
     searchable: false,
     orderable: false, // noorder
-    render: (data: any, row: any, helpers: any) => {
-      const searchField = row._search_field || "";
-      const batchId = row.BATCH_ID || "";
-      const { handleCommentChange, rowChanges } = helpers || {};
+      render: (data: any, row: any) => {
+        const searchField = row._search_field || "";
+        const batchId = row.BATCH_ID || "";
       
       // For Processed/equivalenthours, show plain text
       if (searchField === "Processed" || searchField === "equivalenthours") {

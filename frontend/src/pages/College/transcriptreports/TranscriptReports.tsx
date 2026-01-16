@@ -141,7 +141,9 @@ export default function TranscriptReports() {
         batchId: batchId,
       });
       
-      const result = response.data?.result;
+      const result = response.result;
+      console.log("Extracted result:", result);
+    console.log("Extracted message:", response.message);
       if (result === 1) {
         return { valid: true };
       } else if (result === 2) {
@@ -158,55 +160,101 @@ export default function TranscriptReports() {
   
   // Handle inline edit (for Student ID, Slate ID, Institution ID)
   const handleInlineEdit = (batchId: string, field: string, value: string) => {
-    // Track changes for bulk update
-    const changes = rowChanges.get(batchId) || {};
-    if (field === "STUDENT_ID") {
-      changes.osuid = value;
-    } else if (field === "SLATE_REF_NUMBER") {
-      changes.slateid = value;
-    } else if (field === "INSTITUTION_ID") {
-      changes.instid = value;
-    }
-    // Always update rowChanges to track the field changes
-    // They will be included in bulk update if there's an action selected
-    setRowChanges(new Map(rowChanges.set(batchId, changes)));
+    setRowChanges((prevChanges) => {
+      const newChanges = new Map(prevChanges);
+      const changes = { ...(newChanges.get(batchId) || {}) };
+      if (field === "STUDENT_ID") {
+        changes.osuid = value;
+      } else if (field === "SLATE_REF_NUMBER") {
+        changes.slateid = value;
+      } else if (field === "INSTITUTION_ID") {
+        changes.instid = value;
+      }
+      // Always update rowChanges to track the field changes
+      // They will be included in bulk update if there's an action selected
+      newChanges.set(batchId, changes);
+      return newChanges;
+    });
   };
   
   // Handle action change (transcriptreprocess, articulationreprocess)
+  // Matching CI3 logic: show button when action is Processed, Rerun, or Noaction
+  // Hide button when action is "0" or empty
   const handleActionChange = (batchId: string, action: string, data: any) => {
-    const changes = rowChanges.get(batchId) || {};
-    if (data.type === "transcript") {
-      changes.reprocessTranscript = action;
-      changes.processTranscript_articulated = data.dataType || "";
-    } else if (data.type === "articulation") {
-      changes.articulationProcess = action;
-    }
-    // Only add to rowChanges if action is not "0"
-    if (action && action !== "0" && String(action) !== "0") {
-      setRowChanges(new Map(rowChanges.set(batchId, changes)));
-    } else {
-      // Remove from rowChanges if action is reset to "0"
-      const newChanges = new Map(rowChanges);
-      newChanges.delete(batchId);
-      setRowChanges(newChanges);
-    }
+    console.log('=== TranscriptReports handleActionChange START ===');
+    console.log('handleActionChange called:', { batchId, action, data });
+    console.log('Current rowChanges before update:', Array.from(rowChanges.entries()));
+    
+    setRowChanges((prevChanges) => {
+      const newChanges = new Map(prevChanges);
+      const changes = { ...(newChanges.get(batchId) || {}) };
+      
+      if (data.type === "transcript") {
+        changes.reprocessTranscript = action;
+        changes.processTranscript_articulated = data.dataType || "";
+      } else if (data.type === "articulation") {
+        changes.articulationProcess = action;
+      }
+      
+      // Check if action is valid (not "0" or empty) - matching CI3 lines 563, 682, 776, 824, 829, 839
+      const actionStr = String(action || "").trim();
+      const isActionSelected = actionStr && actionStr !== "0";
+      
+      console.log('Action validation:', { actionStr, isActionSelected, changes });
+      
+      if (isActionSelected) {
+        // Add or update the row in rowChanges - button will show
+        newChanges.set(batchId, changes);
+        console.log('Added/updated row in changes:', batchId, changes);
+      } else {
+        // Action is "0" - check if there are other changes (like inline edits)
+        const hasOtherChanges = changes.osuid || changes.slateid || changes.instid || changes.comment || changes.scenario;
+        if (!hasOtherChanges) {
+          // No other changes, remove from rowChanges - button will hide if no other rows have actions
+          newChanges.delete(batchId);
+          console.log('Removed row from changes:', batchId);
+        } else {
+          // Keep the row but clear the action (for inline edits that might be saved later)
+          if (data.type === "transcript") {
+            changes.reprocessTranscript = undefined;
+            changes.processTranscript_articulated = undefined;
+          } else if (data.type === "articulation") {
+            changes.articulationProcess = undefined;
+          }
+          newChanges.set(batchId, changes);
+          console.log('Kept row but cleared action:', batchId, changes);
+        }
+      }
+      
+      console.log('Final newChanges:', Array.from(newChanges.entries()));
+      return newChanges;
+    });
+    console.log('=== TranscriptReports handleActionChange END ===');
   };
   
   // Handle comment change
   const handleCommentChange = (batchId: string, comment: string) => {
-    const changes = rowChanges.get(batchId) || {};
-    changes.comment = comment;
-    setRowChanges(new Map(rowChanges.set(batchId, changes)));
+    setRowChanges((prevChanges) => {
+      const newChanges = new Map(prevChanges);
+      const changes = { ...(newChanges.get(batchId) || {}) };
+      changes.comment = comment;
+      newChanges.set(batchId, changes);
+      return newChanges;
+    });
   };
   
   // Handle scenario change
   const handleScenarioChange = (batchId: string, scenario: string) => {
-    const changes = rowChanges.get(batchId) || {};
-    changes.scenario = scenario;
-    // Only add to rowChanges if there's an action selected
-    if (changes.reprocessTranscript || changes.articulationProcess) {
-      setRowChanges(new Map(rowChanges.set(batchId, changes)));
-    }
+    setRowChanges((prevChanges) => {
+      const newChanges = new Map(prevChanges);
+      const changes = { ...(newChanges.get(batchId) || {}) };
+      changes.scenario = scenario;
+      // Only add to rowChanges if there's an action selected
+      if (changes.reprocessTranscript || changes.articulationProcess) {
+        newChanges.set(batchId, changes);
+      }
+      return newChanges;
+    });
   };
   
   // Handle bulk update
@@ -281,6 +329,8 @@ export default function TranscriptReports() {
   // Define columns based on type (matching CI3 view logic)
   // Using columnConfig.ts for complete column definitions matching CI3 list.php
   const getColumns = () => {
+    console.log('getColumns called with handleActionChange:', typeof handleActionChange, handleActionChange);
+    
     return createTranscriptReportColumns(
       type,
       hasUpdatePermission,
@@ -297,9 +347,9 @@ export default function TranscriptReports() {
         },
         handleInlineEdit,
         validateInstitution: (value: string, batchId: string) => validateInstitution(value, batchId),
-        handleActionChange,
-        handleCommentChange,
-        handleScenarioChange,
+        handleActionChange: handleActionChange, // Explicitly pass the function
+        handleCommentChange: handleCommentChange,
+        handleScenarioChange: handleScenarioChange,
         rowChanges, // Pass rowChanges so columns can check if actions are selected
       }
     );
@@ -357,15 +407,27 @@ export default function TranscriptReports() {
           </h3>
           <div className="flex items-center gap-2">
             <BulkUpdateButton
-              isVisible={Array.from(rowChanges.values()).some((changes: any) => {
-                const hasTranscriptAction = changes.reprocessTranscript && 
-                  changes.reprocessTranscript !== "0" && 
-                  changes.reprocessTranscript !== 0;
-                const hasArticulationAction = changes.articulationProcess && 
-                  changes.articulationProcess !== "0" && 
-                  changes.articulationProcess !== 0;
-                return hasTranscriptAction || hasArticulationAction;
-              })}
+              isVisible={(() => {
+                const hasAction = Array.from(rowChanges.values()).some((changes: any) => {
+                  // Show button if any row has an action selected (not "0") - matching CI3 logic
+                  // CI3 shows button when: Processed, Rerun, or Noaction is selected (lines 563, 682, 776, 824, 829, 839)
+                  const transcriptAction = String(changes.reprocessTranscript || "").trim();
+                  const articulationAction = String(changes.articulationProcess || "").trim();
+                  
+                  const hasTranscriptAction = transcriptAction && transcriptAction !== "0";
+                  const hasArticulationAction = articulationAction && articulationAction !== "0";
+                  
+                  return hasTranscriptAction || hasArticulationAction;
+                });
+                
+                console.log('BulkUpdateButton isVisible check:', {
+                  rowChangesSize: rowChanges.size,
+                  rowChangesEntries: Array.from(rowChanges.entries()),
+                  hasAction
+                });
+                
+                return hasAction;
+              })()}
               onClick={handleBulkUpdate}
             />
             <Button

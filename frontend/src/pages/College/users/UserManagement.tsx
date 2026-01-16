@@ -8,17 +8,26 @@ import Button from "../../../components/ui/button/Button";
 import StatusBadge from "../../../components/common/StatusBadge";
 import { api, API_ENDPOINTS, API_BASE_URL, getAuthToken } from "../../../config/api";
 import { useAuth } from "../../../context/AuthContext";
+import { useToast } from "../../../context/ToastContext";
 import { PencilIcon, TrashBinIcon, LockIcon } from "../../../icons";
 import ResetPasswordModal from "./ResetPasswordModal";
+import AddUserModal from "./AddUserModal";
+import EditUserModal from "./EditUserModal";
+import ConfirmationModal from "../../../components/common/ConfirmationModal";
 
 export default function UserManagement() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
+  const { alertsuccess, alerterror } = useToast();
   const [error, setError] = useState<string | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [showResetPasswordModal, setShowResetPasswordModal] = useState(false);
+  const [showAddUserModal, setShowAddUserModal] = useState(false);
+  const [showEditUserModal, setShowEditUserModal] = useState(false);
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const [selectedUserName, setSelectedUserName] = useState<string>("");
+  const [userToDelete, setUserToDelete] = useState<number | null>(null);
 
   // Check authentication on mount
   useEffect(() => {
@@ -33,17 +42,26 @@ export default function UserManagement() {
     }
   }, [isAuthenticated, navigate]);
 
-  // Handle delete user
-  const handleDeleteUser = async (userId: number) => {
-    if (!confirm("Are you sure you want to delete this user?")) {
-      return;
-    }
+  // Handle delete user click
+  const handleDeleteClick = (userId: number) => {
+    setUserToDelete(userId);
+    setShowDeleteConfirmModal(true);
+  };
+
+  // Handle delete user confirmation
+  const handleDeleteUser = async () => {
+    if (!userToDelete) return;
 
     try {
-      await api.delete(`${API_ENDPOINTS.USERS_DELETE}/${userId}`);
+      await api.delete(`${API_ENDPOINTS.USERS_DELETE}/${userToDelete}`);
+      alertsuccess("User deleted successfully");
       setRefreshTrigger((prev) => prev + 1);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete user");
+      setShowDeleteConfirmModal(false);
+      setUserToDelete(null);
+    } catch (err: any) {
+      alerterror(err.response?.data?.message || err.message || "Failed to delete user");
+      setShowDeleteConfirmModal(false);
+      setUserToDelete(null);
     }
   };
 
@@ -51,9 +69,10 @@ export default function UserManagement() {
   const handleStatusUpdate = async (userId: number, status: number) => {
     try {
       await api.post(`${API_ENDPOINTS.USERS_UPDATE_STATUS}/${userId}?dvalue=${status}`);
+      alertsuccess("User status updated successfully");
       setRefreshTrigger((prev) => prev + 1);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update status");
+    } catch (err: any) {
+      alerterror(err.response?.data?.message || err.message || "Failed to update status");
     }
   };
 
@@ -87,9 +106,10 @@ export default function UserManagement() {
     return match ? parseInt(match[1]) : null;
   };
 
-  // Handle edit click - navigate to edit page
+  // Handle edit click - show edit modal
   const handleEditClick = (userId: number) => {
-    navigate(`/college/users/edit/${userId}`);
+    setSelectedUserId(userId);
+    setShowEditUserModal(true);
   };
 
   // Handle reset password click
@@ -114,7 +134,7 @@ export default function UserManagement() {
             User Management
           </h3>
           <Button
-            onClick={() => navigate("/college/users/add")}
+            onClick={() => setShowAddUserModal(true)}
           >
             Add User
           </Button>
@@ -236,7 +256,7 @@ export default function UserManagement() {
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleDeleteUser(deleteUserId);
+                          handleDeleteClick(deleteUserId);
                         }}
                         className="text-red-500 hover:text-red-600 dark:text-red-400 transition-colors"
                         title="Delete User"
@@ -256,6 +276,28 @@ export default function UserManagement() {
         />
       </PageContainer>
 
+      {/* Add User Modal */}
+      <AddUserModal
+        isOpen={showAddUserModal}
+        onClose={() => setShowAddUserModal(false)}
+        onSuccess={() => {
+          setRefreshTrigger((prev) => prev + 1);
+        }}
+      />
+
+      {/* Edit User Modal */}
+      <EditUserModal
+        isOpen={showEditUserModal}
+        userId={selectedUserId}
+        onClose={() => {
+          setShowEditUserModal(false);
+          setSelectedUserId(null);
+        }}
+        onSuccess={() => {
+          setRefreshTrigger((prev) => prev + 1);
+        }}
+      />
+
       {/* Reset Password Modal */}
       {showResetPasswordModal && selectedUserId && (
         <ResetPasswordModal
@@ -271,6 +313,21 @@ export default function UserManagement() {
           }}
         />
       )}
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showDeleteConfirmModal}
+        onClose={() => {
+          setShowDeleteConfirmModal(false);
+          setUserToDelete(null);
+        }}
+        onConfirm={handleDeleteUser}
+        title="Confirm Delete"
+        message="Are you sure you want to delete this user? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        confirmVariant="danger"
+      />
     </PageWrapper>
   );
 }

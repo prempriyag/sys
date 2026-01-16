@@ -32,10 +32,7 @@ export default function RowActions({
   useEffect(() => {
     if (transcriptAction === "0" && articulationAction === "0") return;
 
-    let comment = "";
-    const studentId = row.STUDENT_ID || "";
-    const institutionId = row.INSTITUTION_ID || "";
-    const slateId = row.SLATE_REF_NUMBER || "";
+           let comment = "";
 
     if (transcriptAction === "Processed") {
       const selectedOption = document.querySelector(
@@ -66,15 +63,31 @@ export default function RowActions({
   }, [transcriptAction, articulationAction, batchId]);
 
   const handleTranscriptActionChange = (action: string, batchId: string, data: any) => {
+    console.log('RowActions handleTranscriptActionChange:', { action, batchId, data });
+    console.log('RowActions onActionChange type:', typeof onActionChange, onActionChange);
     setTranscriptAction(action);
     // Always call onActionChange to properly track state (including "0" to remove)
-    onActionChange(action, batchId, { ...data, type: "transcript" });
+    console.log('RowActions calling onActionChange with:', { action, batchId, data: { ...data, type: "transcript" } });
+    if (typeof onActionChange === 'function') {
+      onActionChange(action, batchId, { ...data, type: "transcript" });
+      console.log('RowActions onActionChange called successfully');
+    } else {
+      console.error('RowActions ERROR: onActionChange is not a function!', { onActionChange });
+    }
   };
 
   const handleArticulationActionChange = (action: string, batchId: string, data: any) => {
+    console.log('RowActions handleArticulationActionChange:', { action, batchId, data });
+    console.log('RowActions onActionChange type:', typeof onActionChange, onActionChange);
     setArticulationAction(action);
     // Always call onActionChange to properly track state (including "0" to remove)
-    onActionChange(action, batchId, { ...data, type: "articulation" });
+    console.log('RowActions calling onActionChange with:', { action, batchId, data: { ...data, type: "articulation" } });
+    if (typeof onActionChange === 'function') {
+      onActionChange(action, batchId, { ...data, type: "articulation" });
+      console.log('RowActions onActionChange called successfully');
+    } else {
+      console.error('RowActions ERROR: onActionChange is not a function!', { onActionChange });
+    }
   };
 
   const handleScenarioChange = (e: React.ChangeEvent<HTMLSelectElement>) => {

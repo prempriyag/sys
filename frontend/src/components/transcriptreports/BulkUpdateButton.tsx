@@ -21,6 +21,8 @@ export default function BulkUpdateButton({
 }: BulkUpdateButtonProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const { alertsuccess, alerterror } = useToast();
+  
+  console.log('BulkUpdateButton render:', { isVisible, rowsLength: rows.length, disabled, isProcessing });
 
   const handleBulkUpdate = async () => {
     // If custom onClick is provided, use it
@@ -108,17 +110,17 @@ export default function BulkUpdateButton({
     }
   };
 
-  if (!isVisible && rows.length === 0) {
-    return null;
-  }
-
+  // Always render the button, but control visibility with style (matching CI3 behavior)
+  // CI3 uses $("#btnId").show() and $("#btnId").hide() to control visibility
+  const shouldShow = isVisible || rows.length > 0;
+  
   return (
     <button
       onClick={handleBulkUpdate}
       disabled={disabled || isProcessing}
       className="btn btn-primary submitId submitId_float"
       id="btnId"
-      style={{ display: (isVisible || rows.length > 0) ? "block" : "none" }}
+      style={{ display: shouldShow ? "block" : "none" }}
     >
       {isProcessing ? (
         <>

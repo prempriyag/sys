@@ -3,6 +3,7 @@ import { useState } from "react";
 import { api } from "../../config/api";
 import { useToast } from "../../context/ToastContext";
 import { PencilIcon, PaperPlaneIcon, CloseIcon, CopyIcon } from "../../icons";
+import ConfirmationModal from "../common/ConfirmationModal";
 
 interface EditableSlateIdProps {
   value: string;
@@ -24,6 +25,7 @@ export default function EditableSlateId({
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(value);
   const [isSaving, setIsSaving] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
   const { alertsuccess, alerterror } = useToast();
 
   // Only show edit icon for Failed/Rerun types (matching CI3)
@@ -40,23 +42,17 @@ export default function EditableSlateId({
     setEditValue(value);
   };
 
-  const handleSave = async () => {
+  const handleSaveClick = () => {
     if (isSaving || !editValue || editValue === value) {
       setIsEditing(false);
       return;
     }
+    // Show confirmation modal instead of window.confirm
+    setShowConfirmModal(true);
+  };
 
-    // Show confirmation dialog (matching CI3 bootbox.confirm)
-    const confirmed = window.confirm(
-      `Slate ID - ${editValue} is being updated for Student '${studentName}'.\nPlease Confirm`
-    );
-
-    if (!confirmed) {
-      setIsEditing(false);
-      setEditValue(value);
-      return;
-    }
-
+  const handleConfirmSave = async () => {
+    setShowConfirmModal(false);
     setIsSaving(true);
 
     try {
@@ -103,66 +99,83 @@ export default function EditableSlateId({
     );
   }
 
-  // For Failed/Rerun - show with edit icon
-  if (isEditing) {
-    return (
-      <div className="inline-flex items-center gap-2">
-        <button
-          type="button"
-          className="btn-copy-icon cursor-pointer hover:text-brand-500"
-          onClick={() => navigator.clipboard.writeText(value)}
-          title="Copy to clipboard"
-        >
-          <CopyIcon className="w-4 h-4" />
-        </button>
-        <input
-          type="text"
-          className="SLATEID px-2 py-1 border border-gray-300 rounded text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-          value={editValue}
-          onChange={(e) => setEditValue(e.target.value)}
-          autoFocus
-        />
-        <button
-          onClick={handleSave}
-          disabled={isSaving}
-          className="EDIT_SLATEID text-green-500 hover:text-green-700 cursor-pointer disabled:opacity-50"
-          title="Save"
-        >
-          <PaperPlaneIcon className="w-4 h-4" />
-        </button>
-        <button
-          onClick={handleCancel}
-          disabled={isSaving}
-          className="CLOSE_SLATEID text-red-500 hover:text-red-700 cursor-pointer disabled:opacity-50"
-          title="Cancel"
-        >
-          <CloseIcon className="w-4 h-4" />
-        </button>
-      </div>
-    );
-  }
-
   return (
-    <div className="inline-flex items-center gap-2">
-      <button
-        type="button"
-        className="btn-copy-icon cursor-pointer hover:text-brand-500"
-        onClick={() => navigator.clipboard.writeText(value)}
-        title="Copy to clipboard"
-      >
-        <CopyIcon className="w-4 h-4" />
-      </button>
-      {showEditIcon && (
-        <span
-          className="slateid_edit inline-flex items-center cursor-pointer text-blue-500 hover:text-blue-700"
-          onClick={handleEditClick}
-          title="Edit Student Slate ID"
-        >
-          <PencilIcon className="w-4 h-4 me-1" />
-        </span>
+    <>
+      {/* For Failed/Rerun - show with edit icon */}
+      {isEditing ? (
+        <div className="inline-flex items-center gap-2">
+          <button
+            type="button"
+            className="btn-copy-icon cursor-pointer hover:text-brand-500"
+            onClick={() => navigator.clipboard.writeText(value)}
+            title="Copy to clipboard"
+          >
+            <CopyIcon className="w-4 h-4" />
+          </button>
+          <input
+            type="text"
+            className="SLATEID px-2 py-1 border border-gray-300 rounded text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            autoFocus
+          />
+          <button
+            onClick={handleSaveClick}
+            disabled={isSaving}
+            className="EDIT_SLATEID text-green-500 hover:text-green-700 cursor-pointer disabled:opacity-50"
+            title="Save"
+          >
+            <PaperPlaneIcon className="w-4 h-4" />
+          </button>
+          <button
+            onClick={handleCancel}
+            disabled={isSaving}
+            className="CLOSE_SLATEID text-red-500 hover:text-red-700 cursor-pointer disabled:opacity-50"
+            title="Cancel"
+          >
+            <CloseIcon className="w-4 h-4" />
+          </button>
+        </div>
+      ) : (
+        <div className="inline-flex items-center gap-2">
+          <button
+            type="button"
+            className="btn-copy-icon cursor-pointer hover:text-brand-500"
+            onClick={() => navigator.clipboard.writeText(value)}
+            title="Copy to clipboard"
+          >
+            <CopyIcon className="w-4 h-4" />
+          </button>
+          {showEditIcon && (
+            <span
+              className="slateid_edit inline-flex items-center cursor-pointer text-blue-500 hover:text-blue-700"
+              onClick={handleEditClick}
+              title="Edit Student Slate ID"
+            >
+              <PencilIcon className="w-4 h-4 me-1" />
+            </span>
+          )}
+          <span className="student-id-text">{value}</span>
+        </div>
       )}
-      <span className="student-id-text">{value}</span>
-    </div>
+      
+      {/* Confirmation Modal - Always rendered, controlled by isOpen */}
+      <ConfirmationModal
+        isOpen={showConfirmModal}
+        onClose={() => {
+          setShowConfirmModal(false);
+          setIsEditing(false);
+          setEditValue(value);
+        }}
+        onConfirm={handleConfirmSave}
+        title="Confirm Slate ID Update"
+        message={`Slate ID - ${editValue} is being updated for Student '${studentName}'. Please Confirm`}
+        confirmText="Confirm"
+        cancelText="Cancel"
+        confirmVariant="primary"
+        isLoading={isSaving}
+      />
+    </>
   );
 }
 

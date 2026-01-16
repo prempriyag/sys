@@ -67,11 +67,13 @@ export default function RowActions({
 
   const handleTranscriptActionChange = (action: string, batchId: string, data: any) => {
     setTranscriptAction(action);
+    // Always call onActionChange to properly track state (including "0" to remove)
     onActionChange(action, batchId, { ...data, type: "transcript" });
   };
 
   const handleArticulationActionChange = (action: string, batchId: string, data: any) => {
     setArticulationAction(action);
+    // Always call onActionChange to properly track state (including "0" to remove)
     onActionChange(action, batchId, { ...data, type: "articulation" });
   };
 

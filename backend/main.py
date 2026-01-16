@@ -172,7 +172,7 @@ if transcripts_controller is not None:
 
 # Import stored procedure controller
 try:
-    from controllers.college import storedprocedure_controller
+    from controllers.setup import storedprocedure_controller
     print("[MAIN] Successfully imported storedprocedure_controller")
 except Exception as e:
     print(f"[MAIN] ERROR importing storedprocedure_controller: {e}")
@@ -187,7 +187,7 @@ if storedprocedure_controller is not None:
 
 # Import degree mapping controller
 try:
-    from controllers.college import degreemapping_controller
+    from controllers.setup import degreemapping_controller
     print("[MAIN] Successfully imported degreemapping_controller")
 except Exception as e:
     print(f"[MAIN] ERROR importing degreemapping_controller: {e}")
@@ -202,7 +202,7 @@ if degreemapping_controller is not None:
 
 # Import term mapping controller
 try:
-    from controllers.college import termmapping_controller
+    from controllers.setup import termmapping_controller
     print("[MAIN] Successfully imported termmapping_controller")
 except Exception as e:
     print(f"[MAIN] ERROR importing termmapping_controller: {e}")
@@ -217,7 +217,7 @@ if termmapping_controller is not None:
 
 # Import term name mapping controller
 try:
-    from controllers.college import termnamemapping_controller
+    from controllers.setup import termnamemapping_controller
     print("[MAIN] Successfully imported termnamemapping_controller")
 except Exception as e:
     print(f"[MAIN] ERROR importing termnamemapping_controller: {e}")
@@ -232,7 +232,7 @@ if termnamemapping_controller is not None:
 
 # Import grade mapping controller
 try:
-    from controllers.college import grademapping_controller
+    from controllers.setup import grademapping_controller
     print("[MAIN] Successfully imported grademapping_controller")
 except Exception as e:
     print(f"[MAIN] ERROR importing grademapping_controller: {e}")
@@ -247,7 +247,7 @@ if grademapping_controller is not None:
 
 # Import skip keywords controller
 try:
-    from controllers.college import skipkeywords_controller
+    from controllers.setup import skipkeywords_controller
     print("[MAIN] Successfully imported skipkeywords_controller")
 except Exception as e:
     print(f"[MAIN] ERROR importing skipkeywords_controller: {e}")
@@ -262,10 +262,12 @@ if skipkeywords_controller is not None:
 
 # Import all remaining setup controllers
 try:
-    from controllers.college import skipcourses_controller, yearmapping_controller, botschedule_controller
-    from controllers.college import botstatusreport_controller, suffixname_controller, prefixname_controller
-    from controllers.college import combinedname_controller, acceptedgrades_controller, transfergrades_controller
-    from controllers.college import institutionmapping_controller, accreditedinstitution_controller, overrideeditmapping_controller
+    from controllers.setup import skipcourses_controller, yearmapping_controller
+    from controllers.college import botschedule_controller
+    from controllers.college import botstatusreport_controller
+    from controllers.setup import suffixname_controller, prefixname_controller
+    from controllers.setup import combinedname_controller, acceptedgrades_controller, transfergrades_controller
+    from controllers.setup import institutionmapping_controller, accreditedinstitution_controller, overrideeditmapping_controller
     print("[MAIN] Successfully imported remaining setup controllers")
 except Exception as e:
     print(f"[MAIN] ERROR importing remaining setup controllers: {e}")

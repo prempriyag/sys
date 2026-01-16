@@ -4,8 +4,10 @@
 import React from "react";
 import StatusBadge from "../../../components/common/StatusBadge";
 import InlineEdit from "../../../components/common/InlineEdit";
+import EditableStudentId from "../../../components/transcriptreports/EditableStudentId";
+import EditableSlateId from "../../../components/transcriptreports/EditableSlateId";
 import RowActions from "../../../components/transcriptreports/RowActions";
-import { api } from "../../../config/api";
+import { EyeIcon, FileIcon } from "../../../icons";
 
 export interface ColumnConfig {
   data: string;
@@ -136,6 +138,7 @@ export const createTranscriptReportColumns = (
     },
     
     // Column 3: STUDENT_ID (text-center) - with inline editing support
+    // Matching CI3: Shows edit icon for Failed/Rerun types, link for Processed/equivalenthours
     {
       data: "STUDENT_ID",
       name: "Student ID",
@@ -146,73 +149,28 @@ export const createTranscriptReportColumns = (
         const batchId = row.BATCH_ID || "";
         const studentName = row.STUDENT_FULL_NAME || "";
         const searchField = row._search_field || "";
-        const { rowChanges } = helpers || {};
         
-        // Check if this row has pending changes (action selected)
-        const hasPendingChanges = rowChanges?.get?.(batchId);
-        const hasActionSelected = hasPendingChanges && (
-          (hasPendingChanges.reprocessTranscript && hasPendingChanges.reprocessTranscript !== "0") ||
-          (hasPendingChanges.articulationProcess && hasPendingChanges.articulationProcess !== "0")
-        );
-        
-        // Show as link if Processed/equivalenthours and has permission
-        if ((!searchField || searchField === "Processed" || searchField === "equivalenthours") && hasUpdatePermission && data) {
-          return (
-            <div className="inline-flex items-center gap-2">
-              <a 
-                href={`/college/studentview?student_id=${data}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-brand-500 hover:underline"
-              >
-                {data}
-              </a>
-              {batchId && (
-                <InlineEdit
-                  value={data}
-                  batchId={batchId}
-                  type="student"
-                  studentName={studentName}
-                  onSuccess={() => {
-                    if (helpers?.refreshTable) helpers.refreshTable();
-                  }}
-                />
-              )}
-            </div>
-          );
+        if (!data) {
+          return <span>-</span>;
         }
         
-        // Show with inline edit if has permission AND (Failed/Rerun type OR action is selected)
-        const isEditable = hasUpdatePermission && batchId && (
-          searchField === "Failed" || 
-          searchField === "Rerun" || 
-          hasActionSelected
+        return (
+          <EditableStudentId
+            value={data}
+            batchId={batchId}
+            studentName={studentName}
+            searchField={searchField}
+            hasUpdatePermission={hasUpdatePermission}
+            onSuccess={() => {
+              if (helpers?.refreshTable) helpers.refreshTable();
+            }}
+          />
         );
-        
-        if (isEditable) {
-          return (
-            <InlineEdit
-              value={data || ""}
-              batchId={batchId}
-              type="student"
-              studentName={studentName}
-              onSave={(newValue) => {
-                if (handleInlineEdit) {
-                  handleInlineEdit(batchId, "STUDENT_ID", newValue);
-                }
-              }}
-              onSuccess={() => {
-                if (helpers?.refreshTable) helpers.refreshTable();
-              }}
-            />
-          );
-        }
-        
-        return <span>{data || "-"}</span>;
       },
     },
     
     // Column 4: SLATE_REF_NUMBER (text-center) - with inline editing support
+    // Matching CI3: Shows edit icon for Failed/Rerun types
     {
       data: "SLATE_REF_NUMBER",
       name: "Slate ID",
@@ -223,74 +181,23 @@ export const createTranscriptReportColumns = (
         const batchId = row.BATCH_ID || "";
         const studentName = row.STUDENT_FULL_NAME || "";
         const searchField = row._search_field || "";
-        const { rowChanges, handleInlineEdit } = helpers || {};
         
-        // Check if this row has pending changes (action selected)
-        const hasPendingChanges = rowChanges?.get?.(batchId);
-        const hasActionSelected = hasPendingChanges && (
-          (hasPendingChanges.reprocessTranscript && hasPendingChanges.reprocessTranscript !== "0") ||
-          (hasPendingChanges.articulationProcess && hasPendingChanges.articulationProcess !== "0")
-        );
-        
-        // Show as link if Processed/equivalenthours and has permission
-        if ((!searchField || searchField === "Processed" || searchField === "equivalenthours") && hasUpdatePermission && data) {
-          return (
-            <div className="inline-flex items-center gap-2">
-              <a 
-                href={`/college/transcriptreports?batch_id=${batchId}&slate_ref_number=${data}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-brand-500 hover:underline"
-              >
-                {data}
-              </a>
-              {batchId && (
-                <InlineEdit
-                  value={data}
-                  batchId={batchId}
-                  type="slate"
-                  studentName={studentName}
-                  onSave={(newValue) => {
-                    if (handleInlineEdit) {
-                      handleInlineEdit(batchId, "SLATE_REF_NUMBER", newValue);
-                    }
-                  }}
-                  onSuccess={() => {
-                    if (helpers?.refreshTable) helpers.refreshTable();
-                  }}
-                />
-              )}
-            </div>
-          );
+        if (!data) {
+          return <span>-</span>;
         }
         
-        // Show with inline edit if has permission AND (Failed/Rerun type OR action is selected)
-        const isEditable = hasUpdatePermission && batchId && (
-          searchField === "Failed" || 
-          searchField === "Rerun" || 
-          hasActionSelected
+        return (
+          <EditableSlateId
+            value={data}
+            batchId={batchId}
+            studentName={studentName}
+            searchField={searchField}
+            hasUpdatePermission={hasUpdatePermission}
+            onSuccess={() => {
+              if (helpers?.refreshTable) helpers.refreshTable();
+            }}
+          />
         );
-        
-        if (isEditable) {
-          return (
-            <InlineEdit
-              value={data || ""}
-              batchId={batchId}
-              type="slate"
-              studentName={studentName}
-              onSave={(newValue) => {
-                if (handleInlineEdit) {
-                  handleInlineEdit(batchId, "SLATE_REF_NUMBER", newValue);
-                }
-              }}
-              onSuccess={() => {
-                if (helpers?.refreshTable) helpers.refreshTable();
-              }}
-            />
-          );
-        }
-        
-        return <span>{data || "-"}</span>;
       },
     },
     
@@ -537,10 +444,10 @@ export const createTranscriptReportColumns = (
               e.stopPropagation();
               navigate(`/college/errorscreenshot/${batchId}`);
             }}
-            className="text-brand-500 hover:underline inline-flex items-center"
+            className="text-brand-500 hover:text-brand-700 inline-flex items-center"
+            title="View Error Screenshot"
           >
-            <i className="fa fa-eye me-1"></i>
-            View
+            <EyeIcon className="w-4 h-4 fill-current" />
           </button>
         );
       },
@@ -563,9 +470,8 @@ export const createTranscriptReportColumns = (
         return "-";
       }
       return (
-        <a href={pdfUrl} target="_blank" rel="noopener noreferrer" className="text-brand-500 hover:underline">
-          <i className="fa fa-link me-1"></i>
-          View PDF
+        <a href={pdfUrl} target="_blank" rel="noopener noreferrer" className="text-brand-500 hover:text-brand-700 inline-flex items-center gap-1" title="View PDF">
+          <FileIcon className="w-4 h-4" />
         </a>
       );
     },

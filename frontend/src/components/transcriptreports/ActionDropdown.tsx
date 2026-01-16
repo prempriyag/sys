@@ -58,14 +58,13 @@ export default function ActionDropdown({
     
     setSelectedValue(value);
     
-    if (value !== "0") {
-      onActionChange(value, batchId, {
-        type,
-        searchField,
-        articulationStatus,
-        dataType, // Pass data-type for Processed options
-      });
-    }
+    // Always call onActionChange, even for "0" to properly track state
+    onActionChange(value, batchId, {
+      type,
+      searchField,
+      articulationStatus,
+      dataType, // Pass data-type for Processed options
+    });
   };
 
   return (

@@ -9,6 +9,7 @@ import { useNavigate } from "react-router";
 import { API_ENDPOINTS, API_BASE_URL } from "../../../config/api";
 import { RefreshIcon, FilterIcon } from "../../../icons";
 import { useAuth } from "../../../context/AuthContext";
+import { useToast } from "../../../context/ToastContext";
 import { createTranscriptReportColumns } from "./columnConfig";
 import BulkUpdateButton from "../../../components/transcriptreports/BulkUpdateButton";
 import { api } from "../../../config/api";
@@ -122,6 +123,9 @@ export default function TranscriptReports() {
   // Table ref for refreshing
   const tableRef = React.useRef<any>(null);
   
+  // Toast notifications
+  const { alertsuccess, alerterror } = useToast();
+  
   // State for tracking row changes (for bulk update)
   const [rowChanges, setRowChanges] = React.useState<Map<string, any>>(new Map());
   
@@ -163,10 +167,9 @@ export default function TranscriptReports() {
     } else if (field === "INSTITUTION_ID") {
       changes.instid = value;
     }
-    // Only add to rowChanges if there's an action selected or other changes
-    if (changes.reprocessTranscript || changes.articulationProcess || value) {
-      setRowChanges(new Map(rowChanges.set(batchId, changes)));
-    }
+    // Always update rowChanges to track the field changes
+    // They will be included in bulk update if there's an action selected
+    setRowChanges(new Map(rowChanges.set(batchId, changes)));
   };
   
   // Handle action change (transcriptreprocess, articulationreprocess)
@@ -212,25 +215,55 @@ export default function TranscriptReports() {
       return;
     }
     
+    // Filter to only rows with actions selected (matching CI3 logic)
+    const rowsToUpdate = Array.from(rowChanges.entries()).filter(([_batchId, changes]) => {
+      return (changes.reprocessTranscript && changes.reprocessTranscript !== "0") ||
+             (changes.articulationProcess && changes.articulationProcess !== "0");
+    });
+    
+    if (rowsToUpdate.length === 0) {
+      return;
+    }
+    
     try {
-      // Process each row's changes
-      const updatePromises = Array.from(rowChanges.entries()).map(async ([batchId, changes]) => {
-        const updateData = {
-          batchId,
-          comment: changes.comment || "",
-          reprocessTranscript: changes.reprocessTranscript || "0",
-          articulationProcess: changes.articulationProcess || "0",
-          processTranscript_articulated: changes.processTranscript_articulated || "",
-          osuid: changes.STUDENT_ID || "",
-          slateid: changes.SLATE_REF_NUMBER || "",
-          scenario: changes.scenario || "",
-          instid: changes.INSTITUTION_ID || "",
-        };
-        
-        return api.post("/api/transcriptreports/updatechkstatus", updateData);
-      });
+      let successCount = 0;
+      let errorCount = 0;
       
-      await Promise.all(updatePromises);
+      // Process each row's changes sequentially (matching CI3 behavior)
+      for (const [batchId, changes] of rowsToUpdate) {
+        try {
+          const updateData = {
+            batchId,
+            comment: changes.comment || "",
+            reprocessTranscript: changes.reprocessTranscript || "0",
+            articulationProcess: changes.articulationProcess || "0",
+            processTranscript_articulated: changes.processTranscript_articulated || "",
+            osuid: changes.osuid || "",
+            slateid: changes.slateid || "",
+            scenario: changes.scenario || "",
+            instid: changes.instid || "",
+          };
+          
+          const response = await api.post("/api/transcriptreports/updatechkstatus", updateData);
+          
+          if (response.data?.message === "Success" || response.data === "Success") {
+            successCount++;
+          } else {
+            errorCount++;
+          }
+        } catch (error: any) {
+          console.error(`Error updating batch ${batchId}:`, error);
+          errorCount++;
+        }
+      }
+      
+      // Show success/error messages
+      if (successCount > 0) {
+        alertsuccess(`Transcript status updated successfully for ${successCount} record(s)`);
+      }
+      if (errorCount > 0) {
+        alerterror(`Error updating ${errorCount} record(s)`);
+      }
       
       // Clear changes and refresh table
       setRowChanges(new Map());
@@ -241,8 +274,7 @@ export default function TranscriptReports() {
       }
     } catch (error: any) {
       console.error("Bulk update error:", error);
-      // You could add toast notification here
-      alert(error.response?.data?.detail || "Error updating records. Please try again.");
+      alerterror(error.response?.data?.detail || "Error updating records. Please try again.");
     }
   };
   
@@ -325,10 +357,15 @@ export default function TranscriptReports() {
           </h3>
           <div className="flex items-center gap-2">
             <BulkUpdateButton
-              isVisible={Array.from(rowChanges.values()).some((changes: any) => 
-                (changes.reprocessTranscript && changes.reprocessTranscript !== "0") ||
-                (changes.articulationProcess && changes.articulationProcess !== "0")
-              )}
+              isVisible={Array.from(rowChanges.values()).some((changes: any) => {
+                const hasTranscriptAction = changes.reprocessTranscript && 
+                  changes.reprocessTranscript !== "0" && 
+                  changes.reprocessTranscript !== 0;
+                const hasArticulationAction = changes.articulationProcess && 
+                  changes.articulationProcess !== "0" && 
+                  changes.articulationProcess !== 0;
+                return hasTranscriptAction || hasArticulationAction;
+              })}
               onClick={handleBulkUpdate}
             />
             <Button

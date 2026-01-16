@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { api } from "../../config/api";
 import { useToast } from "../../context/ToastContext";
+import { RefreshIcon } from "../../icons";
 
 interface BulkUpdateButtonProps {
   rows?: any[]; // Array of row data with action selections (optional, for backward compatibility)
@@ -121,7 +122,7 @@ export default function BulkUpdateButton({
     >
       {isProcessing ? (
         <>
-          <i className="fa fa-spinner fa-spin me-1"></i>
+          <RefreshIcon className="w-4 h-4 me-1 animate-spin" />
           Processing...
         </>
       ) : (

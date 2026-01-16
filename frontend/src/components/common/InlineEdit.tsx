@@ -1,6 +1,7 @@
 // Inline editing component for Student ID, Slate ID, Institution ID
 import { useState, useRef, useEffect } from "react";
 import { api } from "../../config/api";
+import { PencilIcon, PaperPlaneIcon, CloseIcon } from "../../icons";
 
 interface InlineEditProps {
   value: string;
@@ -135,7 +136,7 @@ export default function InlineEdit({
           className="text-blue-500 hover:text-blue-700 cursor-pointer"
           title="Edit"
         >
-          <i className="fa fa-pencil-alt"></i>
+          <PencilIcon className="w-4 h-4" />
         </button>
       </div>
     );
@@ -158,7 +159,7 @@ export default function InlineEdit({
         className="text-green-500 hover:text-green-700 cursor-pointer disabled:opacity-50"
         title="Save"
       >
-        <i className="fa fa-paper-plane"></i>
+        <PaperPlaneIcon className="w-4 h-4" />
       </button>
       <button
         onClick={handleCancel}
@@ -166,7 +167,7 @@ export default function InlineEdit({
         className="text-red-500 hover:text-red-700 cursor-pointer disabled:opacity-50"
         title="Cancel"
       >
-        <i className="fa fa-times"></i>
+        <CloseIcon className="w-4 h-4" />
       </button>
       {validationError && (
         <span className="text-red-500 text-xs">{validationError}</span>

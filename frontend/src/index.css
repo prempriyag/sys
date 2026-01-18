@@ -802,3 +802,164 @@ span.flatpickr-weekday,
 .simplebar-scrollbar.simplebar-visible:before {
   @apply opacity-100;
 }
+
+/* ============================================
+   Mobile App Styling
+   ============================================ */
+
+/* Safe Area Insets for Notch Devices (iPhone X and above) */
+@supports (padding: max(0px)) {
+  body {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+  
+  /* Ensure header respects safe area */
+  header,
+  .app-header {
+    padding-left: max(1rem, env(safe-area-inset-left));
+    padding-right: max(1rem, env(safe-area-inset-right));
+  }
+}
+
+/* Prevent pull-to-refresh on mobile (makes it feel more app-like) */
+body {
+  overscroll-behavior-y: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Full height for mobile app experience */
+html,
+body,
+#root {
+  height: 100%;
+  min-height: 100vh;
+  min-height: -webkit-fill-available;
+}
+
+/* Mobile app container - ensures fullscreen look */
+#root {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+/* Touch-friendly button sizes on mobile */
+@media (max-width: 768px) {
+  button,
+  a[role="button"],
+  .btn {
+    min-height: 44px; /* iOS recommended touch target size */
+    min-width: 44px;
+  }
+  
+  /* Larger touch targets for menu items on mobile */
+  .menu-item,
+  .menu-dropdown-item {
+    min-height: 48px;
+    padding: 12px 16px;
+  }
+}
+
+/* Smooth scrolling for mobile */
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+/* Prevent text selection on mobile app UI elements */
+@media (max-width: 768px) {
+  button,
+  .menu-item,
+  .menu-dropdown-item,
+  nav a {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+}
+
+/* Hide scrollbars on mobile for cleaner app look (but keep scrollability) */
+@media (max-width: 768px) {
+  ::-webkit-scrollbar {
+    width: 0px;
+    background: transparent;
+  }
+  
+  /* Firefox */
+  * {
+    scrollbar-width: thin;
+    scrollbar-width: none;
+  }
+}
+
+/* App-like transitions */
+@media (max-width: 768px) {
+  * {
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+}
+
+/* Fix for iOS Safari viewport height issues */
+@supports (-webkit-touch-callout: none) {
+  .min-h-screen {
+    min-height: -webkit-fill-available;
+  }
+}
+
+/* Prevent zoom on input focus for mobile app feel */
+@media (max-width: 768px) {
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="tel"],
+  input[type="url"],
+  select,
+  textarea {
+    font-size: 16px !important; /* Prevents iOS zoom on focus */
+  }
+}
+
+/* Fullscreen app mode styling */
+@media (display-mode: standalone) {
+  /* Styles when app is installed and running standalone */
+  body {
+    background-color: #ffffff;
+  }
+  
+  .dark body {
+    background-color: #101828;
+  }
+  
+  /* Add padding at bottom for iOS home indicator */
+  body {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* Bottom Navigation specific styles */
+@media (max-width: 768px) {
+  /* Ensure content doesn't hide behind bottom nav */
+  .main-content {
+    padding-bottom: 80px;
+  }
+  
+  /* Bottom nav backdrop blur support */
+  @supports (backdrop-filter: blur(10px)) {
+    nav[class*="bottom-0"] {
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+    }
+  }
+}
+
+/* Landscape orientation adjustments for mobile */
+@media (max-width: 768px) and (orientation: landscape) {
+  /* Adjustments for landscape mobile view */
+  .app-sidebar {
+    /* Sidebar adjustments for landscape */
+  }
+}

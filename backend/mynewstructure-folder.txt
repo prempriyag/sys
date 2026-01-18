@@ -1,0 +1,77 @@
+backend/
+│
+├── main.py                    # FastAPI entry point
+├── requirements.txt           # Dependencies
+├── .env                       # Environment variables
+├── .env.example              # Template
+├── pyproject.toml            # Project config
+├── README.md                 # Documentation
+│
+├── config/                   # CI3 config/ equivalent
+│   ├── __init__.py
+│   ├── settings.py          # Main settings (like CI3 config.php)
+│   ├── database.py          # Database config (like database.php)
+│   └── constants.py         # Constants (like constants.php)
+│
+├── app/                      # CI3 application/ equivalent
+│   ├── __init__.py
+│   │
+│   ├── controllers/         # CI3 controllers/
+│   │   ├── __init__.py
+│   │   ├── AuthController.py     # Like Auth.php
+│   │   ├── TranscriptsController.py
+│   │   ├── StudentviewController.py
+│   │   ├── ArticulationController.py
+│   │   ├── DashboardController.py
+│   │   └── ReportsController.py
+│   │
+│   ├── models/              # CI3 models/
+│   │   ├── __init__.py
+│   │   ├── UserModel.py          # Like User_model.php
+│   │   ├── TranscriptModel.py
+│   │   ├── KickoutModel.py
+│   │   ├── InstitutionModel.py
+│   │   ├── ArticulationModel.py
+│   │   └── BaseModel.py          # Base model class
+│   │
+│   ├── helpers/             # CI3 helpers/
+│   │   ├── __init__.py
+│   │   ├── form_helper.py        # Form validation
+│   │   ├── url_helper.py         # URL generation
+│   │   ├── date_helper.py        # Date formatting
+│   │   ├── file_helper.py        # File operations
+│   │   └── database_helper.py    # DB utilities
+│   │
+│   ├── libraries/           # CI3 libraries/
+│   │   ├── __init__.py
+│   │   ├── ExcelLibrary.py       # Excel processing
+│   │   ├── PDFLibrary.py         # PDF generation
+│   │   └── EmailLibrary.py       # Email sending
+│   │
+│   ├── middleware/          # CI3 hooks equivalent
+│   │   ├── __init__.py
+│   │   ├── AuthMiddleware.py     # Authentication
+│   │   └── LoggingMiddleware.py  # Request logging
+│   │
+│   ├── core/               # CI3 core/ equivalent
+│   │   ├── __init__.py
+│   │   ├── Database.py           # DB connection
+│   │   ├── Security.py           # Security functions
+│   │   └── Loader.py             # Dynamic loading
+│   │
+│   └── utils/              # Utility functions
+│       ├── __init__.py
+│       ├── validators.py         # Data validation
+│       └── converters.py         # Data conversion
+│
+├── database/               # Database-related
+│   ├── __init__.py
+│   ├── migrations/         # Alembic migrations
+│   ├── seeds/             # Seed data scripts
+│   └── scripts/           # DB maintenance scripts
+│
+├── schemas/               # Pydantic schemas (FastAPI specific)
+    ├── __init__.py
+    ├── auth.py            # Auth schemas
+    ├── transcript.py      # Transcript schemas
+    └── student.py         # Student schemas

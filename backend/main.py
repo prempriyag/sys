@@ -108,7 +108,7 @@ app.add_middleware(
 
 # Import dashboard controller
 try:
-    from controllers import dashboard_controller
+    from backend.controllers.college import dashboard_controller
     print("[MAIN] Successfully imported dashboard_controller")
 except Exception as e:
     print(f"[MAIN] ERROR importing dashboard_controller: {e}")

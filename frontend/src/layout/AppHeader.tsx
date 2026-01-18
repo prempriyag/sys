@@ -12,8 +12,6 @@ import FullscreenToggle from "../components/header/FullscreenToggle";
 import MenuLayoutToggle from "../components/header/MenuLayoutToggle";
 
 const AppHeader: React.FC = () => {
-  const [isApplicationMenuOpen, setApplicationMenuOpen] = useState(false);
-
   const { isMobileOpen, toggleSidebar, toggleMobileSidebar } = useSidebar();
   const { headerBgColor, headerTextColor } = useThemeColor();
   const { menuLayout } = useMenuLayout();
@@ -26,10 +24,6 @@ const AppHeader: React.FC = () => {
     } else {
       toggleMobileSidebar();
     }
-  };
-
-  const toggleApplicationMenu = () => {
-    setApplicationMenuOpen(!isApplicationMenuOpen);
   };
 
   const inputRef = useRef<HTMLInputElement>(null);
@@ -57,34 +51,11 @@ const AppHeader: React.FC = () => {
         color: headerTextColor,
       }}
     >
-      <div className="flex flex-col items-center justify-between grow lg:flex-row lg:px-4">
-        <div className="flex items-center justify-between w-full gap-2 px-3 py-3 border-b border-gray-200 dark:border-gray-800 sm:gap-4 lg:justify-normal lg:border-b-0 lg:px-0 lg:py-4">
-          {/* Logo for horizontal menu - before hamburger */}
-          {menuLayout === "horizontal" && (
-            <Link
-              to={currentModule === "college" ? "/dashboard" : `/${currentModule}/dashboard`}
-              className="mr-4 hidden lg:block"
-            >
-              <img
-                className="dark:hidden object-contain h-10"
-                src={logoLightUrl}
-                alt="Logo"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = "/images/logo/connors-color.png";
-                }}
-              />
-              <img
-                className="hidden dark:block object-contain h-10"
-                src={logoDarkUrl}
-                alt="Logo"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = "/images/logo/connors-white.png";
-                }}
-              />
-            </Link>
-          )}
+      <div className="flex items-center justify-between w-full gap-2 px-3 py-3 lg:px-4 lg:py-4">
+        {/* Left side: Hamburger + Logo */}
+        <div className="flex items-center gap-2 sm:gap-3">
           <button
-            className="items-center justify-center w-10 h-10 text-gray-500 border-gray-200 rounded-lg z-99999 dark:border-gray-800 lg:flex dark:text-gray-400 lg:h-11 lg:w-11 lg:border"
+            className="flex items-center justify-center w-10 h-10 text-gray-500 border-gray-200 rounded-lg z-99999 dark:border-gray-800 dark:text-gray-400 lg:h-11 lg:w-11 lg:border"
             onClick={handleToggle}
             aria-label="Toggle Sidebar"
           >
@@ -119,42 +90,57 @@ const AppHeader: React.FC = () => {
                 />
               </svg>
             )}
-            {/* Cross Icon */}
           </button>
 
-          <Link to="/" className="lg:hidden">
+          {/* Logo - smaller on mobile */}
+          <Link to="/" className="flex-shrink-0">
             <img
-              className="dark:hidden"
+              className="dark:hidden object-contain h-6 sm:h-8 lg:h-10"
               src="./images/logo/auth-logo.png"
               alt="Logo"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = "/images/logo/connors-color.png";
+              }}
             />
             <img
-              className="hidden dark:block"
+              className="hidden dark:block object-contain h-6 sm:h-8 lg:h-10"
               src="./images/logo/auth-logo.png"
               alt="Logo"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = "/images/logo/connors-white.png";
+              }}
             />
           </Link>
 
-          <button
-            onClick={toggleApplicationMenu}
-            className="flex items-center justify-center w-10 h-10 text-gray-700 rounded-lg z-99999 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 lg:hidden"
-          >
-            <svg
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
+          {/* Logo for horizontal menu on desktop */}
+          {menuLayout === "horizontal" && (
+            <Link
+              to={currentModule === "college" ? "/dashboard" : `/${currentModule}/dashboard`}
+              className="hidden lg:block ml-4"
             >
-              <path
-                fillRule="evenodd"
-                clipRule="evenodd"
-                d="M5.99902 10.4951C6.82745 10.4951 7.49902 11.1667 7.49902 11.9951V12.0051C7.49902 12.8335 6.82745 13.5051 5.99902 13.5051C5.1706 13.5051 4.49902 12.8335 4.49902 12.0051V11.9951C4.49902 11.1667 5.1706 10.4951 5.99902 10.4951ZM17.999 10.4951C18.8275 10.4951 19.499 11.1667 19.499 11.9951V12.0051C19.499 12.8335 18.8275 13.5051 17.999 13.5051C17.1706 13.5051 16.499 12.8335 16.499 12.0051V11.9951C16.499 11.1667 17.1706 10.4951 17.999 10.4951ZM13.499 11.9951C13.499 11.1667 12.8275 10.4951 11.999 10.4951C11.1706 10.4951 10.499 11.1667 10.499 11.9951V12.0051C10.499 12.8335 11.1706 13.5051 11.999 13.5051C12.8275 13.5051 13.499 12.8335 13.499 12.0051V11.9951Z"
-                fill="currentColor"
+              <img
+                className="dark:hidden object-contain h-10"
+                src={logoLightUrl}
+                alt="Logo"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = "/images/logo/connors-color.png";
+                }}
               />
-            </svg>
-          </button>
+              <img
+                className="hidden dark:block object-contain h-10"
+                src={logoDarkUrl}
+                alt="Logo"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = "/images/logo/connors-white.png";
+                }}
+              />
+            </Link>
+          )}
+        </div>
 
+        {/* Right side: Search (desktop only) + Actions */}
+        <div className="flex items-center gap-2 sm:gap-3">
+          {/* Search - Desktop only */}
           <div className="hidden lg:block">
             <form>
               <div className="relative">
@@ -189,25 +175,24 @@ const AppHeader: React.FC = () => {
               </div>
             </form>
           </div>
-        </div>
-        <div
-          className={`${
-            isApplicationMenuOpen ? "flex" : "hidden"
-          } items-center justify-between w-full gap-4 px-5 py-4 lg:flex shadow-theme-md lg:justify-end lg:px-0 lg:shadow-none`}
-        >
+
+          {/* Action buttons - All in one row */}
           <div className="flex items-center gap-2 2xsm:gap-3">
-            {/* <!-- Menu Layout Toggle --> */}
-            <MenuLayoutToggle />
-            {/* <!-- Fullscreen Toggle --> */}
-            <FullscreenToggle />
-            {/* <!-- Dark Mode Toggler --> */}
+            {/* Menu Layout Toggle - Desktop only */}
+            <div className="hidden lg:block">
+              <MenuLayoutToggle />
+            </div>
+            {/* Fullscreen Toggle - Desktop only */}
+            <div className="hidden lg:block">
+              <FullscreenToggle />
+            </div>
+            {/* Dark Mode Toggler - Always visible */}
             <ThemeToggleButton />
-            {/* <!-- Dark Mode Toggler --> */}
+            {/* Notification - Always visible */}
             <NotificationDropdown />
-            {/* <!-- Notification Menu Area --> */}
+            {/* User Dropdown - Always visible */}
+            <UserDropdown />
           </div>
-          {/* <!-- User Area --> */}
-          <UserDropdown />
         </div>
       </div>
     </header>

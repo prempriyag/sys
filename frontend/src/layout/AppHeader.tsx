@@ -92,10 +92,10 @@ const AppHeader: React.FC = () => {
             )}
           </button>
 
-          {/* Logo - smaller on mobile */}
-          <Link to="/" className="flex-shrink-0">
+          {/* Logo - mobile view only */}
+          <Link to="/" className="flex-shrink-0 lg:hidden">
             <img
-              className="dark:hidden object-contain h-6 sm:h-8 lg:h-10"
+              className="dark:hidden object-contain h-6 sm:h-8"
               src="./images/logo/auth-logo.png"
               alt="Logo"
               onError={(e) => {
@@ -103,7 +103,7 @@ const AppHeader: React.FC = () => {
               }}
             />
             <img
-              className="hidden dark:block object-contain h-6 sm:h-8 lg:h-10"
+              className="hidden dark:block object-contain h-6 sm:h-8"
               src="./images/logo/auth-logo.png"
               alt="Logo"
               onError={(e) => {

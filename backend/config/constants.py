@@ -7,8 +7,6 @@ This file contains all table names and configuration constants
 from datetime import datetime
 import os
 
-# Support Phone
-SUPPORT_PHONE = '+91 984 904 9259'
 
 # Environment detection (similar to PHP getEnvironment())
 def get_environment() -> str:
@@ -30,6 +28,7 @@ HOT_PATH = os.getenv('HOT_PATH', 'OSUCSC')
 SHARE_PATH = os.getenv('SHARE_PATH', f'\\\\172.16.2.22\\{HOT_FOLDER}\\')
 SHARE_PATH_REPLACE = os.getenv('SHARE_PATH_REPLACE', f'//172.16.2.22/{HOT_FOLDER}/')
 IS_UBUNTU = os.getenv('IS_UBUNTU', 'False').lower() == 'false'
+SHARE_PATH_UBUNTU = os.getenv('SHARE_PATH_UBUNTU', f'/mnt/digiscript-uat/{HOT_FOLDER}/')
 
 # Institution Name
 INS_NAME = os.getenv('INS_NAME', 'OSUCSC')

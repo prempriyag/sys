@@ -15,7 +15,7 @@ export default function TranscriptsUpload() {
 
   // Fetch available source types
   useEffect(() => {
-    fetch(`${API_BASE_URL}/transcripts/sources`)
+    fetch(`${API_BASE_URL}/api/transcripts/sources`)
       .then(res => res.json())
       .then(data => {
         if (data.sources) {

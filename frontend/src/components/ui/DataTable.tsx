@@ -587,7 +587,8 @@ const DataTableComponent = (props: DataTableProps, ref: React.ForwardedRef<DataT
           position: 'relative'
         }}
       >
-        <div style={{ minWidth: 'max-content', display: 'inline-block' }}>
+        {/* <div style={{ minWidth: 'max-content', display: 'inline-block' }}> */}
+        <div>
           <Table className="border-collapse">
           <TableHeader className="bg-gray-100 dark:bg-gray-800" style={{ position: 'sticky', top: 0, zIndex: 10 }}>
             <TableRow>

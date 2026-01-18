@@ -34,8 +34,8 @@ export default function ActionDropdown({
     { value: "Noaction", label: "No Action Needed", dataType: "" },
     { value: "Rerun", label: "Reprocess this Transcript", dataType: "Rerun" },
     { value: "Rerun", label: "Reprocess for 30 days", dataType: "Rerun15" },
-    { value: "Processed", label: "Processed Manually by OSU-OKC", dataType: "Processed" },
-    { value: "Processed", label: "Processed and Articulated manually by OSU-OKC", dataType: "Articulated" },
+    { value: "Processed", label: "Processed Manually by OSU-CSC", dataType: "Processed" },
+    { value: "Processed", label: "Processed and Articulated manually by OSU-CSC", dataType: "Articulated" },
   ];
 
   // Articulation reprocess options (matching CI3 lines 519-524)
@@ -43,7 +43,7 @@ export default function ActionDropdown({
     { value: "0", label: "Action Needed", dataType: "" },
     { value: "Noaction", label: "No Action Needed", dataType: "" },
     { value: "Rerun", label: "Reprocess this Transcript", dataType: "" },
-    { value: "Processed", label: "Processed Manually by OSU-OKC", dataType: "" },
+    { value: "Processed", label: "Processed Manually by OSU-CSC", dataType: "" },
   ];
 
   const options = type === "transcript" ? transcriptOptions : articulationOptions;
@@ -56,19 +56,15 @@ export default function ActionDropdown({
     const selectedOption = e.target.selectedOptions[0];
     const dataType = selectedOption?.getAttribute("data-type") || "";
     
-    console.log('ActionDropdown handleChange:', { value, batchId, type, dataType });
-    
     setSelectedValue(value);
     
-    // Always call onActionChange, even for "0" to properly track state
-    console.log('ActionDropdown calling onActionChange with:', { value, batchId, type, searchField, articulationStatus, dataType });
+    // Always call onActionChange, even for "0" to properly track state and hide button
     onActionChange(value, batchId, {
       type,
       searchField,
       articulationStatus,
       dataType, // Pass data-type for Processed options
     });
-    console.log('ActionDropdown onActionChange called');
   };
 
   return (

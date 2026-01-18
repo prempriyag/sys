@@ -1,6 +1,6 @@
 // Row actions component for transcript reports
 // Handles action dropdowns, scenario dropdown, and user comments
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import ActionDropdown from "./ActionDropdown";
 
 interface RowActionsProps {
@@ -28,11 +28,35 @@ export default function RowActions({
   const searchField = row._search_field || "";
   const articulationStatus = row.ARTICULATION_STATUS_FLAG || "";
 
+  // Track previous action values to prevent unnecessary updates
+  const prevActionsRef = useRef<{ transcriptAction: string; articulationAction: string } | null>(null);
+  
   // Auto-update comment when actions change (matching CI3 logic)
   useEffect(() => {
-    if (transcriptAction === "0" && articulationAction === "0") return;
+    // Only update if actions actually changed (skip first render)
+    if (prevActionsRef.current !== null) {
+      const actionsChanged = 
+        prevActionsRef.current.transcriptAction !== transcriptAction ||
+        prevActionsRef.current.articulationAction !== articulationAction;
+      
+      if (!actionsChanged) {
+        return;
+      }
+    }
+    
+    // Update ref to current values
+    prevActionsRef.current = { transcriptAction, articulationAction };
+    
+    // If both actions are "0", clear the comment
+    if (transcriptAction === "0" && articulationAction === "0") {
+      // Only clear if we had a previous state (not initial render)
+      if (prevActionsRef.current !== null) {
+        onCommentChange(batchId, "");
+      }
+      return;
+    }
 
-           let comment = "";
+    let comment = "";
 
     if (transcriptAction === "Processed") {
       const selectedOption = document.querySelector(
@@ -57,36 +81,26 @@ export default function RowActions({
       comment = "No Action Needed";
     }
 
+    // Only call onCommentChange if we have a comment to set
     if (comment) {
       onCommentChange(batchId, comment);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transcriptAction, articulationAction, batchId]);
 
   const handleTranscriptActionChange = (action: string, batchId: string, data: any) => {
-    console.log('RowActions handleTranscriptActionChange:', { action, batchId, data });
-    console.log('RowActions onActionChange type:', typeof onActionChange, onActionChange);
     setTranscriptAction(action);
     // Always call onActionChange to properly track state (including "0" to remove)
-    console.log('RowActions calling onActionChange with:', { action, batchId, data: { ...data, type: "transcript" } });
     if (typeof onActionChange === 'function') {
       onActionChange(action, batchId, { ...data, type: "transcript" });
-      console.log('RowActions onActionChange called successfully');
-    } else {
-      console.error('RowActions ERROR: onActionChange is not a function!', { onActionChange });
     }
   };
 
   const handleArticulationActionChange = (action: string, batchId: string, data: any) => {
-    console.log('RowActions handleArticulationActionChange:', { action, batchId, data });
-    console.log('RowActions onActionChange type:', typeof onActionChange, onActionChange);
     setArticulationAction(action);
     // Always call onActionChange to properly track state (including "0" to remove)
-    console.log('RowActions calling onActionChange with:', { action, batchId, data: { ...data, type: "articulation" } });
     if (typeof onActionChange === 'function') {
       onActionChange(action, batchId, { ...data, type: "articulation" });
-      console.log('RowActions onActionChange called successfully');
-    } else {
-      console.error('RowActions ERROR: onActionChange is not a function!', { onActionChange });
     }
   };
 

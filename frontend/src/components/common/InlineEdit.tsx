@@ -88,28 +88,57 @@ export default function InlineEdit({
         endpoint = "/api/transcriptreports/updateslateid";
         payload.slateid = editValue;
       } else if (type === "institution") {
-        // Institution ID is updated via updatechkstatus in bulk update
-        // Track the change and notify parent
-        setIsSaving(false);
-        setIsEditing(false);
-        if (onSave) {
-          onSave(editValue); // Track the change for bulk update
-        }
-        if (onSuccess) onSuccess();
-        return;
+        // Institution ID is updated via updatechkstatus endpoint
+        endpoint = "/api/transcriptreports/updatechkstatus";
+        payload.instid = editValue || "";
+        payload.comment = ""; // Empty comment for immediate institution ID update
+        payload.reprocessTranscript = "0";
+        payload.articulationProcess = "0";
+        payload.processTranscript_articulated = "";
       }
 
-      const response = await api.post(endpoint, payload);
+      // Debug logging
+      console.log('=== InlineEdit: Saving ===');
+      console.log('Type:', type);
+      console.log('Endpoint:', endpoint);
+      console.log('Payload:', JSON.stringify(payload, null, 2));
+      console.log('BatchId:', batchId);
+      console.log('EditValue:', editValue);
 
-      if (response.data?.message === "Success" || response.data === "Success") {
-        setIsEditing(false);
-        if (onSuccess) onSuccess();
-      } else {
-        setValidationError("Update failed. Please try again.");
+      try {
+        const response = await api.post(endpoint, payload);
+        
+        console.log('=== InlineEdit: API Response ===');
+        console.log('Response status:', response.status);
+        console.log('Response data:', JSON.stringify(response.data, null, 2));
+
+        if (response.data?.message === "Success" || response.data === "Success") {
+          console.log('=== InlineEdit: Update Success ===');
+          setIsEditing(false);
+          // Track the change for bulk update tracking (if onSave callback is provided)
+          if (onSave && type === "institution") {
+            onSave(editValue);
+          }
+          if (onSuccess) onSuccess();
+        } else {
+          console.error('=== InlineEdit: Update Failed - Invalid Response ===');
+          console.error('Response:', response.data);
+          setValidationError(`Update failed: ${response.data?.message || "Invalid response from server"}`);
+        }
+      } catch (apiError: any) {
+        console.error('=== InlineEdit: API Error ===');
+        console.error('Error object:', apiError);
+        console.error('Error message:', apiError?.message);
+        console.error('Error response:', apiError?.response);
+        console.error('Error response data:', apiError?.response?.data);
+        console.error('Error response status:', apiError?.response?.status);
+        setValidationError(apiError.response?.data?.detail || apiError.message || "Error updating. Please try again.");
       }
     } catch (error: any) {
-      console.error("Update error:", error);
-      setValidationError(error.response?.data?.detail || "Error updating. Please try again.");
+      console.error("=== InlineEdit: General Error ===");
+      console.error("Error:", error);
+      console.error("Error stack:", error.stack);
+      setValidationError(error.message || "Error updating. Please try again.");
     } finally {
       setIsSaving(false);
     }

@@ -293,12 +293,12 @@ class ArticulationReportsModel:
             
             phase_2_condition = ""
             if search_field == "Phase_2":
-                phase_2_condition = """(UPPER(k.ERROR_REASON) LIKE '%AP COURSE — OKC TEAM TO REVIEW AND PROCESS MANUALLY%'
-                              OR UPPER(k.ERROR_REASON) LIKE '%CLEP COURSE — OKC TEAM TO REVIEW AND PROCESS MANUALLY%')"""
+                phase_2_condition = """(UPPER(k.ERROR_REASON) LIKE '%AP COURSE — CSC TEAM TO REVIEW AND PROCESS MANUALLY%'
+                              OR UPPER(k.ERROR_REASON) LIKE '%CLEP COURSE — CSC TEAM TO REVIEW AND PROCESS MANUALLY%')"""
                 print("[ArticulationReports] Phase_2 condition: INCLUDE AP/CLEP courses")
             else:
-                phase_2_condition = """(UPPER(k.ERROR_REASON) NOT LIKE '%AP COURSE — OKC TEAM TO REVIEW AND PROCESS MANUALLY%'
-                              AND UPPER(k.ERROR_REASON) NOT LIKE '%CLEP COURSE — OKC TEAM TO REVIEW AND PROCESS MANUALLY%')"""
+                phase_2_condition = """(UPPER(k.ERROR_REASON) NOT LIKE '%AP COURSE — CSC TEAM TO REVIEW AND PROCESS MANUALLY%'
+                              AND UPPER(k.ERROR_REASON) NOT LIKE '%CLEP COURSE — CSC TEAM TO REVIEW AND PROCESS MANUALLY%')"""
                 print("[ArticulationReports] Phase_2 condition: EXCLUDE AP/CLEP courses")
 
             # Count total records (matches CI3 lines 182-198)

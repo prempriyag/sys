@@ -440,10 +440,16 @@ async def updatechkstatus(
         scenario = request.scenario or ""
         instid = request.instid or ""
         
+        # Debug logging
+        logger.info(f"[updatechkstatus] Received update request for batch {batch_id}")
+        logger.info(f"[updatechkstatus] Request data: batchId={batch_id}, comment={comment}, "
+                   f"reprocessTranscript={reprocess_transcript}, articulationProcess={articulation_process}, "
+                   f"osuid={osuid}, slateid={slateid}, instid={instid}, scenario={scenario}")
+        
         username = current_user.name
         current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S.000')
         
-        # Get existing USER_COMMENTS
+        # Get existing USER_COMMENTS and check if we're only updating fields (not actions)
         get_comment_sql = text(f"""
             SELECT BATCH_ID, USER_COMMENTS
             FROM {TBL_KICKOUT}
@@ -451,9 +457,21 @@ async def updatechkstatus(
         """)
         row_data = db.execute(get_comment_sql, {"batch_id": batch_id}).fetchone()
         
+        # Check if this is just a field update (instid/osuid/slateid) without actions
+        is_field_only_update = (
+            (not reprocess_transcript or reprocess_transcript == "0") and
+            (not articulation_process or articulation_process == "0") and
+            (instid or osuid or slateid) and
+            not comment  # No comment provided
+        )
+        
         # Build USER_COMMENTS
-        if row_data and row_data.USER_COMMENTS:
-            user_comment = f"{row_data.USER_COMMENTS}; {comment}-{username}-{current_time}"
+        # Only update USER_COMMENTS if there's a comment or an action, not for field-only updates
+        if is_field_only_update:
+            # For field-only updates, keep existing USER_COMMENTS unchanged
+            user_comment = row_data.USER_COMMENTS if row_data and row_data.USER_COMMENTS else None
+        elif row_data and row_data.USER_COMMENTS:
+            user_comment = f"{row_data.USER_COMMENTS}; {comment}-{username}-{current_time}" if comment else f"{row_data.USER_COMMENTS}; {username}-{current_time}"
         elif comment:
             user_comment = f"{comment}-{username}-{current_time}"
         else:
@@ -461,10 +479,13 @@ async def updatechkstatus(
         
         # Build update data
         update_fields = {
-            "USER_COMMENTS": user_comment,
             "UPDATED_BY": username.lower(),
             "LAST_UPDATED_DATETIME": current_time
         }
+        
+        # Only update USER_COMMENTS if it changed (not None for field-only updates)
+        if user_comment is not None:
+            update_fields["USER_COMMENTS"] = user_comment
         
         if osuid:
             update_fields["STUDENT_ID"] = osuid
@@ -526,14 +547,25 @@ async def updatechkstatus(
                 set_clauses.append(f"{key} = :{param_name}")
                 params[param_name] = value
         
+        if not set_clauses:
+            logger.warning(f"[updatechkstatus] No fields to update for batch {batch_id}")
+            return {"message": "No fields to update", "success": False}
+        
         update_sql = text(f"""
             UPDATE {TBL_KICKOUT}
             SET {', '.join(set_clauses)}
             WHERE BATCH_ID = :batch_id
         """)
         
-        db.execute(update_sql, params)
+        logger.info(f"[updatechkstatus] Executing SQL update for batch {batch_id}")
+        logger.info(f"[updatechkstatus] Update fields: {list(update_fields.keys())}")
+        logger.debug(f"[updatechkstatus] SQL: {update_sql}")
+        logger.debug(f"[updatechkstatus] Params: {params}")
+        
+        result = db.execute(update_sql, params)
         db.commit()
+        
+        logger.info(f"[updatechkstatus] Update successful for batch {batch_id}. Rows affected: {result.rowcount}")
         
         return {"message": "Success", "success": True}
         

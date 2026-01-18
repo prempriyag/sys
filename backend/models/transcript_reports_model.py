@@ -71,7 +71,7 @@ class TranscriptReportsModel:
         if search_field == "Processed":
             search_conditions.append(
                 "(UPPER(k.TRANSCRIPT_STATUS_FLAG) LIKE 'PROCESSED' "
-                "OR UPPER(k.TRANSCRIPT_STATUS_FLAG) LIKE 'PROCESSED MANUALLY BY OSU-OKC' "
+                "OR UPPER(k.TRANSCRIPT_STATUS_FLAG) LIKE 'PROCESSED MANUALLY BY OSU-CSC' "
                 "OR UPPER(k.TRANSCRIPT_STATUS_FLAG) = 'DUPLICATE' "
                 "OR UPPER(k.TRANSCRIPT_STATUS_FLAG) = 'NO ACTION NEEDED')"
             )
@@ -520,7 +520,7 @@ class TranscriptReportsModel:
             <option value="0">Action Needed</option>
             <option value="Noaction">No Action Needed</option>
             <option value="Rerun">Reprocess this Transcript</option>
-            <option value="Processed">Processed Manually by OSU-OKC</option>
+            <option value="Processed">Processed Manually by OSU-CSC</option>
             </select>'''
             else:
                 return ""
@@ -530,8 +530,8 @@ class TranscriptReportsModel:
             <option value="Noaction">No Action Needed</option>
             <option value="Rerun" data-type="Rerun">Reprocess this Transcript</option>
             <option value="Rerun" data-type="Rerun15">Reprocess for 30 days</option>
-            <option value="Processed" data-type="Processed">Processed Manually by OSU-OKC</option>
-            <option value="Processed" data-type="Articulated">Processed and Articulated manually by OSU-OKC</option>
+            <option value="Processed" data-type="Processed">Processed Manually by OSU-CSC</option>
+            <option value="Processed" data-type="Articulated">Processed and Articulated manually by OSU-CSC</option>
             </select>'''
 
     @staticmethod

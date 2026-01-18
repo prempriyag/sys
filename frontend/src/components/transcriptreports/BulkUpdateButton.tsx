@@ -21,8 +21,6 @@ export default function BulkUpdateButton({
 }: BulkUpdateButtonProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const { alertsuccess, alerterror } = useToast();
-  
-  console.log('BulkUpdateButton render:', { isVisible, rowsLength: rows.length, disabled, isProcessing });
 
   const handleBulkUpdate = async () => {
     // If custom onClick is provided, use it
@@ -115,27 +113,31 @@ export default function BulkUpdateButton({
   const shouldShow = isVisible || rows.length > 0;
   
   return (
-    <button
-      onClick={handleBulkUpdate}
-      disabled={disabled || isProcessing}
-      className="btn btn-primary submitId submitId_float"
-      id="btnId"
+    <div 
+      className="fixed bottom-6 right-6 z-50"
       style={{ display: shouldShow ? "block" : "none" }}
     >
-      {isProcessing ? (
-        <>
-          <RefreshIcon className="w-4 h-4 me-1 animate-spin" />
-          Processing...
-        </>
-      ) : (
-        <>
-          <span className="submitId_svg">
-            <img src="/img/update.svg" alt="Update" />
-          </span>
-          Update Selected
-        </>
-      )}
-    </button>
+      <button
+        onClick={handleBulkUpdate}
+        disabled={disabled || isProcessing}
+        className="flex items-center gap-2 rounded-lg bg-brand-500 px-6 py-3 text-sm font-semibold text-white shadow-lg transition-all duration-200 hover:bg-brand-600 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-50 dark:bg-brand-600 dark:hover:bg-brand-700"
+        id="btnId"
+      >
+        {isProcessing ? (
+          <>
+            <RefreshIcon className="h-5 w-5 animate-spin" />
+            <span>Processing...</span>
+          </>
+        ) : (
+          <>
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </svg>
+            <span>Update Selected</span>
+          </>
+        )}
+      </button>
+    </div>
   );
 }
 

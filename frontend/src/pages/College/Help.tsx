@@ -26,14 +26,14 @@ export default function Help() {
     <PageWrapper>
       <PageMeta
         title="User Manual | College Module"
-        description="OSU-OKC User Manual Document"
+        description="OSU-CSC User Manual Document"
       />
       <PageBreadcrumb pageTitle="User Manual" />
       <div className="min-h-screen rounded-2xl border border-gray-200 bg-white px-5 py-7 dark:border-gray-800 dark:bg-white/[0.03] xl:px-10 xl:py-12">
         <div className="mx-auto w-full">
           <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <h3 className="font-semibold text-gray-800 text-theme-xl dark:text-white/90 sm:text-2xl">
-              OSU-OKC User Manual Document
+              OSU-CSC User Manual Document
             </h3>
             <div className="flex flex-wrap gap-2">
               <Button
@@ -80,7 +80,7 @@ export default function Help() {
             <div className="mt-6 w-full overflow-hidden rounded-lg border border-gray-200 dark:border-gray-800">
               <iframe
                 src={pdfUrl}
-                title="OSU OKC User Manual"
+                title="OSU CSC User Manual"
                 className="h-[600px] w-full sm:h-[800px] lg:h-[900px]"
                 style={{ minHeight: "600px" }}
                 onError={handleIframeError}

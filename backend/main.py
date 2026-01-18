@@ -408,6 +408,21 @@ if roles_controller is not None:
     app.include_router(roles_controller.router)
     print("[MAIN] Successfully registered roles_controller router")
 
+# Import studentview controller
+try:
+    from controllers.college import studentview_controller
+    print("[MAIN] Successfully imported studentview_controller")
+except Exception as e:
+    print(f"[MAIN] ERROR importing studentview_controller: {e}")
+    import traceback
+    traceback.print_exc()
+    studentview_controller = None
+
+# Include studentview router if imported successfully
+if studentview_controller is not None:
+    app.include_router(studentview_controller.router)
+    print("[MAIN] Successfully registered studentview_controller router")
+
 
 @app.get("/")
 async def root():

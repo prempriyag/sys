@@ -596,7 +596,17 @@ export const createTranscriptReportColumns = (
       // For other types, show editable textarea if user has permission
       if (hasUpdatePermission && batchId) {
         // Get the current comment value from rowChanges if it exists, otherwise use data
-        const currentComment = rowChanges?.get?.(batchId)?.comment || data || "";
+        // If comment is explicitly undefined in rowChanges, it means it was cleared, so use data
+        const rowChange = rowChanges?.get?.(batchId);
+        let currentComment: string;
+        
+        if (rowChange && 'comment' in rowChange) {
+          // Comment exists in rowChanges - use it (even if empty string, which means cleared)
+          currentComment = rowChange.comment !== undefined ? (rowChange.comment || "") : (data || "");
+        } else {
+          // No comment in rowChanges, use original data
+          currentComment = data || "";
+        }
         
         return (
           <textarea

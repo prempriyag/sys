@@ -14,12 +14,19 @@ import { createTranscriptReportColumns } from "./columnConfig";
 import BulkUpdateButton from "../../../components/transcriptreports/BulkUpdateButton";
 import { api } from "../../../config/api";
 
-export default function TranscriptReports() {
+interface TranscriptReportsProps {
+  studentId?: string;
+  batchId?: string;
+  institutionId?: string;
+  type?: string;
+}
+
+export default function TranscriptReports(props?: TranscriptReportsProps) {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   
-  // Determine type from URL path (matching CI3 route structure)
+  // Determine type from props, URL path, or search params (matching CI3 route structure)
   // Routes: /college/transcriptkickouts -> "Failed"
   //         /college/transcript_articulationkickouts -> "Articulation-Kickouts"
   //         /college/transcriptprocessed -> "Processed"
@@ -27,6 +34,10 @@ export default function TranscriptReports() {
   //         /college/transcriptequivalenthours -> "equivalenthours"
   //         /college/transcriptreports -> "" (default)
   const getTypeFromPath = () => {
+    // Use prop type if provided (from StudentView)
+    if (props?.type) {
+      return props.type;
+    }
     const path = location.pathname;
     if (path.includes("/transcriptkickouts") || path.includes("/studentlogkickouts")) {
       return "Failed";
@@ -48,9 +59,19 @@ export default function TranscriptReports() {
   const [showFilters, setShowFilters] = useState(false);
   const { hasPermission } = useAuth();
   
-  // Filter state
-  const [fieldType, setFieldType] = useState<string>("");
-  const [fieldName, setFieldName] = useState<string>("");
+  // Filter state - initialize from props if provided (from StudentView)
+  const [fieldType, setFieldType] = useState<string>(() => {
+    if (props?.batchId) return "BATCH_ID";
+    if (props?.institutionId) return "COLLEGE_ID";
+    if (props?.studentId) return "STUDENT_ID";
+    return "";
+  });
+  const [fieldName, setFieldName] = useState<string>(() => {
+    if (props?.batchId) return props.batchId;
+    if (props?.institutionId) return props.institutionId;
+    if (props?.studentId) return props.studentId;
+    return "";
+  });
   const [fromDate, setFromDate] = useState<string>("");
   const [toDate, setToDate] = useState<string>("");
 
@@ -59,9 +80,12 @@ export default function TranscriptReports() {
 
   // Helper function to copy text to clipboard
   const copyToClipboard = (text: string) => {
+    if (!text || text.trim() === "") return;
     navigator.clipboard.writeText(text).then(() => {
-      // You could add a toast notification here
-      console.log("Copied to clipboard:", text);
+      alertsuccess("Copied to clipboard!");
+    }).catch((err) => {
+      console.error("Failed to copy to clipboard:", err);
+      alerterror("Failed to copy to clipboard");
     });
   };
 
@@ -129,6 +153,13 @@ export default function TranscriptReports() {
   // State for tracking row changes (for bulk update)
   const [rowChanges, setRowChanges] = React.useState<Map<string, any>>(new Map());
   
+  // Clear rowChanges when pathname changes (when navigating between different report types)
+  // This ensures state is reset when switching between pages like Articulation Kickouts -> Transcript Kickouts
+  React.useEffect(() => {
+    console.log('Clearing rowChanges due to navigation:', { pathname: location.pathname, type });
+    setRowChanges(new Map());
+  }, [location.pathname]);
+  
   // Validate institution ID
   const validateInstitution = async (value: string, batchId: string): Promise<{ valid: boolean; message?: string }> => {
     if (!value || !batchId) {
@@ -181,55 +212,81 @@ export default function TranscriptReports() {
   // Matching CI3 logic: show button when action is Processed, Rerun, or Noaction
   // Hide button when action is "0" or empty
   const handleActionChange = (batchId: string, action: string, data: any) => {
-    console.log('=== TranscriptReports handleActionChange START ===');
-    console.log('handleActionChange called:', { batchId, action, data });
-    console.log('Current rowChanges before update:', Array.from(rowChanges.entries()));
-    
     setRowChanges((prevChanges) => {
       const newChanges = new Map(prevChanges);
-      const changes = { ...(newChanges.get(batchId) || {}) };
-      
-      if (data.type === "transcript") {
-        changes.reprocessTranscript = action;
-        changes.processTranscript_articulated = data.dataType || "";
-      } else if (data.type === "articulation") {
-        changes.articulationProcess = action;
-      }
+      const existingChanges = newChanges.get(batchId) || {};
+      const changes = { ...existingChanges };
       
       // Check if action is valid (not "0" or empty) - matching CI3 lines 563, 682, 776, 824, 829, 839
       const actionStr = String(action || "").trim();
       const isActionSelected = actionStr && actionStr !== "0";
       
-      console.log('Action validation:', { actionStr, isActionSelected, changes });
-      
       if (isActionSelected) {
+        // Action is valid - set it
+        if (data.type === "transcript") {
+          changes.reprocessTranscript = action;
+          if (data.dataType) {
+            changes.processTranscript_articulated = data.dataType;
+          }
+        } else if (data.type === "articulation") {
+          changes.articulationProcess = action;
+        }
         // Add or update the row in rowChanges - button will show
         newChanges.set(batchId, changes);
-        console.log('Added/updated row in changes:', batchId, changes);
       } else {
-        // Action is "0" - check if there are other changes (like inline edits)
-        const hasOtherChanges = changes.osuid || changes.slateid || changes.instid || changes.comment || changes.scenario;
-        if (!hasOtherChanges) {
-          // No other changes, remove from rowChanges - button will hide if no other rows have actions
-          newChanges.delete(batchId);
-          console.log('Removed row from changes:', batchId);
-        } else {
-          // Keep the row but clear the action (for inline edits that might be saved later)
-          if (data.type === "transcript") {
-            changes.reprocessTranscript = undefined;
-            changes.processTranscript_articulated = undefined;
-          } else if (data.type === "articulation") {
-            changes.articulationProcess = undefined;
+        // Action is "0" - remove the action from changes
+        // Build a new changes object without the action being removed
+        const cleanedChanges: any = {};
+        
+        // Keep only non-action changes (osuid, slateid, instid, scenario)
+        if (changes.osuid !== undefined && changes.osuid !== "") {
+          cleanedChanges.osuid = changes.osuid;
+        }
+        if (changes.slateid !== undefined && changes.slateid !== "") {
+          cleanedChanges.slateid = changes.slateid;
+        }
+        if (changes.instid !== undefined && changes.instid !== "") {
+          cleanedChanges.instid = changes.instid;
+        }
+        if (changes.scenario !== undefined && changes.scenario !== "" && changes.scenario !== "0") {
+          cleanedChanges.scenario = changes.scenario;
+        }
+        
+        // Check if the OTHER action type is still selected (not the one being cleared)
+        if (data.type === "transcript" && changes.articulationProcess !== undefined) {
+          const articulationAction = String(changes.articulationProcess).trim();
+          if (articulationAction !== "" && articulationAction !== "0") {
+            cleanedChanges.articulationProcess = changes.articulationProcess;
           }
-          newChanges.set(batchId, changes);
-          console.log('Kept row but cleared action:', batchId, changes);
+        } else if (data.type === "articulation" && changes.reprocessTranscript !== undefined) {
+          const transcriptAction = String(changes.reprocessTranscript).trim();
+          if (transcriptAction !== "" && transcriptAction !== "0") {
+            cleanedChanges.reprocessTranscript = changes.reprocessTranscript;
+            if (changes.processTranscript_articulated) {
+              cleanedChanges.processTranscript_articulated = changes.processTranscript_articulated;
+            }
+          }
+        }
+        
+        // Check if any action is still selected after clearing this one
+        const hasAnyAction = (
+          (cleanedChanges.reprocessTranscript !== undefined) ||
+          (cleanedChanges.articulationProcess !== undefined)
+        );
+        
+        const hasOtherChanges = Object.keys(cleanedChanges).length > 0;
+        
+        if (!hasOtherChanges && !hasAnyAction) {
+          // No other changes and no actions - remove the row completely so button hides
+          newChanges.delete(batchId);
+        } else {
+          // Keep the row but with cleaned changes (no cleared action/comment)
+          newChanges.set(batchId, cleanedChanges);
         }
       }
       
-      console.log('Final newChanges:', Array.from(newChanges.entries()));
       return newChanges;
     });
-    console.log('=== TranscriptReports handleActionChange END ===');
   };
   
   // Handle comment change
@@ -237,7 +294,30 @@ export default function TranscriptReports() {
     setRowChanges((prevChanges) => {
       const newChanges = new Map(prevChanges);
       const changes = { ...(newChanges.get(batchId) || {}) };
-      changes.comment = comment;
+      
+      // If comment is empty string and no actions are selected, remove comment from changes
+      if (!comment || comment.trim() === "") {
+        const hasAction = (changes.reprocessTranscript && changes.reprocessTranscript !== "0") ||
+                         (changes.articulationProcess && changes.articulationProcess !== "0");
+        
+        if (!hasAction) {
+          // No action and empty comment - remove comment field
+          delete changes.comment;
+          // If no other changes, remove the entire row
+          const hasOtherChanges = changes.osuid || changes.slateid || changes.instid || changes.scenario;
+          if (!hasOtherChanges) {
+            newChanges.delete(batchId);
+            return newChanges;
+          }
+        } else {
+          // Action exists, keep empty comment
+          changes.comment = comment;
+        }
+      } else {
+        // Comment has value, set it
+        changes.comment = comment;
+      }
+      
       newChanges.set(batchId, changes);
       return newChanges;
     });
@@ -259,23 +339,36 @@ export default function TranscriptReports() {
   
   // Handle bulk update
   const handleBulkUpdate = async () => {
+    console.log('=== handleBulkUpdate START ===');
+    console.log('rowChanges size:', rowChanges.size);
+    console.log('rowChanges entries:', Array.from(rowChanges.entries()));
+    
     if (rowChanges.size === 0) {
+      console.log('No row changes, returning early');
       return;
     }
     
     // Filter to only rows with actions selected (matching CI3 logic)
     const rowsToUpdate = Array.from(rowChanges.entries()).filter(([_batchId, changes]) => {
-      return (changes.reprocessTranscript && changes.reprocessTranscript !== "0") ||
-             (changes.articulationProcess && changes.articulationProcess !== "0");
+      const hasTranscriptAction = changes.reprocessTranscript && changes.reprocessTranscript !== "0";
+      const hasArticulationAction = changes.articulationProcess && changes.articulationProcess !== "0";
+      // Also include if instid/osuid/slateid is changed (for immediate updates)
+      const hasFieldChange = changes.instid || changes.osuid || changes.slateid;
+      return hasTranscriptAction || hasArticulationAction || hasFieldChange;
     });
     
+    console.log('Rows to update:', rowsToUpdate.length);
+    console.log('Rows to update details:', rowsToUpdate.map(([batchId, changes]) => ({ batchId, changes })));
+    
     if (rowsToUpdate.length === 0) {
+      console.log('No rows with actions or field changes, returning early');
       return;
     }
     
     try {
       let successCount = 0;
       let errorCount = 0;
+      const errors: Array<{ batchId: string; error: string }> = [];
       
       // Process each row's changes sequentially (matching CI3 behavior)
       for (const [batchId, changes] of rowsToUpdate) {
@@ -292,25 +385,52 @@ export default function TranscriptReports() {
             instid: changes.instid || "",
           };
           
+          console.log(`=== Updating batch ${batchId} ===`);
+          console.log('Update data:', JSON.stringify(updateData, null, 2));
+          
           const response = await api.post("/api/transcriptreports/updatechkstatus", updateData);
           
-          if (response.data?.message === "Success" || response.data === "Success") {
+          console.log(`=== Response for batch ${batchId} ===`);
+          console.log('Response status:', response.status);
+          console.log('Response data:', JSON.stringify(response.data, null, 2));
+          
+          if (response.data?.message === "Success" || response.data === "Success" || response.data?.success === true) {
+            console.log(`✓ Successfully updated batch ${batchId}`);
             successCount++;
           } else {
+            const errorMsg = response.data?.message || response.data?.detail || "Unknown error";
+            console.error(`✗ Failed to update batch ${batchId}:`, errorMsg);
+            errors.push({ batchId, error: errorMsg });
             errorCount++;
           }
         } catch (error: any) {
-          console.error(`Error updating batch ${batchId}:`, error);
+          console.error(`=== Error updating batch ${batchId} ===`);
+          console.error('Error object:', error);
+          console.error('Error message:', error?.message);
+          console.error('Error response:', error?.response);
+          console.error('Error response data:', error?.response?.data);
+          console.error('Error response status:', error?.response?.status);
+          console.error('Error stack:', error?.stack);
+          
+          const errorMsg = error.response?.data?.detail || error.response?.data?.message || error.message || "Unknown error";
+          errors.push({ batchId, error: errorMsg });
           errorCount++;
         }
       }
+      
+      console.log('=== Bulk Update Summary ===');
+      console.log('Success count:', successCount);
+      console.log('Error count:', errorCount);
+      console.log('Errors:', errors);
       
       // Show success/error messages
       if (successCount > 0) {
         alertsuccess(`Transcript status updated successfully for ${successCount} record(s)`);
       }
       if (errorCount > 0) {
-        alerterror(`Error updating ${errorCount} record(s)`);
+        const errorDetails = errors.map(e => `Batch ${e.batchId}: ${e.error}`).join('; ');
+        console.error('Bulk update errors:', errorDetails);
+        alerterror(`Error updating ${errorCount} record(s). ${errorDetails}`);
       }
       
       // Clear changes and refresh table
@@ -321,16 +441,19 @@ export default function TranscriptReports() {
         setRefreshTrigger((prev) => prev + 1);
       }
     } catch (error: any) {
-      console.error("Bulk update error:", error);
-      alerterror(error.response?.data?.detail || "Error updating records. Please try again.");
+      console.error("=== handleBulkUpdate: General Error ===");
+      console.error("Error:", error);
+      console.error("Error stack:", error.stack);
+      console.error("Error response:", error.response);
+      alerterror(error.response?.data?.detail || error.message || "Error updating records. Please try again.");
     }
+    
+    console.log('=== handleBulkUpdate END ===');
   };
   
   // Define columns based on type (matching CI3 view logic)
   // Using columnConfig.ts for complete column definitions matching CI3 list.php
   const getColumns = () => {
-    console.log('getColumns called with handleActionChange:', typeof handleActionChange, handleActionChange);
-    
     return createTranscriptReportColumns(
       type,
       hasUpdatePermission,
@@ -354,7 +477,7 @@ export default function TranscriptReports() {
       }
     );
   };
-  
+
   // Get export file name based on type
   const getExportFileName = () => {
     if (type === "Failed") {
@@ -408,22 +531,25 @@ export default function TranscriptReports() {
           <div className="flex items-center gap-2">
             <BulkUpdateButton
               isVisible={(() => {
+                // Only show button if rowChanges has entries AND at least one has an action selected
+                if (rowChanges.size === 0) {
+                  return false;
+                }
+                
                 const hasAction = Array.from(rowChanges.values()).some((changes: any) => {
-                  // Show button if any row has an action selected (not "0") - matching CI3 logic
+                  // Show button if any row has an action selected (not "0" or empty or undefined) - matching CI3 logic
                   // CI3 shows button when: Processed, Rerun, or Noaction is selected (lines 563, 682, 776, 824, 829, 839)
-                  const transcriptAction = String(changes.reprocessTranscript || "").trim();
-                  const articulationAction = String(changes.articulationProcess || "").trim();
+                  const transcriptAction = changes.reprocessTranscript !== undefined 
+                    ? String(changes.reprocessTranscript).trim() 
+                    : "";
+                  const articulationAction = changes.articulationProcess !== undefined 
+                    ? String(changes.articulationProcess).trim() 
+                    : "";
                   
-                  const hasTranscriptAction = transcriptAction && transcriptAction !== "0";
-                  const hasArticulationAction = articulationAction && articulationAction !== "0";
+                  const hasTranscriptAction = transcriptAction !== "" && transcriptAction !== "0";
+                  const hasArticulationAction = articulationAction !== "" && articulationAction !== "0";
                   
                   return hasTranscriptAction || hasArticulationAction;
-                });
-                
-                console.log('BulkUpdateButton isVisible check:', {
-                  rowChangesSize: rowChanges.size,
-                  rowChangesEntries: Array.from(rowChanges.entries()),
-                  hasAction
                 });
                 
                 return hasAction;

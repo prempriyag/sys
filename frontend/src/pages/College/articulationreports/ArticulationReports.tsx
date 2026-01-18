@@ -10,16 +10,27 @@ import { API_ENDPOINTS, API_BASE_URL } from "../../../config/api";
 import { RefreshIcon, FilterIcon } from "../../../icons";
 import { useAuth } from "../../../context/AuthContext";
 
-export default function ArticulationReports() {
+interface ArticulationReportsProps {
+  studentId?: string;
+  batchId?: string;
+  institutionId?: string;
+  type?: string;
+}
+
+export default function ArticulationReports(props?: ArticulationReportsProps) {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   
-  // Determine type from URL path (matching CI3 route structure)
+  // Determine type from props, URL path, or search params (matching CI3 route structure)
   // Routes: /college/articulationkickouts -> "Failed"
   //         /college/articulationphase2kickouts -> "Phase_2"
   //         /college/articulationprocessed -> "Processed"
   //         /college/articulationrerun -> "Rerun"
   const getTypeFromPath = () => {
+    // Use prop type if provided (from StudentView)
+    if (props?.type) {
+      return props.type;
+    }
     const path = location.pathname;
     if (path.includes("/articulationkickouts")) {
       return "Failed";
@@ -40,8 +51,19 @@ export default function ArticulationReports() {
   const { hasPermission } = useAuth();
   
   // Filter state
-  const [fieldType, setFieldType] = useState<string>("");
-  const [fieldName, setFieldName] = useState<string>("");
+  // Filter state - initialize from props if provided (from StudentView)
+  const [fieldType, setFieldType] = useState<string>(() => {
+    if (props?.batchId) return "BATCH_ID";
+    if (props?.institutionId) return "COLLEGE_ID";
+    if (props?.studentId) return "STUDENT_ID";
+    return "";
+  });
+  const [fieldName, setFieldName] = useState<string>(() => {
+    if (props?.batchId) return props.batchId;
+    if (props?.institutionId) return props.institutionId;
+    if (props?.studentId) return props.studentId;
+    return "";
+  });
   const [fromDate, setFromDate] = useState<string>("");
   const [toDate, setToDate] = useState<string>("");
 

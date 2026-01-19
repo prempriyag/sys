@@ -331,15 +331,6 @@ export const collegeMenu: MenuConfig = {
           name: "Error Logs",
           path: "/college/Error_log",
         },
-        {
-          name: "Master Settings",
-          path: "/college/master_setup",
-        },
-        {
-          name: "SMTP Setup",
-          path: "/college/smtp",
-          permission: "smtp_setup",
-        },
       ],
     },
     {

@@ -60,6 +60,9 @@ export const API_ENDPOINTS = {
   STUDENTVIEW_GET_STUDENTS: "/api/studentview/getstudentslist",
   STUDENTVIEW_VIEW_PAGE_LOAD: "/api/studentview/viewpageload",
   STUDENTVIEW_ARTICULATION_PAGE_LOAD: "/api/studentview/articulationviewpageload",
+  // Theme Settings endpoints
+  SETTINGS: "/api/theme-settings",
+  SETTINGS_UPLOAD_LOGO: "/api/theme-settings/upload-logo",
 };
 
 // Helper function to get auth token from localStorage

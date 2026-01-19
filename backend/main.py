@@ -5,7 +5,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
-from controllers import auth_controller, users_controller
+from controllers import auth_controller, users_controller, theme_settings_controller
 from controllers.college import transcriptreports_controller
 
 # Import digiscript reports controller
@@ -108,7 +108,7 @@ app.add_middleware(
 
 # Import dashboard controller
 try:
-    from backend.controllers.college import dashboard_controller
+    from controllers.college import dashboard_controller
     print("[MAIN] Successfully imported dashboard_controller")
 except Exception as e:
     print(f"[MAIN] ERROR importing dashboard_controller: {e}")
@@ -119,6 +119,7 @@ except Exception as e:
 # Include routers
 app.include_router(auth_controller.router)
 app.include_router(users_controller.router)
+app.include_router(theme_settings_controller.router)
 app.include_router(transcriptreports_controller.router)
 
 # Include dashboard router if imported successfully

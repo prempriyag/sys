@@ -248,7 +248,8 @@ export default function App() {
             <Route path="/college/roles/view/:id" element={<EditRole />} />
             <Route path="/college/Error_log" element={<ErrorLog />} />
             <Route path="/college/master_setup" element={<MasterSettings />} />
-            <Route path="/college/smtp" element={<SmtpSetup />} />
+            {/* SMTP route hidden - now accessible via /settings page */}
+            {/* <Route path="/college/smtp" element={<SmtpSetup />} /> */}
             
             {/* College - User Manual */}
             <Route path="/college/Help" element={<Help />} />

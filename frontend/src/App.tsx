@@ -72,6 +72,22 @@ import ErrorScreenshot from "./pages/College/ErrorScreenshot";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import PermissionRoute from "./components/auth/PermissionRoute";
 
+//School Pages
+import SchoolDashboard from "./pages/School/dashboard/SchoolDashboard";
+import SchoolTranscriptReports from "./pages/School/transcriptreports/TranscriptReports";
+import SchoolDigiScriptReports from "./pages/School/digiscriptreports/DigiScriptReports";
+import SchoolTranscriptHdrOcr from "./pages/School/ocr/transcripthdrocr/TranscriptHdrOcr";
+import SchoolTranscriptLineOcr from "./pages/School/ocr/transcriptlineocr/TranscriptLineOcr";
+import SchoolTranscriptHdrData from "./pages/School/data/transcripthdrdata/TranscriptHdrData";
+import SchoolTranscriptLineData from "./pages/School/data/transcriptlinedata/TranscriptLineData";
+import SchoolDigiScriptBotLog from "./pages/School/botlogs/digiscriptbotlog/DigiScriptBotLog";
+import SchoolStudentLogKickouts from "./pages/School/studentlogs/kickouts/StudentLogKickouts";
+import SchoolStudentLogProcessed from "./pages/School/studentlogs/processed/StudentLogProcessed";
+import SchoolStudentLogRerun from "./pages/School/studentlogs/rerun/StudentLogRerun";
+import SchoolStudentView from "./pages/School/StudentView";
+import SchoolTranscriptsUpload from "./pages/School/transcripts/TranscriptsUpload";
+import SchoolTranscriptsList from "./pages/School/transcripts/TranscriptsList";
+
 export default function App() {
   return (
     <>
@@ -94,6 +110,10 @@ export default function App() {
             {/* Default route - college dashboard */}
             <Route index element={<CollegeDashboard />} />
             <Route path="/dashboard" element={<CollegeDashboard />} />
+
+            {/* School dashboard */}
+            <Route index element={<SchoolDashboard />} />
+            <Route path="school/dashboard" element={<SchoolDashboard />} />
             
             {/* College module routes (default module) */}
             <Route path="/college/dashboard" element={<CollegeDashboard />} />
@@ -132,6 +152,11 @@ export default function App() {
             <Route path="/college/transcriptprocessed" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><TranscriptReports /></PermissionRoute>} />
             <Route path="/college/transcriptrerun" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><TranscriptReports /></PermissionRoute>} />
             
+            {/* School - Transcripts (all handled by single TranscriptReports component with type parameter) */}
+            <Route path="/school/transcriptkickouts" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><SchoolTranscriptReports /></PermissionRoute>} />
+            <Route path="/school/transcriptprocessed" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><SchoolTranscriptReports /></PermissionRoute>} />
+            <Route path="/school/transcriptrerun" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><SchoolTranscriptReports /></PermissionRoute>} />
+
             {/* College - Articulation */}
             <Route path="/college/articulationkickouts" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><ArticulationReports /></PermissionRoute>} />
             <Route path="/college/articulationphase2kickouts" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><ArticulationReports /></PermissionRoute>} />
@@ -144,6 +169,12 @@ export default function App() {
             <Route path="/college/studentlogreprocessed" element={<PermissionRoute permission="student_log_rerun" action="VIEW"><StudentLogRerun /></PermissionRoute>} />
             <Route path="/college/studentview" element={<PermissionRoute permission="student_view" action="VIEW"><StudentView /></PermissionRoute>} />
             
+            {/* School - Student Action Center */}
+            <Route path="/school/studentlogkickouts" element={<PermissionRoute permission="student_log_kickout" action="VIEW"><StudentLogKickouts /></PermissionRoute>} />
+            <Route path="/school/studentlogprocessed" element={<PermissionRoute permission="student_log_processed" action="VIEW"><StudentLogProcessed /></PermissionRoute>} />
+            <Route path="/school/studentlogreprocessed" element={<PermissionRoute permission="student_log_rerun" action="VIEW"><StudentLogRerun /></PermissionRoute>} />
+            <Route path="/school/studentview" element={<PermissionRoute permission="student_view" action="VIEW"><StudentView /></PermissionRoute>} />
+
             {/* College - Reports */}
             <Route path="/college/transcriptreports" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><TranscriptReports /></PermissionRoute>} />
             <Route path="/college/transcriptequivalenthours" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><TranscriptReports /></PermissionRoute>} />

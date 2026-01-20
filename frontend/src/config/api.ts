@@ -38,7 +38,6 @@ export const API_ENDPOINTS = {
   OVERRIDE_EDIT_MAPPING_LIST: "/api/overrideeditmapping/ajaxlist",
   STORED_PROCEDURE_GET_NAME: "/api/storedprocedure/getname",
   STORED_PROCEDURE_RUN: "/api/storedprocedure/run",
-  TRANSCRIPTS_LIST: "/api/transcripts/ajaxlist",
   ERROR_LOG_LIST: "/api/errorlog/ajaxlist",
   ERROR_LOG_UPDATE_STATUS: "/api/errorlog/updatestatus",
   SMTP_LIST: "/api/smtp/ajaxlist",
@@ -60,6 +59,25 @@ export const API_ENDPOINTS = {
   STUDENTVIEW_GET_STUDENTS: "/api/studentview/getstudentslist",
   STUDENTVIEW_VIEW_PAGE_LOAD: "/api/studentview/viewpageload",
   STUDENTVIEW_ARTICULATION_PAGE_LOAD: "/api/studentview/articulationviewpageload",
+
+  //School
+  SCHOOL_TRANSCRIPT_REPORTS: "/api/school/transcriptreports",
+  SCHOOL_TRANSCRIPT_REPORTS_LIST: "/api/school/transcriptreports/ajaxlist",
+  SCHOOL_DIGISCRIPT_REPORTS_LIST: "/api/school/digiscriptreports/ajaxlist",
+  SCHOOL_TRANSCRIPT_HDR_OCR_LIST: "/api/school/transcripthdrocr/ajaxlist",
+  SCHOOL_TRANSCRIPT_LINE_OCR_LIST: "/api/school/transcriptlineocr/ajaxlist",
+  SCHOOL_TRANSCRIPT_HDR_DATA_LIST: "/api/school/transcripthdrdata/ajaxlist",
+  SCHOOL_TRANSCRIPT_LINE_DATA_LIST: "/api/school/transcriptlinedata/ajaxlist",
+  SCHOOL_DIGISCRIPT_BOT_LOG_LIST: "/api/school/digiscriptbotlog/ajaxlist",
+  SCHOOL_TRANSCRIPTS_LIST: "/api/school/transcripts/ajaxlist",
+  SCHOOL_TRANSCRIPTS_UPLOAD: "/api/school/transcripts/upload",
+  SCHOOL_TRANSCRIPTS_SOURCES: "/api/school/transcripts/sources",
+  SCHOOL_INSTITUTION_MAPPING_LIST: "/api/school/institutionmapping/ajaxlist",
+
+  // Student View endpoints
+  SCHOOL_STUDENTVIEW: "/api/school/studentview",
+  SCHOOL_STUDENTVIEW_GET_STUDENTS: "/api/school/studentview/getstudentslist",
+  SCHOOL_STUDENTVIEW_VIEW_PAGE_LOAD: "/api/school/studentview/viewpageload",
 };
 
 // Helper function to get auth token from localStorage

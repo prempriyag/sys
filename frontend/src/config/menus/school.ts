@@ -39,21 +39,21 @@ export const schoolMenu: MenuConfig = {
       subItems: [
         {
           name: "Kickouts",
-          path: "/school/hdrreports?type=Failed",
+          path: "/school/transcriptkickouts",
         },
         {
           name: "Processed",
-          path: "/school/hdrreports?type=Processed",
+          path: "/school/transcriptprocessed",
         },
         {
           name: "Rerun",
-          path: "/school/hdrreports?type=Rerun",
+          path: "/school/transcriptrerun",
         },
       ],
     },
     {
       name: "Reports",
-      path: "/school/hdrreports",
+      path: "/school/transcriptreports",
       icon: "bar-chart",
     },
     {
@@ -118,12 +118,12 @@ export const schoolMenu: MenuConfig = {
       subItems: [
         {
           name: "Upload Transcript",
-          path: "/school/download/add",
+          path: "/school/transcripts/add",
           permission: "school_upload_transcripts",
         },
         {
           name: "Uploaded Transcripts",
-          path: "/school/download",
+          path: "/school/transcripts",
           permission: "school_upload_transcripts",
         },
       ],

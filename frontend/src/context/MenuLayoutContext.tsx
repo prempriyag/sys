@@ -19,10 +19,10 @@ export const useMenuLayout = () => {
 };
 
 export const MenuLayoutProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // Load from localStorage or default to vertical
+  // Load from localStorage or default to horizontal
   const [menuLayout, setMenuLayoutState] = useState<MenuLayoutType>(() => {
     const saved = localStorage.getItem("menuLayout");
-    return (saved === "horizontal" || saved === "vertical" ? saved : "vertical") as MenuLayoutType;
+    return (saved === "horizontal" || saved === "vertical" ? saved : "horizontal") as MenuLayoutType;
   });
 
   // Save to localStorage whenever it changes

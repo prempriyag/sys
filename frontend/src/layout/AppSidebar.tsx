@@ -308,6 +308,15 @@ const AppSidebar: React.FC = () => {
                 : "lg:justify-start"
             }`}
                       >
+                        {subItem.icon && (
+                          <span className={`menu-item-icon-size ${
+                            isActive(subItem.path)
+                              ? "menu-item-icon-active"
+                              : "menu-item-icon-inactive"
+                          }`}>
+                            {getIcon(subItem.icon)}
+                          </span>
+                        )}
                         {subItem.name}
                       </Link>
                     </li>

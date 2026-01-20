@@ -11,7 +11,7 @@ interface EditUserModalProps {
   isOpen: boolean;
   userId: number | null;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (messageText?: string) => void;
 }
 
 export default function EditUserModal({
@@ -149,12 +149,19 @@ export default function EditUserModal({
     try {
       const response = await api.put(`${API_ENDPOINTS.USERS_UPDATE}/${userId}`, formData);
       
-      if (response.data?.status === 1 || response.data?.message?.includes("success")) {
-        alertsuccess(response.data?.message || "User updated successfully");
-        onSuccess();
+      // Check for success response (MessageResponse has 'success' and 'message' fields)
+      // Handle both direct response (fetch) and wrapped response (axios) formats
+      const success = response.success || response.data?.success;
+      const message = response.message || response.data?.message || "";
+      const isSuccess = success || message.toLowerCase().includes("success");
+      
+      if (isSuccess) {
+        const successMessage = message || "User updated successfully";
+        alertsuccess(successMessage);
+        onSuccess(successMessage);
         onClose();
       } else {
-        alerterror(response.data?.message || "Failed to update user");
+        alerterror(message || "Failed to update user");
       }
     } catch (err: any) {
       console.error("Update user error:", err);
@@ -168,10 +175,15 @@ export default function EditUserModal({
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} className="max-w-2xl">
-      <div className="p-6">
-        <h3 className="mb-6 text-xl font-semibold text-gray-800 dark:text-white">
+      {/* Modal Header */}
+      <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+        <h3 className="text-xl font-semibold text-gray-800 dark:text-white">
           Edit User
         </h3>
+      </div>
+
+      {/* Modal Body */}
+      <div className="p-6">
 
         {loadingUser ? (
           <div className="flex items-center justify-center py-8">
@@ -189,7 +201,7 @@ export default function EditUserModal({
                 onChange={(e) => handleFieldChange("name", e.target.value)}
                 onBlur={(e) => handleBlur("name", e.target.value)}
                 placeholder="Enter Full Name"
-                required
+                error={!!errors.name}
                 className={errors.name ? "border-red-500" : ""}
               />
               {errors.name && (
@@ -209,7 +221,7 @@ export default function EditUserModal({
             </div>
 
             <div>
-              <Label>Role *</Label>
+              <Label>Roles *</Label>
               <div className="relative">
                 <select
                   className={`relative w-full appearance-none rounded-lg border bg-transparent px-4 py-2.5 text-sm text-gray-800 outline-none focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:focus:border-brand-800 ${
@@ -218,7 +230,6 @@ export default function EditUserModal({
                   value={formData.role_id}
                   onChange={(e) => handleFieldChange("role_id", parseInt(e.target.value))}
                   onBlur={(e) => handleBlur("role_id", parseInt(e.target.value))}
-                  required
                 >
                   <option value={0}>Select Role</option>
                   {roles.map((role) => (
@@ -252,7 +263,7 @@ export default function EditUserModal({
             </div>
 
             <div>
-              <Label>Permissions *</Label>
+              <Label>Module Permissions *</Label>
               {errors.permissions && (
                 <p className="mb-2 text-xs text-red-500">{errors.permissions}</p>
               )}
@@ -305,7 +316,7 @@ export default function EditUserModal({
                     Updating...
                   </>
                 ) : (
-                  "Update User"
+                  "Submit"
                 )}
               </Button>
               <Button

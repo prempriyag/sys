@@ -231,12 +231,21 @@ export default function HorizontalMenuItem({
                 <Link
                   key={subKey}
                   to={subItem.path || "#"}
-                  className={`block px-4 py-2 text-sm transition-colors ${
+                  className={`flex items-center gap-2 px-4 py-2 text-sm transition-colors ${
                     isSubItemActive
                       ? "bg-brand-50 text-brand-600 dark:bg-brand-900/20 dark:text-brand-400"
                       : "text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
                   }`}
                 >
+                  {subItem.icon && (
+                    <span className={`menu-item-icon-size ${
+                      isSubItemActive
+                        ? "menu-item-icon-active"
+                        : "menu-item-icon-inactive"
+                    }`}>
+                      {getIcon(subItem.icon)}
+                    </span>
+                  )}
                   {subItem.name}
                 </Link>
               );

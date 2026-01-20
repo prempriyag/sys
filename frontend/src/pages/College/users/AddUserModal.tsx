@@ -10,7 +10,7 @@ import { useToast } from "../../../context/ToastContext";
 interface AddUserModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (messageText?: string) => void;
 }
 
 export default function AddUserModal({
@@ -85,22 +85,6 @@ export default function AddUserModal({
           return "Please enter a valid email address";
         }
         return "";
-      case "password":
-        if (!value || value.trim() === "") {
-          return "Password is required";
-        }
-        if (value.length < 8) {
-          return "Password must be at least 8 characters";
-        }
-        return "";
-      case "cpassword":
-        if (!value || value.trim() === "") {
-          return "Confirm Password is required";
-        }
-        if (value !== formData.password) {
-          return "Passwords do not match";
-        }
-        return "";
       case "role_id":
         if (!value || value === 0) {
           return "Please select a role";
@@ -139,8 +123,6 @@ export default function AddUserModal({
     const newErrors: Record<string, string> = {};
     newErrors.name = validateField("name", formData.name);
     newErrors.email = validateField("email", formData.email);
-    newErrors.password = validateField("password", formData.password);
-    newErrors.cpassword = validateField("cpassword", formData.cpassword);
     newErrors.role_id = validateField("role_id", formData.role_id);
 
     // Check permissions
@@ -157,15 +139,23 @@ export default function AddUserModal({
 
     setLoading(true);
     try {
-      const { cpassword, ...submitData } = formData;
+      // Remove password fields as backend auto-generates password
+      const { password, cpassword, ...submitData } = formData;
       const response = await api.post(API_ENDPOINTS.USERS_INSERT, submitData);
       
-      if (response.data?.status === 1 || response.data?.message?.includes("success")) {
-        alertsuccess(response.data?.message || "User added successfully");
-        onSuccess();
+      // Check for success response (MessageResponse has 'success' and 'message' fields)
+      // Handle both direct response (fetch) and wrapped response (axios) formats
+      const success = response.success || response.data?.success;
+      const message = response.message || response.data?.message || "";
+      const isSuccess = success || message.toLowerCase().includes("success");
+      
+      if (isSuccess) {
+        const successMessage = message || "User added successfully";
+        alertsuccess(successMessage);
+        onSuccess(successMessage);
         onClose();
       } else {
-        alerterror(response.data?.message || "Failed to add user");
+        alerterror(message || "Failed to add user");
       }
     } catch (err: any) {
       console.error("Add user error:", err);
@@ -177,11 +167,15 @@ export default function AddUserModal({
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} className="max-w-2xl">
-      <div className="p-6">
-        <h3 className="mb-6 text-xl font-semibold text-gray-800 dark:text-white">
-          Add New User
+      {/* Modal Header */}
+      <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+        <h3 className="text-xl font-semibold text-gray-800 dark:text-white">
+          Add User
         </h3>
+      </div>
 
+      {/* Modal Body */}
+      <div className="p-6">
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -191,7 +185,7 @@ export default function AddUserModal({
               onChange={(e) => handleFieldChange("name", e.target.value)}
               onBlur={(e) => handleBlur("name", e.target.value)}
               placeholder="Enter Full Name"
-              required
+              error={!!errors.name}
               className={errors.name ? "border-red-500" : ""}
             />
             {errors.name && (
@@ -200,14 +194,14 @@ export default function AddUserModal({
           </div>
 
           <div>
-            <Label>Email *</Label>
+            <Label>Email address *</Label>
             <Input
               type="email"
               value={formData.email}
               onChange={(e) => handleFieldChange("email", e.target.value)}
               onBlur={(e) => handleBlur("email", e.target.value)}
-              placeholder="Enter Email"
-              required
+              placeholder="Enter email"
+              error={!!errors.email}
               className={errors.email ? "border-red-500" : ""}
             />
             {errors.email && (
@@ -216,39 +210,7 @@ export default function AddUserModal({
           </div>
 
           <div>
-            <Label>Password *</Label>
-            <Input
-              type="password"
-              value={formData.password || ""}
-              onChange={(e) => handleFieldChange("password", e.target.value)}
-              onBlur={(e) => handleBlur("password", e.target.value)}
-              placeholder="Enter Password (min 8 characters)"
-              required
-              className={errors.password ? "border-red-500" : ""}
-            />
-            {errors.password && (
-              <p className="mt-1 text-xs text-red-500">{errors.password}</p>
-            )}
-          </div>
-
-          <div>
-            <Label>Confirm Password *</Label>
-            <Input
-              type="password"
-              value={formData.cpassword || ""}
-              onChange={(e) => handleFieldChange("cpassword", e.target.value)}
-              onBlur={(e) => handleBlur("cpassword", e.target.value)}
-              placeholder="Confirm Password"
-              required
-              className={errors.cpassword ? "border-red-500" : ""}
-            />
-            {errors.cpassword && (
-              <p className="mt-1 text-xs text-red-500">{errors.cpassword}</p>
-            )}
-          </div>
-
-          <div>
-            <Label>Role *</Label>
+            <Label>Roles *</Label>
             <div className="relative">
               <select
                 className={`relative w-full appearance-none rounded-lg border bg-transparent px-4 py-2.5 text-sm text-gray-800 outline-none focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:focus:border-brand-800 ${
@@ -291,7 +253,7 @@ export default function AddUserModal({
           </div>
 
           <div>
-            <Label>Permissions *</Label>
+            <Label>Module Permissions *</Label>
             {errors.permissions && (
               <p className="mb-2 text-xs text-red-500">{errors.permissions}</p>
             )}
@@ -344,7 +306,7 @@ export default function AddUserModal({
                   Adding...
                 </>
               ) : (
-                "Add User"
+                "Submit"
               )}
             </Button>
             <Button

@@ -14,6 +14,13 @@ import {
   TimeIcon,
   DocsIcon,
   BoltIcon,
+  PageIcon,
+  BoxIcon,
+  PencilIcon,
+  CheckCircleIcon,
+  ArrowRightIcon,
+  FolderIcon,
+  BoxCubeIcon,
 } from "../icons";
 
 // Map icon string names to icon components
@@ -33,6 +40,13 @@ export const iconMap: Record<string, React.ComponentType<any>> = {
   calendar: CalenderIcon,
   list: ListIcon,
   table: TableIcon,
+  page: PageIcon,
+  box: BoxIcon,
+  pencil: PencilIcon,
+  "check-circle": CheckCircleIcon,
+  "arrow-right": ArrowRightIcon,
+  folder: FolderIcon,
+  "box-cube": BoxCubeIcon,
 };
 
 export const getIcon = (iconName?: string | React.ReactNode): React.ReactNode => {

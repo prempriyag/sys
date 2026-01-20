@@ -47,7 +47,11 @@ const Input: FC<InputProps> = ({
     lg: "h-12 text-base px-5 py-3",
   };
   
-  let inputClasses = ` w-full rounded-lg border appearance-none ${sizeClasses[size]} shadow-theme-xs placeholder:text-gray-400 focus:outline-hidden focus:ring-3  dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 ${className}`;
+  // For date/time inputs, don't use appearance-none to show native date picker
+  const isDateOrTime = type === "date" || type === "time";
+  const appearanceClass = isDateOrTime ? "" : "appearance-none";
+  const datePadding = isDateOrTime ? "pr-10" : "";
+  let inputClasses = ` w-full rounded-lg border ${appearanceClass} ${sizeClasses[size]} ${datePadding} shadow-theme-xs placeholder:text-gray-400 focus:outline-hidden focus:ring-3  dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 ${className}`;
 
   if (disabled) {
     inputClasses += ` text-gray-500 border-gray-300 opacity-40 bg-gray-100 cursor-not-allowed dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700 opacity-40`;

@@ -20,6 +20,7 @@ export default function UserManagement() {
   const { isAuthenticated } = useAuth();
   const { alertsuccess, alerterror } = useToast();
   const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [showResetPasswordModal, setShowResetPasswordModal] = useState(false);
   const [showAddUserModal, setShowAddUserModal] = useState(false);
@@ -28,6 +29,7 @@ export default function UserManagement() {
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const [selectedUserName, setSelectedUserName] = useState<string>("");
   const [userToDelete, setUserToDelete] = useState<number | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Check authentication on mount
   useEffect(() => {
@@ -52,16 +54,47 @@ export default function UserManagement() {
   const handleDeleteUser = async () => {
     if (!userToDelete) return;
 
+    setIsDeleting(true);
     try {
-      await api.delete(`${API_ENDPOINTS.USERS_DELETE}/${userToDelete}`);
-      alertsuccess("User deleted successfully");
-      setRefreshTrigger((prev) => prev + 1);
-      setShowDeleteConfirmModal(false);
-      setUserToDelete(null);
+      const response = await api.delete(`${API_ENDPOINTS.USERS_DELETE}/${userToDelete}`);
+      
+      console.log("[DELETE] Response received:", response);
+      
+      // Check for success response (MessageResponse has 'success' and 'message' fields)
+      // Handle both direct response (fetch) and wrapped response (axios) formats
+      const success = response.success || response.data?.success;
+      const message = response.message || response.data?.message || "";
+      const isSuccess = success || message.toLowerCase().includes("success");
+      
+      if (isSuccess) {
+        const successMessage = message || "User deleted successfully";
+        alertsuccess(successMessage);
+        setMessage({ type: "success", text: successMessage });
+        setRefreshTrigger((prev) => prev + 1);
+        setShowDeleteConfirmModal(false);
+        setUserToDelete(null);
+        // Clear message after 5 seconds
+        setTimeout(() => setMessage(null), 5000);
+      } else {
+        const errorMessage = message || "Failed to delete user";
+        alerterror(errorMessage);
+        setMessage({ type: "error", text: errorMessage });
+        setShowDeleteConfirmModal(false);
+        setUserToDelete(null);
+        // Clear message after 5 seconds
+        setTimeout(() => setMessage(null), 5000);
+      }
     } catch (err: any) {
-      alerterror(err.response?.data?.message || err.message || "Failed to delete user");
+      console.error("[DELETE] Delete user error:", err);
+      const errorMessage = err.response?.data?.detail || err.response?.data?.message || err.message || "Failed to delete user";
+      alerterror(errorMessage);
+      setMessage({ type: "error", text: errorMessage });
       setShowDeleteConfirmModal(false);
       setUserToDelete(null);
+      // Clear message after 5 seconds
+      setTimeout(() => setMessage(null), 5000);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -150,6 +183,25 @@ export default function UserManagement() {
             >
               ×
             </button>
+          </div>
+        )}
+
+        {/* Success/Error Message Banner */}
+        {message && (
+          <div className={`mb-4 p-4 rounded-lg border ${
+            message.type === "success" 
+              ? "bg-green-50 text-green-800 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800" 
+              : "bg-red-50 text-red-800 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800"
+          }`}>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">{message.text}</span>
+              <button
+                onClick={() => setMessage(null)}
+                className={`ml-4 ${message.type === "success" ? "text-green-800 dark:text-green-300" : "text-red-800 dark:text-red-300"}`}
+              >
+                ×
+              </button>
+            </div>
           </div>
         )}
 
@@ -279,9 +331,15 @@ export default function UserManagement() {
       {/* Add User Modal */}
       <AddUserModal
         isOpen={showAddUserModal}
-        onClose={() => setShowAddUserModal(false)}
-        onSuccess={() => {
+        onClose={() => {
+          setShowAddUserModal(false);
+          setMessage(null);
+        }}
+        onSuccess={(messageText?: string) => {
           setRefreshTrigger((prev) => prev + 1);
+          setMessage({ type: "success", text: messageText || "User added successfully" });
+          // Clear message after 5 seconds
+          setTimeout(() => setMessage(null), 5000);
         }}
       />
 
@@ -292,9 +350,13 @@ export default function UserManagement() {
         onClose={() => {
           setShowEditUserModal(false);
           setSelectedUserId(null);
+          setMessage(null);
         }}
-        onSuccess={() => {
+        onSuccess={(messageText?: string) => {
           setRefreshTrigger((prev) => prev + 1);
+          setMessage({ type: "success", text: messageText || "User updated successfully" });
+          // Clear message after 5 seconds
+          setTimeout(() => setMessage(null), 5000);
         }}
       />
 
@@ -318,8 +380,10 @@ export default function UserManagement() {
       <ConfirmationModal
         isOpen={showDeleteConfirmModal}
         onClose={() => {
-          setShowDeleteConfirmModal(false);
-          setUserToDelete(null);
+          if (!isDeleting) {
+            setShowDeleteConfirmModal(false);
+            setUserToDelete(null);
+          }
         }}
         onConfirm={handleDeleteUser}
         title="Confirm Delete"
@@ -327,6 +391,7 @@ export default function UserManagement() {
         confirmText="Delete"
         cancelText="Cancel"
         confirmVariant="danger"
+        isLoading={isDeleting}
       />
     </PageWrapper>
   );

@@ -12,7 +12,7 @@ import AddTermModal from "./AddTermModal";
 import EditTermModal from "./EditTermModal";
 import { Modal } from "../../../../components/ui/modal";
 import Input from "../../../../components/form/input/InputField";
-import Label from "../../../../components/form/Label";s
+import Label from "../../../../components/form/Label";
 import ConfirmationModal from "../../../../components/common/ConfirmationModal";
 
 export default function TermMapping() {

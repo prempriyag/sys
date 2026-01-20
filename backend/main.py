@@ -5,7 +5,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
-from controllers import auth_controller, users_controller, theme_settings_controller
+from controllers import auth_controller, users_controller, theme_settings_controller, sso_controller
 from controllers.college import transcriptreports_controller
 
 # Import digiscript reports controller
@@ -121,6 +121,22 @@ app.include_router(auth_controller.router)
 app.include_router(users_controller.router)
 app.include_router(theme_settings_controller.router)
 app.include_router(transcriptreports_controller.router)
+
+# Include SSO router
+try:
+    from fastapi import APIRouter
+    app.include_router(sso_controller.router)
+    # Also include router with /sso prefix (without /api) for unified entry points
+    sso_router_short = APIRouter(prefix="/sso", tags=["SSO"])
+    # Add routes using add_api_route method
+    sso_router_short.add_api_route("/client", sso_controller.client_sso_login, methods=["GET"])
+    sso_router_short.add_api_route("/ktech", sso_controller.ktech_sso_login, methods=["GET"])
+    app.include_router(sso_router_short)
+    print("[MAIN] Successfully registered sso_controller router")
+except Exception as e:
+    print(f"[MAIN] ERROR registering sso_controller router: {e}")
+    import traceback
+    traceback.print_exc()
 
 # Include dashboard router if imported successfully
 if dashboard_controller is not None:

@@ -62,6 +62,14 @@ export const API_ENDPOINTS = {
   // Theme Settings endpoints
   SETTINGS: "/api/theme-settings",
   SETTINGS_UPLOAD_LOGO: "/api/theme-settings/upload-logo",
+  
+  // SSO endpoints
+  SSO_CLIENT: "/sso/client",
+  SSO_KTECH: "/sso/ktech",
+  SSO_CLIENT_OAUTH_CALLBACK: "/api/sso/client/oauth/callback",
+  SSO_CLIENT_SAML_CALLBACK: "/api/sso/client/saml/callback",
+  SSO_KTECH_OAUTH_CALLBACK: "/api/sso/ktech/oauth/callback",
+  SSO_KTECH_SAML_CALLBACK: "/api/sso/ktech/saml/callback",
 
   //School
   SCHOOL_TRANSCRIPT_REPORTS: "/api/school/transcriptreports",
@@ -183,4 +191,29 @@ export const api = {
     const response = await apiRequest(endpoint, { ...options, method: "DELETE" });
     return response.json();
   },
+};
+
+// SSO Helper Functions
+/**
+ * Redirect to Client SSO login
+ * @param returnTo Optional URL to return to after SSO login
+ */
+export const redirectToClientSSO = (returnTo?: string) => {
+  const url = new URL(`${API_BASE_URL}${API_ENDPOINTS.SSO_CLIENT}`);
+  if (returnTo) {
+    url.searchParams.set("return_to", returnTo);
+  }
+  window.location.href = url.toString();
+};
+
+/**
+ * Redirect to KTech SSO login
+ * @param returnTo Optional URL to return to after SSO login
+ */
+export const redirectToKTechSSO = (returnTo?: string) => {
+  const url = new URL(`${API_BASE_URL}${API_ENDPOINTS.SSO_KTECH}`);
+  if (returnTo) {
+    url.searchParams.set("return_to", returnTo);
+  }
+  window.location.href = url.toString();
 };

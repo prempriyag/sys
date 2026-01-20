@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     # Application Configuration
     ENVIRONMENT: str = "DEV"
     DEBUG: bool = True
+    BASE_URL: str = "http://localhost:8000"  # Base URL for SSO redirects
+    FRONTEND_URL: str = "http://localhost:5173"  # Frontend URL for SSO callbacks
     
     class Config:
         env_file = ".env"

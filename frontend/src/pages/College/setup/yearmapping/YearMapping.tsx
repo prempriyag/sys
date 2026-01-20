@@ -4,90 +4,174 @@ import PageMeta from "../../../../components/common/PageMeta";
 import PageContainer, { PageWrapper } from "../../../../components/common/PageContainer";
 import DataTable from "../../../../components/ui/DataTable";
 import Button from "../../../../components/ui/button/Button";
-import { API_BASE_URL } from "../../../../config/api";
+import { Modal } from "../../../../components/ui/modal";
+import Input from "../../../../components/form/input/InputField";
+import Label from "../../../../components/form/Label";
+import { api } from "../../../../config/api";
 import { RefreshIcon, PlusIcon, PencilIcon, TrashBinIcon } from "../../../../icons";
 import { useAuth } from "../../../../context/AuthContext";
+import ConfirmationModal from "../../../../components/common/ConfirmationModal";
 
 export default function YearMapping() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const { hasPermission } = useAuth();
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
   const [editingYear, setEditingYear] = useState<string | null>(null);
+  const [yearToDelete, setYearToDelete] = useState<string | null>(null);
   const [formData, setFormData] = useState({ YEAR_CD: "" });
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   const hasAddPermission = hasPermission("year_mapping", "ADD");
   const hasUpdatePermission = hasPermission("year_mapping", "UPDATE");
   const hasDeletePermission = hasPermission("year_mapping", "DELETE");
 
   const handleAdd = () => {
     setFormData({ YEAR_CD: "" });
+    setErrors({});
     setShowAddModal(true);
     setMessage(null);
   };
 
   const handleEdit = async (yearCd: string) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/yearmapping/get`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("auth_token")}` },
-        body: JSON.stringify({ id: yearCd }),
-      });
-      const data = await response.json();
+      const response = await api.post("/api/yearmapping/get", { id: yearCd });
+      const data = response;
       if (data.YEAR_CD) {
         setFormData({ YEAR_CD: data.YEAR_CD });
+        setErrors({});
         setEditingYear(yearCd);
         setShowEditModal(true);
         setMessage(null);
       }
     } catch (error: any) {
-      setMessage({ type: "error", text: error.message || "Error loading year data" });
+      setMessage({ type: "error", text: error.response?.data?.detail || error.message || "Error loading year data" });
     }
   };
 
-  const handleDelete = async (yearCd: string) => {
-    if (!window.confirm("Are you sure you want to delete this year?")) return;
+  const handleDeleteClick = (yearCd: string) => {
+    setYearToDelete(yearCd);
+    setShowDeleteConfirmModal(true);
+  };
+
+  const handleDelete = async () => {
+    if (!yearToDelete) return;
+
+    setIsDeleting(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/yearmapping/delete`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("auth_token")}` },
-        body: JSON.stringify({ id: yearCd }),
-      });
-      const data = await response.json();
-      if (data.status === "Success") {
-        setMessage({ type: "success", text: "Year deleted successfully" });
+      const response = await api.post("/api/yearmapping/delete", { id: yearToDelete });
+      
+      const success = response.status === 1 || response.success || response.status === "Success" || response.message?.toLowerCase().includes("success");
+      const messageText = response.message || "Year deleted successfully";
+
+      if (success) {
+        setMessage({ type: "success", text: messageText });
         setRefreshTrigger((prev) => prev + 1);
+        setShowDeleteConfirmModal(false);
+        setYearToDelete(null);
+        setTimeout(() => setMessage(null), 5000);
       } else {
-        setMessage({ type: "error", text: "Error deleting year" });
+        setMessage({ type: "error", text: messageText });
+        setShowDeleteConfirmModal(false);
+        setYearToDelete(null);
+        setTimeout(() => setMessage(null), 5000);
       }
     } catch (error: any) {
-      setMessage({ type: "error", text: error.message || "Error deleting year" });
+      console.error("Delete year error:", error);
+      setMessage({ type: "error", text: error.response?.data?.detail || error.message || "Error deleting year" });
+      setShowDeleteConfirmModal(false);
+      setYearToDelete(null);
+      setTimeout(() => setMessage(null), 5000);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  // Field validation
+  const validateField = (name: string, value: string): string => {
+    switch (name) {
+      case "YEAR_CD":
+        if (!value || value.trim() === "") {
+          return "Year Code is required";
+        }
+        if (value.trim().length < 1) {
+          return "Year Code must be at least 1 character";
+        }
+        return "";
+      default:
+        return "";
+    }
+  };
+
+  const handleFieldChange = (name: string, value: string) => {
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    // Clear error for this field when user starts typing
+    if (errors[name]) {
+      setErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors[name];
+        return newErrors;
+      });
+    }
+  };
+
+  const handleBlur = (name: string, value: string) => {
+    const error = validateField(name, value);
+    if (error) {
+      setErrors((prev) => ({ ...prev, [name]: error }));
     }
   };
 
   const handleSubmit = async (e: React.FormEvent, isEdit: boolean) => {
     e.preventDefault();
+    setErrors({});
+
+    // Validate all fields
+    const newErrors: Record<string, string> = {};
+    newErrors.YEAR_CD = validateField("YEAR_CD", formData.YEAR_CD);
+
+    // If there are errors, set them and return
+    const hasErrors = Object.values(newErrors).some((error) => error !== "");
+    if (hasErrors) {
+      setErrors(newErrors);
+      return;
+    }
+
+    setLoading(true);
+
     try {
       const endpoint = isEdit ? "/api/yearmapping/update" : "/api/yearmapping/insert";
-      const body = isEdit ? { YEAR_CD: formData.YEAR_CD, OLD_YEAR_CD: editingYear } : formData;
-      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("auth_token")}` },
-        body: JSON.stringify(body),
-      });
-      const data = await response.json();
-      if (data.status === 1) {
-        setMessage({ type: "success", text: data.message || "Success" });
+      const body = isEdit 
+        ? { YEAR_CD: formData.YEAR_CD, OLD_YEAR_CD: editingYear }
+        : formData;
+
+      const response = await api.post(endpoint, body);
+
+      const success = response.status === 1 || response.success || response.message?.toLowerCase().includes("success");
+      const messageText = response.message || (isEdit ? "Year updated successfully" : "Year added successfully");
+
+      if (success) {
+        setMessage({ type: "success", text: messageText });
         setShowAddModal(false);
         setShowEditModal(false);
         setFormData({ YEAR_CD: "" });
         setEditingYear(null);
         setRefreshTrigger((prev) => prev + 1);
+        setTimeout(() => setMessage(null), 5000);
       } else {
-        setMessage({ type: "error", text: data.message || "Error saving year" });
+        setMessage({ type: "error", text: messageText || "Error saving year" });
+        setTimeout(() => setMessage(null), 5000);
       }
     } catch (error: any) {
-      setMessage({ type: "error", text: error.message || "Error saving year" });
+      console.error("Save year error:", error);
+      setMessage({ type: "error", text: error.response?.data?.detail || error.message || "Error saving year" });
+      setTimeout(() => setMessage(null), 5000);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -103,11 +187,26 @@ export default function YearMapping() {
             {hasAddPermission && <Button onClick={handleAdd} startIcon={<PlusIcon className="w-5 h-5" />}>Add Year</Button>}
           </div>
         </div>
+
+        {/* Success/Error Message Banner */}
         {message && (
-          <div className={`mb-4 p-4 rounded-lg ${message.type === "success" ? "bg-green-50 text-green-800 dark:bg-green-900/20 dark:text-green-400" : "bg-red-50 text-red-800 dark:bg-red-900/20 dark:text-red-400"}`}>
-            {message.text}
+          <div className={`mb-4 p-4 rounded-lg border ${
+            message.type === "success" 
+              ? "bg-green-50 text-green-800 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800" 
+              : "bg-red-50 text-red-800 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800"
+          }`}>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">{message.text}</span>
+              <button
+                onClick={() => setMessage(null)}
+                className={`ml-4 ${message.type === "success" ? "text-green-800 dark:text-green-300" : "text-red-800 dark:text-red-300"}`}
+              >
+                ×
+              </button>
+            </div>
           </div>
         )}
+
         <DataTable
           refreshTrigger={refreshTrigger}
           ajaxUrl="/api/yearmapping/ajaxlist"
@@ -118,42 +217,155 @@ export default function YearMapping() {
               render: (data: any, row: any) => (
                 <div className="flex items-center gap-2">
                   {hasUpdatePermission && <button onClick={() => handleEdit(row.YEAR_CD)} className="text-brand-500 hover:text-brand-700" title="Edit"><PencilIcon className="w-5 h-5" /></button>}
-                  {hasDeletePermission && <button onClick={() => handleDelete(row.YEAR_CD)} className="text-red-500 hover:text-red-700" title="Delete"><TrashBinIcon className="w-5 h-5" /></button>}
+                  {hasDeletePermission && <button onClick={() => handleDeleteClick(row.YEAR_CD)} className="text-red-500 hover:text-red-700" title="Delete"><TrashBinIcon className="w-5 h-5" /></button>}
                 </div>
               ),
             }] : []),
           ]}
         />
-        {showAddModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold">Add Year</h3>
-                <button onClick={() => setShowAddModal(false)} className="text-gray-500 hover:text-gray-700">×</button>
-              </div>
-              <form onSubmit={(e) => handleSubmit(e, false)}>
-                <div className="mb-4"><label className="block text-sm font-medium mb-2">Year Code *</label><input type="text" value={formData.YEAR_CD} onChange={(e) => setFormData({ ...formData, YEAR_CD: e.target.value })} required className="w-full px-4 py-2 border rounded-lg" /></div>
-                <div className="flex gap-2 justify-end"><Button type="submit">Submit</Button><Button type="button" variant="outline" onClick={() => setShowAddModal(false)}>Cancel</Button></div>
-              </form>
-            </div>
+
+        {/* Add Modal */}
+        <Modal isOpen={showAddModal} onClose={() => {
+          setShowAddModal(false);
+          setMessage(null);
+          setErrors({});
+        }} className="max-w-md">
+          {/* Modal Header */}
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+            <h3 className="text-xl font-semibold text-gray-800 dark:text-white">
+              Add Year
+            </h3>
           </div>
-        )}
-        {showEditModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold">Edit Year</h3>
-                <button onClick={() => setShowEditModal(false)} className="text-gray-500 hover:text-gray-700">×</button>
+
+          {/* Modal Body */}
+          <div className="p-6">
+            <form onSubmit={(e) => handleSubmit(e, false)} className="space-y-4">
+              <div>
+                <Label>Year Code *</Label>
+                <Input
+                  value={formData.YEAR_CD}
+                  onChange={(e) => handleFieldChange("YEAR_CD", e.target.value)}
+                  onBlur={(e) => handleBlur("YEAR_CD", e.target.value)}
+                  placeholder="Enter Year Code"
+                  error={!!errors.YEAR_CD}
+                />
+                {errors.YEAR_CD && (
+                  <p className="mt-1 text-xs text-red-500">{errors.YEAR_CD}</p>
+                )}
               </div>
-              <form onSubmit={(e) => handleSubmit(e, true)}>
-                <div className="mb-4"><label className="block text-sm font-medium mb-2">Year Code *</label><input type="text" value={formData.YEAR_CD} onChange={(e) => setFormData({ ...formData, YEAR_CD: e.target.value })} required className="w-full px-4 py-2 border rounded-lg" /></div>
-                <div className="flex gap-2 justify-end"><Button type="submit">Update</Button><Button type="button" variant="outline" onClick={() => setShowEditModal(false)}>Cancel</Button></div>
-              </form>
-            </div>
+              <div className="flex gap-4 pt-4">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg transition px-5 py-3.5 text-sm bg-brand-500 text-white shadow-theme-xs hover:bg-brand-600 disabled:bg-brand-300 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {loading ? (
+                    <>
+                      <span className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></span>
+                      Adding...
+                    </>
+                  ) : (
+                    "Submit"
+                  )}
+                </button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowAddModal(false);
+                    setMessage(null);
+                    setErrors({});
+                  }}
+                  className="flex-1"
+                  disabled={loading}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </form>
           </div>
-        )}
+        </Modal>
+
+        {/* Edit Modal */}
+        <Modal isOpen={showEditModal} onClose={() => {
+          setShowEditModal(false);
+          setEditingYear(null);
+          setMessage(null);
+          setErrors({});
+        }} className="max-w-md">
+          {/* Modal Header */}
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+            <h3 className="text-xl font-semibold text-gray-800 dark:text-white">
+              Edit Year
+            </h3>
+          </div>
+
+          {/* Modal Body */}
+          <div className="p-6">
+            <form onSubmit={(e) => handleSubmit(e, true)} className="space-y-4">
+              <div>
+                <Label>Year Code *</Label>
+                <Input
+                  value={formData.YEAR_CD}
+                  onChange={(e) => handleFieldChange("YEAR_CD", e.target.value)}
+                  onBlur={(e) => handleBlur("YEAR_CD", e.target.value)}
+                  placeholder="Enter Year Code"
+                  error={!!errors.YEAR_CD}
+                />
+                {errors.YEAR_CD && (
+                  <p className="mt-1 text-xs text-red-500">{errors.YEAR_CD}</p>
+                )}
+              </div>
+              <div className="flex gap-4 pt-4">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg transition px-5 py-3.5 text-sm bg-brand-500 text-white shadow-theme-xs hover:bg-brand-600 disabled:bg-brand-300 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {loading ? (
+                    <>
+                      <span className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></span>
+                      Updating...
+                    </>
+                  ) : (
+                    "Update"
+                  )}
+                </button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowEditModal(false);
+                    setEditingYear(null);
+                    setMessage(null);
+                    setErrors({});
+                  }}
+                  className="flex-1"
+                  disabled={loading}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          </div>
+        </Modal>
+
+        {/* Delete Confirmation Modal */}
+        <ConfirmationModal
+          isOpen={showDeleteConfirmModal}
+          onClose={() => {
+            if (!isDeleting) {
+              setShowDeleteConfirmModal(false);
+              setYearToDelete(null);
+            }
+          }}
+          onConfirm={handleDelete}
+          title="Confirm Delete"
+          message="Are you sure you want to delete this year? This action cannot be undone."
+          confirmText="Delete"
+          cancelText="Cancel"
+          confirmVariant="danger"
+          isLoading={isDeleting}
+        />
       </PageContainer>
     </PageWrapper>
   );
 }
-

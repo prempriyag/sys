@@ -4,110 +4,61 @@ import PageMeta from "../../../../components/common/PageMeta";
 import PageContainer, { PageWrapper } from "../../../../components/common/PageContainer";
 import DataTable from "../../../../components/ui/DataTable";
 import Button from "../../../../components/ui/button/Button";
-import { API_BASE_URL } from "../../../../config/api";
+import { api, API_BASE_URL } from "../../../../config/api";
 import { RefreshIcon, PlusIcon, PencilIcon, TrashBinIcon } from "../../../../icons";
 import { useAuth } from "../../../../context/AuthContext";
+import { useToast } from "../../../../context/ToastContext";
+import AddDegreeModal from "./AddDegreeModal";
+import EditDegreeModal from "./EditDegreeModal";
+import ConfirmationModal from "../../../../components/common/ConfirmationModal";
 
 export default function DegreeMapping() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const { hasPermission } = useAuth();
+  const { alertsuccess, alerterror } = useToast();
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [formData, setFormData] = useState({ DEGREE_CD: "", DEGREE_NAME: "" });
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
+  const [selectedDegreeId, setSelectedDegreeId] = useState<number | null>(null);
+  const [degreeToDelete, setDegreeToDelete] = useState<number | null>(null);
 
   const hasAddPermission = hasPermission("college_degree", "ADD");
   const hasUpdatePermission = hasPermission("college_degree", "UPDATE");
   const hasDeletePermission = hasPermission("college_degree", "DELETE");
 
-  const handleAdd = () => {
-    setFormData({ DEGREE_CD: "", DEGREE_NAME: "" });
-    setShowAddModal(true);
-    setMessage(null);
+  // Handle edit click - show edit modal
+  const handleEditClick = (id: number) => {
+    setSelectedDegreeId(id);
+    setShowEditModal(true);
   };
 
-  const handleEdit = async (id: number) => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/degreemapping/get`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
-        },
-        body: JSON.stringify({ id }),
-      });
-
-      const data = await response.json();
-      if (data.Id) {
-        setFormData({ DEGREE_CD: data.DEGREE_CD, DEGREE_NAME: data.DEGREE_NAME });
-        setEditingId(id);
-        setShowEditModal(true);
-        setMessage(null);
-      }
-    } catch (error: any) {
-      setMessage({ type: "error", text: error.message || "Error loading degree data" });
-    }
+  // Handle delete click
+  const handleDeleteClick = (id: number) => {
+    setDegreeToDelete(id);
+    setShowDeleteConfirmModal(true);
   };
 
-  const handleDelete = async (id: number) => {
-    if (!window.confirm("Are you sure you want to delete this degree?")) {
-      return;
-    }
+  // Handle delete confirmation
+  const handleDeleteDegree = async () => {
+    if (!degreeToDelete) return;
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/degreemapping/delete`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
-        },
-        body: JSON.stringify({ id }),
-      });
-
-      const data = await response.json();
-      if (data.status === "Success") {
-        setMessage({ type: "success", text: "Degree deleted successfully" });
+      const response = await api.post(`${API_BASE_URL}/api/degreemapping/delete`, { id: degreeToDelete });
+      
+      if (response.status === "Success" || response.status === 1) {
+        alertsuccess("Degree deleted successfully");
         setRefreshTrigger((prev) => prev + 1);
+        setShowDeleteConfirmModal(false);
+        setDegreeToDelete(null);
       } else {
-        setMessage({ type: "error", text: "Error deleting degree" });
+        alerterror(response.message || "Error deleting degree");
+        setShowDeleteConfirmModal(false);
+        setDegreeToDelete(null);
       }
-    } catch (error: any) {
-      setMessage({ type: "error", text: error.message || "Error deleting degree" });
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent, isEdit: boolean) => {
-    e.preventDefault();
-
-    try {
-      const endpoint = isEdit ? "/api/degreemapping/update" : "/api/degreemapping/insert";
-      const body = isEdit
-        ? { Id: editingId, ...formData }
-        : formData;
-
-      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
-        },
-        body: JSON.stringify(body),
-      });
-
-      const data = await response.json();
-      if (data.status === 1) {
-        setMessage({ type: "success", text: data.message || "Success" });
-        setShowAddModal(false);
-        setShowEditModal(false);
-        setFormData({ DEGREE_CD: "", DEGREE_NAME: "" });
-        setEditingId(null);
-        setRefreshTrigger((prev) => prev + 1);
-      } else {
-        setMessage({ type: "error", text: data.message || "Error saving degree" });
-      }
-    } catch (error: any) {
-      setMessage({ type: "error", text: error.message || "Error saving degree" });
+    } catch (err: any) {
+      alerterror(err.response?.data?.message || err.message || "Error deleting degree");
+      setShowDeleteConfirmModal(false);
+      setDegreeToDelete(null);
     }
   };
 
@@ -134,7 +85,7 @@ export default function DegreeMapping() {
             </Button>
             {hasAddPermission && (
               <Button
-                onClick={handleAdd}
+                onClick={() => setShowAddModal(true)}
                 startIcon={<PlusIcon className="w-5 h-5" />}
               >
                 Add Degree
@@ -143,15 +94,6 @@ export default function DegreeMapping() {
           </div>
         </div>
 
-        {message && (
-          <div className={`mb-4 p-4 rounded-lg ${
-            message.type === "success" 
-              ? "bg-green-50 text-green-800 dark:bg-green-900/20 dark:text-green-400" 
-              : "bg-red-50 text-red-800 dark:bg-red-900/20 dark:text-red-400"
-          }`}>
-            {message.text}
-          </div>
-        )}
 
         <DataTable
           refreshTrigger={refreshTrigger}
@@ -168,23 +110,31 @@ export default function DegreeMapping() {
                     name: "Action",
                     searchable: false,
                     orderable: false,
-                    render: (data: any, row: any) => {
+                    render: (_data: any, row: any) => {
                       return (
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-3">
                           {hasUpdatePermission && (
                             <button
-                              onClick={() => handleEdit(row.Id)}
-                              className="text-brand-500 hover:text-brand-700"
-                              title="Edit"
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditClick(row.Id);
+                              }}
+                              className="text-brand-500 hover:text-brand-600 dark:text-brand-400 transition-colors"
+                              title="Edit Degree"
                             >
                               <PencilIcon className="w-5 h-5" />
                             </button>
                           )}
                           {hasDeletePermission && (
                             <button
-                              onClick={() => handleDelete(row.Id)}
-                              className="text-red-500 hover:text-red-700"
-                              title="Delete"
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteClick(row.Id);
+                              }}
+                              className="text-red-500 hover:text-red-600 dark:text-red-400 transition-colors"
+                              title="Delete Degree"
                             >
                               <TrashBinIcon className="w-5 h-5" />
                             </button>
@@ -197,105 +147,44 @@ export default function DegreeMapping() {
               : []),
           ]}
         />
-
-        {/* Add Modal */}
-        {showAddModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold">Add Degree</h3>
-                <button
-                  onClick={() => setShowAddModal(false)}
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  ×
-                </button>
-              </div>
-              <form onSubmit={(e) => handleSubmit(e, false)}>
-                <div className="mb-4">
-                  <label className="block text-sm font-medium mb-2">Degree Code *</label>
-                  <input
-                    type="text"
-                    value={formData.DEGREE_CD}
-                    onChange={(e) => setFormData({ ...formData, DEGREE_CD: e.target.value })}
-                    required
-                    className="w-full px-4 py-2 border rounded-lg"
-                  />
-                </div>
-                <div className="mb-4">
-                  <label className="block text-sm font-medium mb-2">Degree Name *</label>
-                  <input
-                    type="text"
-                    value={formData.DEGREE_NAME}
-                    onChange={(e) => setFormData({ ...formData, DEGREE_NAME: e.target.value })}
-                    required
-                    className="w-full px-4 py-2 border rounded-lg"
-                  />
-                </div>
-                <div className="flex gap-2 justify-end">
-                  <Button type="submit">Submit</Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setShowAddModal(false)}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* Edit Modal */}
-        {showEditModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold">Edit Degree</h3>
-                <button
-                  onClick={() => setShowEditModal(false)}
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  ×
-                </button>
-              </div>
-              <form onSubmit={(e) => handleSubmit(e, true)}>
-                <div className="mb-4">
-                  <label className="block text-sm font-medium mb-2">Degree Code *</label>
-                  <input
-                    type="text"
-                    value={formData.DEGREE_CD}
-                    onChange={(e) => setFormData({ ...formData, DEGREE_CD: e.target.value })}
-                    required
-                    className="w-full px-4 py-2 border rounded-lg"
-                  />
-                </div>
-                <div className="mb-4">
-                  <label className="block text-sm font-medium mb-2">Degree Name *</label>
-                  <input
-                    type="text"
-                    value={formData.DEGREE_NAME}
-                    onChange={(e) => setFormData({ ...formData, DEGREE_NAME: e.target.value })}
-                    required
-                    className="w-full px-4 py-2 border rounded-lg"
-                  />
-                </div>
-                <div className="flex gap-2 justify-end">
-                  <Button type="submit">Update</Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setShowEditModal(false)}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
       </PageContainer>
+
+      {/* Add Degree Modal */}
+      <AddDegreeModal
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onSuccess={() => {
+          setRefreshTrigger((prev) => prev + 1);
+        }}
+      />
+
+      {/* Edit Degree Modal */}
+      <EditDegreeModal
+        isOpen={showEditModal}
+        degreeId={selectedDegreeId}
+        onClose={() => {
+          setShowEditModal(false);
+          setSelectedDegreeId(null);
+        }}
+        onSuccess={() => {
+          setRefreshTrigger((prev) => prev + 1);
+        }}
+      />
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showDeleteConfirmModal}
+        onClose={() => {
+          setShowDeleteConfirmModal(false);
+          setDegreeToDelete(null);
+        }}
+        onConfirm={handleDeleteDegree}
+        title="Confirm Delete"
+        message="Are you sure you want to delete this degree? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        confirmVariant="danger"
+      />
     </PageWrapper>
   );
 }

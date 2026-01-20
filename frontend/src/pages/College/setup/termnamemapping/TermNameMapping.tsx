@@ -4,99 +4,61 @@ import PageMeta from "../../../../components/common/PageMeta";
 import PageContainer, { PageWrapper } from "../../../../components/common/PageContainer";
 import DataTable from "../../../../components/ui/DataTable";
 import Button from "../../../../components/ui/button/Button";
-import { API_BASE_URL } from "../../../../config/api";
+import { api, API_BASE_URL } from "../../../../config/api";
 import { RefreshIcon, PlusIcon, PencilIcon, TrashBinIcon } from "../../../../icons";
 import { useAuth } from "../../../../context/AuthContext";
+import { useToast } from "../../../../context/ToastContext";
+import AddTermNameModal from "./AddTermNameModal";
+import EditTermNameModal from "./EditTermNameModal";
+import ConfirmationModal from "../../../../components/common/ConfirmationModal";
 
 export default function TermNameMapping() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const { hasPermission } = useAuth();
+  const { alertsuccess, alerterror } = useToast();
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [formData, setFormData] = useState({ OCR_TERM_NAME: "", TERM_NAME: "" });
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
+  const [selectedTermNameId, setSelectedTermNameId] = useState<number | null>(null);
+  const [termNameToDelete, setTermNameToDelete] = useState<number | null>(null);
+
   const hasAddPermission = hasPermission("college_term_names", "ADD");
   const hasUpdatePermission = hasPermission("college_term_names", "UPDATE");
   const hasDeletePermission = hasPermission("college_term_names", "DELETE");
 
-  const handleAdd = () => {
-    setFormData({ OCR_TERM_NAME: "", TERM_NAME: "" });
-    setShowAddModal(true);
-    setMessage(null);
+  // Handle edit click - show edit modal
+  const handleEditClick = (id: number) => {
+    setSelectedTermNameId(id);
+    setShowEditModal(true);
   };
 
-  const handleEdit = async (id: number) => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/termnamemapping/get`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
-        },
-        body: JSON.stringify({ id }),
-      });
-      const data = await response.json();
-      if (data.Id) {
-        setFormData({ OCR_TERM_NAME: data.OCR_TERM_NAME || "", TERM_NAME: data.TERM_NAME || "" });
-        setEditingId(id);
-        setShowEditModal(true);
-        setMessage(null);
-      }
-    } catch (error: any) {
-      setMessage({ type: "error", text: error.message || "Error loading term name data" });
-    }
+  // Handle delete click
+  const handleDeleteClick = (id: number) => {
+    setTermNameToDelete(id);
+    setShowDeleteConfirmModal(true);
   };
 
-  const handleDelete = async (id: number) => {
-    if (!window.confirm("Are you sure you want to delete this term name?")) return;
+  // Handle delete confirmation
+  const handleDeleteTermName = async () => {
+    if (!termNameToDelete) return;
+
     try {
-      const response = await fetch(`${API_BASE_URL}/api/termnamemapping/delete`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
-        },
-        body: JSON.stringify({ id }),
-      });
-      const data = await response.json();
-      if (data.status === "Success") {
-        setMessage({ type: "success", text: "Term name deleted successfully" });
+      const response = await api.post(`${API_BASE_URL}/api/termnamemapping/delete`, { id: termNameToDelete });
+      
+      if (response.status === "Success" || response.status === 1) {
+        alertsuccess("Term name deleted successfully");
         setRefreshTrigger((prev) => prev + 1);
+        setShowDeleteConfirmModal(false);
+        setTermNameToDelete(null);
       } else {
-        setMessage({ type: "error", text: "Error deleting term name" });
+        alerterror(response.message || "Error deleting term name");
+        setShowDeleteConfirmModal(false);
+        setTermNameToDelete(null);
       }
-    } catch (error: any) {
-      setMessage({ type: "error", text: error.message || "Error deleting term name" });
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent, isEdit: boolean) => {
-    e.preventDefault();
-    try {
-      const endpoint = isEdit ? "/api/termnamemapping/update" : "/api/termnamemapping/insert";
-      const body = isEdit ? { Id: editingId, ...formData } : formData;
-      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
-        },
-        body: JSON.stringify(body),
-      });
-      const data = await response.json();
-      if (data.status === 1) {
-        setMessage({ type: "success", text: data.message || "Success" });
-        setShowAddModal(false);
-        setShowEditModal(false);
-        setFormData({ OCR_TERM_NAME: "", TERM_NAME: "" });
-        setEditingId(null);
-        setRefreshTrigger((prev) => prev + 1);
-      } else {
-        setMessage({ type: "error", text: data.message || "Error saving term name" });
-      }
-    } catch (error: any) {
-      setMessage({ type: "error", text: error.message || "Error saving term name" });
+    } catch (err: any) {
+      alerterror(err.response?.data?.message || err.message || "Error deleting term name");
+      setShowDeleteConfirmModal(false);
+      setTermNameToDelete(null);
     }
   };
 
@@ -109,14 +71,9 @@ export default function TermNameMapping() {
           <h3 className="font-semibold text-gray-800 text-theme-xl dark:text-white/90 sm:text-2xl">View Term Names</h3>
           <div className="flex items-center gap-2">
             <Button onClick={() => setRefreshTrigger((prev) => prev + 1)} variant="outline" startIcon={<RefreshIcon className="w-5 h-5" />}>Refresh Data</Button>
-            {hasAddPermission && <Button onClick={handleAdd} startIcon={<PlusIcon className="w-5 h-5" />}>Add Term Name</Button>}
+            {hasAddPermission && <Button onClick={() => setShowAddModal(true)} startIcon={<PlusIcon className="w-5 h-5" />}>Add Term Name</Button>}
           </div>
         </div>
-        {message && (
-          <div className={`mb-4 p-4 rounded-lg ${message.type === "success" ? "bg-green-50 text-green-800 dark:bg-green-900/20 dark:text-green-400" : "bg-red-50 text-red-800 dark:bg-red-900/20 dark:text-red-400"}`}>
-            {message.text}
-          </div>
-        )}
         <DataTable
           refreshTrigger={refreshTrigger}
           ajaxUrl="/api/termnamemapping/ajaxlist"
@@ -127,65 +84,78 @@ export default function TermNameMapping() {
             { data: "Updated_on", name: "Updated On", searchable: false, orderable: true },
             ...(hasUpdatePermission || hasDeletePermission ? [{
               data: "actions", name: "Action", searchable: false, orderable: false,
-              render: (data: any, row: any) => (
-                <div className="flex items-center gap-2">
-                  {hasUpdatePermission && <button onClick={() => handleEdit(row.Id)} className="text-brand-500 hover:text-brand-700" title="Edit"><PencilIcon className="w-5 h-5" /></button>}
-                  {hasDeletePermission && <button onClick={() => handleDelete(row.Id)} className="text-red-500 hover:text-red-700" title="Delete"><TrashBinIcon className="w-5 h-5" /></button>}
+              render: (_data: any, row: any) => (
+                <div className="flex items-center gap-3">
+                  {hasUpdatePermission && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEditClick(row.Id);
+                      }}
+                      className="text-brand-500 hover:text-brand-600 dark:text-brand-400 transition-colors"
+                      title="Edit Term Name"
+                    >
+                      <PencilIcon className="w-5 h-5" />
+                    </button>
+                  )}
+                  {hasDeletePermission && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteClick(row.Id);
+                      }}
+                      className="text-red-500 hover:text-red-600 dark:text-red-400 transition-colors"
+                      title="Delete Term Name"
+                    >
+                      <TrashBinIcon className="w-5 h-5" />
+                    </button>
+                  )}
                 </div>
               ),
             }] : []),
           ]}
         />
-        {showAddModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold">Add Term Name</h3>
-                <button onClick={() => setShowAddModal(false)} className="text-gray-500 hover:text-gray-700">×</button>
-              </div>
-              <form onSubmit={(e) => handleSubmit(e, false)}>
-                <div className="mb-4">
-                  <label className="block text-sm font-medium mb-2">OCR Term Name *</label>
-                  <input type="text" value={formData.OCR_TERM_NAME} onChange={(e) => setFormData({ ...formData, OCR_TERM_NAME: e.target.value })} required className="w-full px-4 py-2 border rounded-lg" />
-                </div>
-                <div className="mb-4">
-                  <label className="block text-sm font-medium mb-2">Term Name *</label>
-                  <input type="text" value={formData.TERM_NAME} onChange={(e) => setFormData({ ...formData, TERM_NAME: e.target.value })} required className="w-full px-4 py-2 border rounded-lg" />
-                </div>
-                <div className="flex gap-2 justify-end">
-                  <Button type="submit">Submit</Button>
-                  <Button type="button" variant="outline" onClick={() => setShowAddModal(false)}>Cancel</Button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-        {showEditModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold">Edit Term Name</h3>
-                <button onClick={() => setShowEditModal(false)} className="text-gray-500 hover:text-gray-700">×</button>
-              </div>
-              <form onSubmit={(e) => handleSubmit(e, true)}>
-                <div className="mb-4">
-                  <label className="block text-sm font-medium mb-2">OCR Term Name *</label>
-                  <input type="text" value={formData.OCR_TERM_NAME} onChange={(e) => setFormData({ ...formData, OCR_TERM_NAME: e.target.value })} required className="w-full px-4 py-2 border rounded-lg" />
-                </div>
-                <div className="mb-4">
-                  <label className="block text-sm font-medium mb-2">Term Name *</label>
-                  <input type="text" value={formData.TERM_NAME} onChange={(e) => setFormData({ ...formData, TERM_NAME: e.target.value })} required className="w-full px-4 py-2 border rounded-lg" />
-                </div>
-                <div className="flex gap-2 justify-end">
-                  <Button type="submit">Update</Button>
-                  <Button type="button" variant="outline" onClick={() => setShowEditModal(false)}>Cancel</Button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
+      {/* Add Term Name Modal */}
+      <AddTermNameModal
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onSuccess={() => {
+          setRefreshTrigger((prev) => prev + 1);
+        }}
+      />
+
+      {/* Edit Term Name Modal */}
+      <EditTermNameModal
+        isOpen={showEditModal}
+        termNameId={selectedTermNameId}
+        onClose={() => {
+          setShowEditModal(false);
+          setSelectedTermNameId(null);
+        }}
+        onSuccess={() => {
+          setRefreshTrigger((prev) => prev + 1);
+        }}
+      />
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showDeleteConfirmModal}
+        onClose={() => {
+          setShowDeleteConfirmModal(false);
+          setTermNameToDelete(null);
+        }}
+        onConfirm={handleDeleteTermName}
+        title="Confirm Delete"
+        message="Are you sure you want to delete this term name? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        confirmVariant="danger"
+      />
       </PageContainer>
     </PageWrapper>
   );
 }
+
 

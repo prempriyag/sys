@@ -10,13 +10,36 @@ logger = logging.getLogger(__name__)
 class TransferGradesMappingModel:
     @staticmethod
     def build_search_conditions(request_data: Dict[str, Any]) -> str:
+        """Build search conditions from request data"""
         search_conditions = []
+        
+        # Global search (main search box)
         search_value = request_data.get("search", {}).get("value", "")
         if search_value:
             search_lower = search_value.lower()
-            search_conditions.append(f"""(lower(TRANSFER_GRADE) like'%{search_lower}%' or 
-                lower(UPDATED_BY) like'%{search_lower}%' or
-                UPDATED_ON like'%{search_value}%')""")
+            search_conditions.append(f"""(lower(TRANSFER_GRADE) like '%{search_lower}%' or 
+                lower(UPDATED_BY) like '%{search_lower}%' or
+                UPDATED_ON like '%{search_value}%')""")
+
+        # Column-specific search (individual column search boxes)
+        columns = request_data.get("columns", [])
+        if columns:
+            for col in columns:
+                col_search = col.get("search", {})
+                col_search_value = col_search.get("value", "").strip() if col_search else ""
+                
+                if col_search_value:
+                    col_data = col.get("data", "")
+                    col_search_lower = col_search_value.lower()
+                    
+                    # Map column data names to database fields
+                    if col_data == "TRANSFER_GRADE":
+                        search_conditions.append(f"lower(TRANSFER_GRADE) like '%{col_search_lower}%'")
+                    elif col_data == "UPDATED_BY":
+                        search_conditions.append(f"lower(UPDATED_BY) like '%{col_search_lower}%'")
+                    elif col_data == "UPDATED_ON":
+                        search_conditions.append(f"UPDATED_ON like '%{col_search_value}%'")
+
         if search_conditions:
             return " AND ".join(search_conditions)
         return ""

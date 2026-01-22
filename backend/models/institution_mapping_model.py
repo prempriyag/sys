@@ -11,7 +11,10 @@ logger = logging.getLogger(__name__)
 class InstitutionMappingModel:
     @staticmethod
     def build_search_conditions(request_data: Dict[str, Any], inst_type: str = "") -> str:
+        """Build search conditions from request data"""
         search_conditions = []
+        
+        # Global search (main search box)
         search_value = request_data.get("search", {}).get("value", "")
         if search_value:
             search_safe = check_special_name(search_value)
@@ -21,12 +24,50 @@ class InstitutionMappingModel:
                 lower(INSTITUTION_NAME) like '%{search_lower}%' or 
                 SLATE_INSTITUTION_ID like '%{search_safe}%' or 
                 lower(SLATE_INSTITUTION_NAME) like '%{search_lower}%' or 
-                INSTITUTION_ZIPCODE like'%{search_safe}%' or 
-                EXTERNAL_INSTITUTION_ZIPCODE like'%{search_safe}%' or 
-                lower(EXTERNAL_INSTITUTION_NAME) like'%{search_lower}%' or
-                lower(UPDATED_BY) like'%{search_lower}%' or   		 
+                INSTITUTION_ZIPCODE like '%{search_safe}%' or 
+                EXTERNAL_INSTITUTION_ZIPCODE like '%{search_safe}%' or 
+                lower(EXTERNAL_INSTITUTION_NAME) like '%{search_lower}%' or
+                lower(UPDATED_BY) like '%{search_lower}%' or   		 
                 LAST_UPDATED_DATETIME like '%{search_safe}%' or  
-                lower(SLATE_INSTITUTION_NAME) like'%{search_lower}%')""")
+                lower(SLATE_INSTITUTION_NAME) like '%{search_lower}%')""")
+
+        # Column-specific search (individual column search boxes)
+        columns = request_data.get("columns", [])
+        if columns:
+            for col in columns:
+                col_search = col.get("search", {})
+                col_search_value = col_search.get("value", "").strip() if col_search else ""
+                
+                if col_search_value:
+                    col_data = col.get("data", "")
+                    col_search_safe = check_special_name(col_search_value)
+                    col_search_lower = check_special_name(col_search_value.lower())
+                    
+                    # Map column data names to database fields
+                    if col_data == "SOURCE_TYPE":
+                        search_conditions.append(f"lower(SOURCE_TYPE) like '%{col_search_lower}%'")
+                    elif col_data == "INSTITUTION_TYPE":
+                        search_conditions.append(f"lower(INSTITUTION_TYPE) like '%{col_search_lower}%'")
+                    elif col_data == "INSTITUTION_ID":
+                        search_conditions.append(f"INSTITUTION_ID like '%{col_search_safe}%'")
+                    elif col_data == "INSTITUTION_NAME":
+                        search_conditions.append(f"lower(INSTITUTION_NAME) like '%{col_search_lower}%'")
+                    elif col_data == "INSTITUTION_ZIPCODE":
+                        search_conditions.append(f"INSTITUTION_ZIPCODE like '%{col_search_safe}%'")
+                    elif col_data == "EXTERNAL_INSTITUTION_NAME":
+                        search_conditions.append(f"lower(EXTERNAL_INSTITUTION_NAME) like '%{col_search_lower}%'")
+                    elif col_data == "SLATE_INSTITUTION_ID":
+                        search_conditions.append(f"SLATE_INSTITUTION_ID like '%{col_search_safe}%'")
+                    elif col_data == "SLATE_INSTITUTION_NAME":
+                        search_conditions.append(f"lower(SLATE_INSTITUTION_NAME) like '%{col_search_lower}%'")
+                    elif col_data == "EXTERNAL_INSTITUTION_ZIPCODE":
+                        search_conditions.append(f"EXTERNAL_INSTITUTION_ZIPCODE like '%{col_search_safe}%'")
+                    elif col_data == "UPDATED_BY":
+                        search_conditions.append(f"lower(UPDATED_BY) like '%{col_search_lower}%'")
+                    elif col_data == "LAST_UPDATED_DATETIME":
+                        search_conditions.append(f"LAST_UPDATED_DATETIME like '%{col_search_safe}%'")
+        
+        # Institution type filter
         if inst_type == 'C':
             search_conditions.append("INSTITUTION_TYPE IN ('C')")
         elif inst_type == 'H':
@@ -35,6 +76,7 @@ class InstitutionMappingModel:
             search_conditions.append("INSTITUTION_TYPE IN ('TECH')")
         elif inst_type == 'ocr':
             search_conditions.append("INSTITUTION_TYPE IN ('OCR')")
+        
         if search_conditions:
             return " AND ".join(search_conditions)
         return ""

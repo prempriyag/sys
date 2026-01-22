@@ -11,15 +11,39 @@ logger = logging.getLogger(__name__)
 class PrefixNameModel:
     @staticmethod
     def build_search_conditions(request_data: Dict[str, Any]) -> str:
+        """Build search conditions from request data"""
         search_conditions = []
+        
+        # Global search (main search box)
         search_value = request_data.get("search", {}).get("value", "")
         if search_value:
             search_safe = check_special_name(search_value)
             search_lower = check_special_name(search_value.lower())
-            search_conditions.append(f"""(lower(Prefix) like'%{search_lower}%' or 
-                lower(Updated_By) like'%{search_lower}%' or
-                Updated_on like'%{search_safe}%' or
-                lower(ID) like'%{search_lower}%')""")
+            search_conditions.append(f"""(lower(Prefix) like '%{search_lower}%' or 
+                lower(Updated_By) like '%{search_lower}%' or
+                Updated_on like '%{search_safe}%' or
+                lower(ID) like '%{search_lower}%')""")
+
+        # Column-specific search (individual column search boxes)
+        columns = request_data.get("columns", [])
+        if columns:
+            for col in columns:
+                col_search = col.get("search", {})
+                col_search_value = col_search.get("value", "").strip() if col_search else ""
+                
+                if col_search_value:
+                    col_data = col.get("data", "")
+                    col_search_safe = check_special_name(col_search_value)
+                    col_search_lower = check_special_name(col_search_value.lower())
+                    
+                    # Map column data names to database fields
+                    if col_data == "Prefix":
+                        search_conditions.append(f"lower(Prefix) like '%{col_search_lower}%'")
+                    elif col_data == "Updated_By":
+                        search_conditions.append(f"lower(Updated_By) like '%{col_search_lower}%'")
+                    elif col_data == "Updated_on":
+                        search_conditions.append(f"Updated_on like '%{col_search_safe}%'")
+
         if search_conditions:
             return " AND ".join(search_conditions)
         return ""

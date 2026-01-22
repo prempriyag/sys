@@ -11,21 +11,59 @@ logger = logging.getLogger(__name__)
 class OverrideEditMappingModel:
     @staticmethod
     def build_search_conditions(request_data: Dict[str, Any]) -> str:
+        """Build search conditions from request data"""
         search_conditions = []
+        
+        # Global search (main search box)
         search_value = request_data.get("search", {}).get("value", "")
         if search_value:
             search_safe = check_special_name(search_value)
             search_lower = check_special_name(search_value.lower())
-            search_conditions.append(f"""(lower(o.TERM) like'%{search_lower}%' or 
-                lower(o.SUBJECT) like'%{search_lower}%' or 
-                lower(o.COURSE) like'%{search_lower}%' or 
-                lower(o.EQV_SUBJECT) like'%{search_lower}%' or 
-                lower(o.EQV_COURSE) like'%{search_lower}%' or 
-                lower(o.COURSE_ATTRIBUTE) like'%{search_lower}%' or 
-                lower(o.UPDATED_BY) like'%{search_lower}%' or
-                o.UPDATED_ON like'%{search_safe}%' or
-                lower(o.INSTITUTION_ID) like'%{search_lower}%' or
-                lower(m.INSTITUTION_NAME) like'%{search_lower}%')""")
+            search_conditions.append(f"""(lower(o.TERM) like '%{search_lower}%' or 
+                lower(o.SUBJECT) like '%{search_lower}%' or 
+                lower(o.COURSE) like '%{search_lower}%' or 
+                lower(o.EQV_SUBJECT) like '%{search_lower}%' or 
+                lower(o.EQV_COURSE) like '%{search_lower}%' or 
+                lower(o.COURSE_ATTRIBUTE) like '%{search_lower}%' or 
+                lower(o.UPDATED_BY) like '%{search_lower}%' or
+                o.UPDATED_ON like '%{search_safe}%' or
+                lower(o.INSTITUTION_ID) like '%{search_lower}%' or
+                lower(m.INSTITUTION_NAME) like '%{search_lower}%')""")
+
+        # Column-specific search (individual column search boxes)
+        columns = request_data.get("columns", [])
+        if columns:
+            for col in columns:
+                col_search = col.get("search", {})
+                col_search_value = col_search.get("value", "").strip() if col_search else ""
+                
+                if col_search_value:
+                    col_data = col.get("data", "")
+                    col_search_safe = check_special_name(col_search_value)
+                    col_search_lower = check_special_name(col_search_value.lower())
+                    
+                    # Map column data names to database fields
+                    if col_data == "INSTITUTION_ID":
+                        search_conditions.append(f"lower(o.INSTITUTION_ID) like '%{col_search_lower}%'")
+                    elif col_data == "INSTITUTION_NAME":
+                        search_conditions.append(f"lower(m.INSTITUTION_NAME) like '%{col_search_lower}%'")
+                    elif col_data == "TERM":
+                        search_conditions.append(f"lower(o.TERM) like '%{col_search_lower}%'")
+                    elif col_data == "SUBJECT":
+                        search_conditions.append(f"lower(o.SUBJECT) like '%{col_search_lower}%'")
+                    elif col_data == "COURSE":
+                        search_conditions.append(f"lower(o.COURSE) like '%{col_search_lower}%'")
+                    elif col_data == "EQV_SUBJECT":
+                        search_conditions.append(f"lower(o.EQV_SUBJECT) like '%{col_search_lower}%'")
+                    elif col_data == "EQV_COURSE":
+                        search_conditions.append(f"lower(o.EQV_COURSE) like '%{col_search_lower}%'")
+                    elif col_data == "COURSE_ATTRIBUTE":
+                        search_conditions.append(f"lower(o.COURSE_ATTRIBUTE) like '%{col_search_lower}%'")
+                    elif col_data == "UPDATED_BY":
+                        search_conditions.append(f"lower(o.UPDATED_BY) like '%{col_search_lower}%'")
+                    elif col_data == "UPDATED_ON":
+                        search_conditions.append(f"o.UPDATED_ON like '%{col_search_safe}%'")
+
         if search_conditions:
             return " AND ".join(search_conditions)
         return ""

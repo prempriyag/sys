@@ -538,7 +538,8 @@ class SchoolTranscriptReportsModel:
             print(f"[TranscriptReports] Request keys: {list(request_data.keys())}")
             
             # First, test if we can query the table at all
-            test_sql = f"SELECT COUNT(*) as test_count FROM {TBL_KICKOUT} WITH(NOLOCK) WHERE PROJECT_ID = {SCHOOL_PROJECT_ID}"
+            # Include NULL PROJECT_ID like dashboard does for school data
+            test_sql = f"SELECT COUNT(*) as test_count FROM {TBL_KICKOUT} WITH(NOLOCK) WHERE (PROJECT_ID = {SCHOOL_PROJECT_ID} OR PROJECT_ID IS NULL)"
             try:
                 test_result = db.execute(text(test_sql)).fetchone()
                 test_count = test_result.test_count if test_result else 0
@@ -572,12 +573,13 @@ class SchoolTranscriptReportsModel:
             search_query = SchoolTranscriptReportsModel.build_search_conditions(request_data)
 
             # Count query (matches CI3 lines 600-610)
+            # Include NULL PROJECT_ID like dashboard does for school data
             count_sql = f"""
                 SELECT count(*) as allcount
                 FROM {TBL_KICKOUT} as k WITH(NOLOCK)
                 INNER JOIN {TBL_TRANSCRIPTHDRDATA} as h WITH(NOLOCK) ON h.BATCH_ID=k.BATCH_ID
                 INNER JOIN {TBL_DOWNLOAD} as d WITH(NOLOCK) ON d.BATCH_ID=k.BATCH_ID
-                WHERE k.PROJECT_ID = {SCHOOL_PROJECT_ID}
+                WHERE (k.PROJECT_ID = {SCHOOL_PROJECT_ID} OR k.PROJECT_ID IS NULL)
             """
             
             if search_query:
@@ -645,12 +647,13 @@ class SchoolTranscriptReportsModel:
                     (SELECT TOP 1 INSTITUTION_NAME FROM {TBL_INSTITUTION_MAPPING} as m WHERE m.INSTITUTION_ID = k.INSTITUTION_ID) AS INSTITUTION_NAME"""
 
             # Build data query exactly as CI3 (matches lines 662-673)
+            # Include NULL PROJECT_ID like dashboard does for school data
             data_sql = f"""
                 SELECT {columns_list}
                 FROM {TBL_KICKOUT} as k WITH(NOLOCK)
                 INNER JOIN {TBL_TRANSCRIPTHDRDATA} as h WITH(NOLOCK) ON h.BATCH_ID=k.BATCH_ID
                 INNER JOIN {TBL_DOWNLOAD} as d WITH(NOLOCK) ON d.BATCH_ID=k.BATCH_ID
-                WHERE k.PROJECT_ID = {SCHOOL_PROJECT_ID}
+                WHERE (k.PROJECT_ID = {SCHOOL_PROJECT_ID} OR k.PROJECT_ID IS NULL)
             """
             
             if search_query:

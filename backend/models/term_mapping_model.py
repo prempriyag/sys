@@ -16,7 +16,10 @@ logger = logging.getLogger(__name__)
 class TermMappingModel:
     @staticmethod
     def build_search_conditions(request_data: Dict[str, Any]) -> str:
+        """Build search conditions from request data"""
         search_conditions = []
+        
+        # Global search (main search box)
         search_value = request_data.get("search", {}).get("value", "")
         if search_value:
             search_safe = check_special_name(search_value)
@@ -28,6 +31,35 @@ class TermMappingModel:
                 lower(UPDATED_BY) like '%{search_lower}%' or
                 LAST_UPDATED_DATETIME like '%{search_safe}%' or                
                 TERM_END like'%{search_safe}%')""")
+
+        # Column-specific search (individual column search boxes)
+        columns = request_data.get("columns", [])
+        if columns:
+            for col in columns:
+                col_search = col.get("search", {})
+                col_search_value = col_search.get("value", "").strip() if col_search else ""
+                
+                if col_search_value:
+                    col_data = col.get("data", "")
+                    col_search_safe = check_special_name(col_search_value)
+                    col_search_lower = check_special_name(col_search_value.lower())
+                    
+                    # Map column data names to database fields
+                    if col_data == "TERM":
+                        search_conditions.append(f"lower(TERM) like '%{col_search_lower}%'")
+                    elif col_data == "TERM_CODE":
+                        search_conditions.append(f"lower(TERM_CODE) like '%{col_search_lower}%'")
+                    elif col_data == "TERM_START":
+                        search_conditions.append(f"TERM_START like '%{col_search_safe}%'")
+                    elif col_data == "TERM_END":
+                        search_conditions.append(f"TERM_END like '%{col_search_safe}%'")
+                    elif col_data == "GRACE_PERIOD":
+                        search_conditions.append(f"GRACE_PERIOD like '%{col_search_safe}%'")
+                    elif col_data == "UPDATED_BY":
+                        search_conditions.append(f"lower(UPDATED_BY) like '%{col_search_lower}%'")
+                    elif col_data == "LAST_UPDATED_DATETIME":
+                        search_conditions.append(f"LAST_UPDATED_DATETIME like '%{col_search_safe}%'")
+
         if search_conditions:
             return " AND ".join(search_conditions)
         return ""

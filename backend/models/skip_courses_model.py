@@ -10,7 +10,10 @@ logger = logging.getLogger(__name__)
 class SkipCoursesModel:
     @staticmethod
     def build_search_conditions(request_data: Dict[str, Any]) -> str:
+        """Build search conditions from request data"""
         search_conditions = []
+        
+        # Global search (main search box)
         search_value = request_data.get("search", {}).get("value", "")
         if search_value:
             search_lower = search_value.lower()
@@ -21,6 +24,34 @@ class SkipCoursesModel:
                 lower(c.UPDATED_BY) like '%{search_lower}%' or
                 c.LAST_UPDATED_DATETIME like '%{search_value}%' or 
                 lower(c.EXTERNAL_COURSE_ID) like '%{search_value}%')""")
+
+        # Column-specific search (individual column search boxes)
+        columns = request_data.get("columns", [])
+        if columns:
+            for col in columns:
+                col_search = col.get("search", {})
+                col_search_value = col_search.get("value", "").strip() if col_search else ""
+                
+                if col_search_value:
+                    col_data = col.get("data", "")
+                    col_search_lower = col_search_value.lower()
+                    
+                    # Map column data names to database fields
+                    if col_data == "INSTITUTION_ID":
+                        search_conditions.append(f"lower(c.INSTITUTION_ID) like '%{col_search_value}%'")
+                    elif col_data == "INSTITUTION_NAME":
+                        search_conditions.append(f"lower(m.INSTITUTION_NAME) like '%{col_search_lower}%'")
+                    elif col_data == "CATEGORY":
+                        search_conditions.append(f"lower(c.CATEGORY) like '%{col_search_lower}%'")
+                    elif col_data == "EXTERNAL_SUBJECT":
+                        search_conditions.append(f"lower(c.EXTERNAL_SUBJECT) like '%{col_search_lower}%'")
+                    elif col_data == "EXTERNAL_COURSE_ID":
+                        search_conditions.append(f"lower(c.EXTERNAL_COURSE_ID) like '%{col_search_value}%'")
+                    elif col_data == "UPDATED_BY":
+                        search_conditions.append(f"lower(c.UPDATED_BY) like '%{col_search_lower}%'")
+                    elif col_data == "LAST_UPDATED_DATETIME":
+                        search_conditions.append(f"c.LAST_UPDATED_DATETIME like '%{col_search_value}%'")
+
         if search_conditions:
             return " AND ".join(search_conditions)
         return ""

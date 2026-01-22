@@ -15,9 +15,9 @@ class GradeMappingModel:
         search_value = request_data.get("search", {}).get("value", "")
         if search_value:
             search_lower = check_special_name(search_value.lower())
-            search_conditions.append(f"""(lower(EQUIVALENT_GRADE) like'%{search_lower}%' or
-                lower(UPDATED_BY) like'%{search_lower}%' or
-                lower(TRANSCRIPT_GRADE) like'%{search_lower}%')""")
+            search_conditions.append(f"""(lower(EQUIVALENT_GRADE) like '%{search_lower}%' or
+                lower(UPDATED_BY) like '%{search_lower}%' or
+                lower(TRANSCRIPT_GRADE) like '%{search_lower}%')""")
         if search_conditions:
             return " AND ".join(search_conditions)
         return ""

@@ -10,10 +10,26 @@ logger = logging.getLogger(__name__)
 class YearMappingModel:
     @staticmethod
     def build_search_conditions(request_data: Dict[str, Any]) -> str:
+        """Build search conditions from request data"""
         search_conditions = []
+        
+        # Global search (main search box)
         search_value = request_data.get("search", {}).get("value", "")
         if search_value:
-            search_conditions.append(f"YEAR_CD like'%{search_value}%'")
+            search_conditions.append(f"YEAR_CD like '%{search_value}%'")
+
+        # Column-specific search (individual column search boxes)
+        columns = request_data.get("columns", [])
+        if columns:
+            for col in columns:
+                col_search = col.get("search", {})
+                col_search_value = col_search.get("value", "").strip() if col_search else ""
+                
+                if col_search_value:
+                    col_data = col.get("data", "")
+                    if col_data == "YEAR_CD":
+                        search_conditions.append(f"YEAR_CD like '%{col_search_value}%'")
+
         if search_conditions:
             return " AND ".join(search_conditions)
         return ""

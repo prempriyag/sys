@@ -11,7 +11,10 @@ logger = logging.getLogger(__name__)
 class TermNameMappingModel:
     @staticmethod
     def build_search_conditions(request_data: Dict[str, Any]) -> str:
+        """Build search conditions from request data"""
         search_conditions = []
+        
+        # Global search (main search box)
         search_value = request_data.get("search", {}).get("value", "")
         if search_value:
             search_safe = check_special_name(search_value)
@@ -20,6 +23,29 @@ class TermNameMappingModel:
                 lower(Updated_by) like '%{search_lower}%' or
                 Updated_on like '%{search_safe}%' or
                 lower(TERM_NAME) like '%{search_lower}%')""")
+
+        # Column-specific search (individual column search boxes)
+        columns = request_data.get("columns", [])
+        if columns:
+            for col in columns:
+                col_search = col.get("search", {})
+                col_search_value = col_search.get("value", "").strip() if col_search else ""
+                
+                if col_search_value:
+                    col_data = col.get("data", "")
+                    col_search_safe = check_special_name(col_search_value)
+                    col_search_lower = check_special_name(col_search_value.lower())
+                    
+                    # Map column data names to database fields
+                    if col_data == "OCR_TERM_NAME":
+                        search_conditions.append(f"lower(OCR_TERM_NAME) like '%{col_search_lower}%'")
+                    elif col_data == "TERM_NAME":
+                        search_conditions.append(f"lower(TERM_NAME) like '%{col_search_lower}%'")
+                    elif col_data == "Updated_by":
+                        search_conditions.append(f"lower(Updated_by) like '%{col_search_lower}%'")
+                    elif col_data == "Updated_on":
+                        search_conditions.append(f"Updated_on like '%{col_search_safe}%'")
+
         if search_conditions:
             return " AND ".join(search_conditions)
         return ""

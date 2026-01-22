@@ -57,30 +57,30 @@ async def test_query(
     Test endpoint to verify database connection and check for data
     """
     from sqlalchemy import text
-    from config.constants import TBL_KICKOUT, TBL_TRANSCRIPTHDRDATA, TBL_DOWNLOAD, COLLEGE_PROJECT_ID
+    from config.constants import TBL_KICKOUT, TBL_TRANSCRIPTHDRDATA, TBL_DOWNLOAD, SCHOOL_PROJECT_ID
     
     try:
         # Test 1: Check if table exists and has any data
         test1 = db.execute(text(f"SELECT COUNT(*) as cnt FROM {TBL_KICKOUT} WITH(NOLOCK)")).fetchone()
         
-        # Test 2: Check records with PROJECT_ID
-        test2 = db.execute(text(f"SELECT COUNT(*) as cnt FROM {TBL_KICKOUT} WITH(NOLOCK) WHERE PROJECT_ID = {COLLEGE_PROJECT_ID}")).fetchone()
+        # Test 2: Check records with PROJECT_ID (include NULL like dashboard does)
+        test2 = db.execute(text(f"SELECT COUNT(*) as cnt FROM {TBL_KICKOUT} WITH(NOLOCK) WHERE (PROJECT_ID = {SCHOOL_PROJECT_ID} OR PROJECT_ID IS NULL)")).fetchone()
         
-        # Test 3: Check if joins work
+        # Test 3: Check if joins work (include NULL like dashboard does)
         test3_sql = f"""
             SELECT COUNT(*) as cnt
             FROM {TBL_KICKOUT} k WITH(NOLOCK)
             INNER JOIN {TBL_TRANSCRIPTHDRDATA} h WITH(NOLOCK) ON h.BATCH_ID=k.BATCH_ID
             INNER JOIN {TBL_DOWNLOAD} d WITH(NOLOCK) ON d.BATCH_ID=k.BATCH_ID
-            WHERE k.PROJECT_ID = {COLLEGE_PROJECT_ID}
+            WHERE (k.PROJECT_ID = {SCHOOL_PROJECT_ID} OR k.PROJECT_ID IS NULL)
         """
         test3 = db.execute(text(test3_sql)).fetchone()
         
-        # Test 4: Get a sample record
+        # Test 4: Get a sample record (include NULL like dashboard does)
         sample_sql = f"""
             SELECT TOP 1 k.BATCH_ID, k.PROJECT_ID, k.TRANSCRIPT_STATUS_FLAG
             FROM {TBL_KICKOUT} k WITH(NOLOCK)
-            WHERE k.PROJECT_ID = {COLLEGE_PROJECT_ID}
+            WHERE (k.PROJECT_ID = {SCHOOL_PROJECT_ID} OR k.PROJECT_ID IS NULL)
         """
         sample = db.execute(text(sample_sql)).fetchone()
         
@@ -89,7 +89,7 @@ async def test_query(
             "test2_records_with_project_id": test2.cnt if test2 else 0,
             "test3_records_with_joins": test3.cnt if test3 else 0,
             "sample_record": dict(sample._mapping) if sample else None,
-            "project_id": COLLEGE_PROJECT_ID,
+            "project_id": SCHOOL_PROJECT_ID,
             "table_names": {
                 "kickout": TBL_KICKOUT,
                 "hdrdata": TBL_TRANSCRIPTHDRDATA,

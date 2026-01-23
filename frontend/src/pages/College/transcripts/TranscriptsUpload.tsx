@@ -3,7 +3,7 @@ import PageBreadcrumb from "../../../components/common/PageBreadCrumb";
 import PageMeta from "../../../components/common/PageMeta";
 import PageContainer, { PageWrapper } from "../../../components/common/PageContainer";
 import Button from "../../../components/ui/button/Button";
-import { API_BASE_URL } from "../../../config/api";
+import { API_BASE_URL, API_ENDPOINTS, getAuthToken } from "../../../config/api";
 import { ArrowUpIcon } from "../../../icons";
 
 export default function TranscriptsUpload() {
@@ -15,7 +15,12 @@ export default function TranscriptsUpload() {
 
   // Fetch available source types
   useEffect(() => {
-    fetch(`${API_BASE_URL}/api/transcripts/sources`)
+    const token = getAuthToken();
+    fetch(`${API_BASE_URL}${API_ENDPOINTS.TRANSCRIPTS_SOURCES}`, {
+      headers: token ? {
+        "Authorization": `Bearer ${token}`
+      } : {}
+    })
       .then(res => res.json())
       .then(data => {
         if (data.sources) {
@@ -72,8 +77,14 @@ export default function TranscriptsUpload() {
         formData.append("files", file);
       });
 
-      const response = await fetch(`${API_BASE_URL}/transcripts/upload`, {
+      // Get auth token for API request
+      const token = getAuthToken();
+      
+      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.TRANSCRIPTS_UPLOAD}`, {
         method: "POST",
+        headers: token ? {
+          "Authorization": `Bearer ${token}`
+        } : {},
         body: formData,
       });
 
@@ -89,7 +100,13 @@ export default function TranscriptsUpload() {
         setMessage({ type: "error", text: data.detail || data.message || "Upload failed" });
       }
     } catch (error: any) {
-      setMessage({ type: "error", text: error.message || "Upload failed" });
+      console.error("Upload error:", error);
+      // Handle JSON parse errors
+      if (error instanceof SyntaxError) {
+        setMessage({ type: "error", text: "Server response error. Please check the console for details." });
+      } else {
+        setMessage({ type: "error", text: error.message || "Upload failed. Please try again." });
+      }
     } finally {
       setUploading(false);
     }

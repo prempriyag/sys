@@ -16,6 +16,7 @@ import string
 
 from database.connection import get_db
 from helpers.permission_dependency import require_permission
+from helpers.common_helper import sanitize_string
 from models import User
 from models.transcripts_model import TranscriptsModel
 from config.constants import (
@@ -94,15 +95,14 @@ def generate_random_string(length: int = 5) -> str:
 
 
 def sanitize_filename(filename: str) -> str:
-    """Sanitize filename by replacing special characters and dots with dashes"""
+    """
+    Sanitize filename by replacing special characters and dots with dashes
+    Uses common_helper.sanitize_string() which matches CI3 sanitizeString()
+    """
     # Remove extension
     base_name = os.path.splitext(filename)[0]
-    # Replace special characters and dots with dashes
-    sanitized = ''.join(c if c.isalnum() or c in ('-', '_') else '-' for c in base_name)
-    # Remove multiple consecutive dashes
-    while '--' in sanitized:
-        sanitized = sanitized.replace('--', '-')
-    return sanitized.strip('-')
+    # Use the common helper function
+    return sanitize_string(base_name)
 
 
 @router.post("/upload")

@@ -538,7 +538,8 @@ class SchoolTranscriptReportsModel:
             print(f"[TranscriptReports] Request keys: {list(request_data.keys())}")
             
             # First, test if we can query the table at all
-            test_sql = f"SELECT COUNT(*) as test_count FROM {TBL_KICKOUT} WITH(NOLOCK) WHERE PROJECT_ID = {SCHOOL_PROJECT_ID}"
+            # Include NULL PROJECT_ID like dashboard does for school data
+            test_sql = f"SELECT COUNT(*) as test_count FROM {TBL_KICKOUT} WITH(NOLOCK) WHERE (PROJECT_ID = {SCHOOL_PROJECT_ID} OR PROJECT_ID IS NULL)"
             try:
                 test_result = db.execute(text(test_sql)).fetchone()
                 test_count = test_result.test_count if test_result else 0
@@ -572,12 +573,13 @@ class SchoolTranscriptReportsModel:
             search_query = SchoolTranscriptReportsModel.build_search_conditions(request_data)
 
             # Count query (matches CI3 lines 600-610)
+            # Include NULL PROJECT_ID like dashboard does for school data
             count_sql = f"""
                 SELECT count(*) as allcount
                 FROM {TBL_KICKOUT} as k WITH(NOLOCK)
                 INNER JOIN {TBL_TRANSCRIPTHDRDATA} as h WITH(NOLOCK) ON h.BATCH_ID=k.BATCH_ID
                 INNER JOIN {TBL_DOWNLOAD} as d WITH(NOLOCK) ON d.BATCH_ID=k.BATCH_ID
-                WHERE k.PROJECT_ID = {SCHOOL_PROJECT_ID}
+                WHERE (k.PROJECT_ID = {SCHOOL_PROJECT_ID} OR k.PROJECT_ID IS NULL)
             """
             
             if search_query:
@@ -607,10 +609,14 @@ class SchoolTranscriptReportsModel:
                       k.LETTER_SENT_DATE,
                       k.TRANSFER_LETTER_FILE_LINK,
                       k.STUDENT_ID,
+                      k.SLATE_PROSPECT_ID,
+                      k.SLATE_REF_NUMBER,
                       k.STUDENT_FULL_NAME,
                       k.STATUS_SAAADMS,
                       k.STATUS_SOAPCOL,
                       k.STATUS_BDMS,
+                      k.STATUS_SLATE,
+                      k.STATUS_SLATE_UPLOAD,
                       k.STATUS_SHATAEQ,
                       k.STATUS_SPACMNT,
                       k.SCENARIO,
@@ -645,12 +651,13 @@ class SchoolTranscriptReportsModel:
                     (SELECT TOP 1 INSTITUTION_NAME FROM {TBL_INSTITUTION_MAPPING} as m WHERE m.INSTITUTION_ID = k.INSTITUTION_ID) AS INSTITUTION_NAME"""
 
             # Build data query exactly as CI3 (matches lines 662-673)
+            # Include NULL PROJECT_ID like dashboard does for school data
             data_sql = f"""
                 SELECT {columns_list}
                 FROM {TBL_KICKOUT} as k WITH(NOLOCK)
                 INNER JOIN {TBL_TRANSCRIPTHDRDATA} as h WITH(NOLOCK) ON h.BATCH_ID=k.BATCH_ID
                 INNER JOIN {TBL_DOWNLOAD} as d WITH(NOLOCK) ON d.BATCH_ID=k.BATCH_ID
-                WHERE k.PROJECT_ID = {SCHOOL_PROJECT_ID}
+                WHERE (k.PROJECT_ID = {SCHOOL_PROJECT_ID} OR k.PROJECT_ID IS NULL)
             """
             
             if search_query:
@@ -694,6 +701,7 @@ class SchoolTranscriptReportsModel:
                 record_dict = dict(record._mapping)
                 batch_id = record_dict.get("BATCH_ID", "")
                 student_id = record_dict.get("STUDENT_ID", "")
+                slate_ref_number = record_dict.get("SLATE_REF_NUMBER", "")
                 institution_id = record_dict.get("INSTITUTION_ID", "")
                 transcript_link = record_dict.get("TRANSCRIPT_LINK", "")
                 transfer_letter_link = record_dict.get("TRANSFER_LETTER_FILE_LINK", "")
@@ -739,10 +747,13 @@ class SchoolTranscriptReportsModel:
                         else ""
                     ),
                     "BATCH_ID": batch_id,
+                    "SLATE_REF_NUMBER": slate_ref_number,
                     "STATUS_BANNER": status_banner,
                     "STATUS_SAAADMS": record_dict.get("STATUS_SAAADMS", ""),
                     "STATUS_SOAPCOL": record_dict.get("STATUS_SOAPCOL", ""),
                     "STATUS_BDMS": record_dict.get("STATUS_BDMS", ""),
+                    "STATUS_SLATE": record_dict.get("STATUS_SLATE", ""),
+                    "STATUS_SLATE_UPLOAD": record_dict.get("STATUS_SLATE_UPLOAD", ""),
                     "ERROR_REASON": error_reason,  # Already formatted with <br> tags
                     # ERROR_SCREENSHOT: Return raw value if exists (frontend will check and construct URL from batch_id)
                     # Matches CI3: if ($record->ERROR_SCREENSHOT != '' || !empty($record->ERROR_SCREENSHOT))
@@ -794,6 +805,9 @@ class SchoolTranscriptReportsModel:
                     "STATUS_SOAHOLD": record_dict.get("STATUS_SOAHOLD", ""),
                     "STATUS_SOATEST": record_dict.get("STATUS_SOATEST", ""),
                     "TRANSCRIPT_STATUS_FLAG": record_dict.get("TRANSCRIPT_STATUS_FLAG", ""),
+                    "ARTICULATION_STATUS_FLAG": articulation_status_flag,
+                    "STATUS_SLATE": record_dict.get("STATUS_SLATE", ""),
+                    "STATUS_SLATE_UPLOAD": record_dict.get("STATUS_SLATE_UPLOAD", ""),
                     "STATUS_SHATAEQ": record_dict.get("STATUS_SHATAEQ", ""),
                     "STATUS_SPACMNT": record_dict.get("STATUS_SPACMNT", ""),
                     "PROCESS_STATUS": record_dict.get("PROCESS_STATUS", ""),

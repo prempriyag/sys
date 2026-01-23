@@ -8,6 +8,16 @@ from sqlalchemy import text
 from controllers import auth_controller, users_controller, theme_settings_controller, sso_controller
 from controllers.college import transcriptreports_controller
 
+# Import school transcriptreports controller
+try:
+    from controllers.school import transcriptreports_controller as school_transcriptreports_controller
+    print("[MAIN] Successfully imported school_transcriptreports_controller")
+except Exception as e:
+    print(f"[MAIN] ERROR importing school_transcriptreports_controller: {e}")
+    import traceback
+    traceback.print_exc()
+    school_transcriptreports_controller = None
+
 # Import digiscript reports controller
 try:
     from controllers.college import digiscriptreports_controller
@@ -121,6 +131,13 @@ app.include_router(auth_controller.router)
 app.include_router(users_controller.router)
 app.include_router(theme_settings_controller.router)
 app.include_router(transcriptreports_controller.router)
+
+# Include school transcriptreports router if imported successfully
+if school_transcriptreports_controller is not None:
+    app.include_router(school_transcriptreports_controller.router)
+    print("[MAIN] Successfully registered school_transcriptreports_controller router")
+else:
+    print("[MAIN] WARNING: school_transcriptreports_controller router NOT registered due to import error")
 
 # Include SSO router
 try:

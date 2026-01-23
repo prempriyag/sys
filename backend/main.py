@@ -8,16 +8,6 @@ from sqlalchemy import text
 from controllers import auth_controller, users_controller, theme_settings_controller, sso_controller
 from controllers.college import transcriptreports_controller
 
-# Import school transcriptreports controller
-try:
-    from controllers.school import transcriptreports_controller as school_transcriptreports_controller
-    print("[MAIN] Successfully imported school_transcriptreports_controller")
-except Exception as e:
-    print(f"[MAIN] ERROR importing school_transcriptreports_controller: {e}")
-    import traceback
-    traceback.print_exc()
-    school_transcriptreports_controller = None
-
 # Import digiscript reports controller
 try:
     from controllers.college import digiscriptreports_controller
@@ -317,7 +307,13 @@ try:
     from controllers.college import botstatusreport_controller
     from controllers.setup import suffixname_controller, prefixname_controller
     from controllers.setup import combinedname_controller, acceptedgrades_controller, transfergrades_controller
-    from controllers.setup import institutionmapping_controller, accreditedinstitution_controller, overrideeditmapping_controller
+    from controllers.setup import (
+        institutionmapping_controller,
+        accreditedinstitution_controller,
+        overrideeditmapping_controller,
+        gpapickmapping_controller,
+        gpascalemapping_controller,
+    )
     print("[MAIN] Successfully imported remaining setup controllers")
 except Exception as e:
     print(f"[MAIN] ERROR importing remaining setup controllers: {e}")
@@ -335,6 +331,8 @@ except Exception as e:
     institutionmapping_controller = None
     accreditedinstitution_controller = None
     overrideeditmapping_controller = None
+    gpapickmapping_controller = None
+    gpascalemapping_controller = None
 
 # Register all remaining setup routers
 controllers_to_register = [
@@ -350,6 +348,8 @@ controllers_to_register = [
     (institutionmapping_controller, "institutionmapping_controller"),
     (accreditedinstitution_controller, "accreditedinstitution_controller"),
     (overrideeditmapping_controller, "overrideeditmapping_controller"),
+    (gpapickmapping_controller, "gpapickmapping_controller"),
+    (gpascalemapping_controller, "gpascalemapping_controller"),
 ]
 
 for controller, name in controllers_to_register:

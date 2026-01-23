@@ -59,11 +59,13 @@ export const schoolMenu: MenuConfig = {
     {
       name: "Student Action Center",
       icon: "users",
-      permission: "student_action_center",
+      //permission: "student_action_center",
+      permissions: ["student_log_kickout", "student_log_processed", "student_log_rerun", "student_view"],
       subItems: [
         {
           name: "Ready for Articulation",
           icon: "file-text",
+          permissions: ["student_log_kickout", "student_log_processed", "student_log_rerun"],
           subItems: [
             {
               name: "Kickouts",
@@ -114,7 +116,7 @@ export const schoolMenu: MenuConfig = {
     {
       name: "High School Uploads",
       icon: "upload",
-      permission: "school_uploads",
+      //permission: "school_uploads",
       subItems: [
         {
           name: "Upload Transcript",

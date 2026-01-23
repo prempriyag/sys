@@ -74,8 +74,8 @@ export default function SchoolDashboard() {
 
   // Calculate statistics
   const totalTranscripts = dashboardData.transcriptStatusDonut.series.reduce((a: number, b: number) => a + b, 0);
-  const processedCount = dashboardData.transcriptStatus.datasets.find((d: any) => d.name === "PROCESSED")?.data.reduce((a: number, b: number) => a + b, 0) || 0;
-  const failedCount = dashboardData.transcriptStatus.datasets.find((d: any) => d.name === "FAILED")?.data.reduce((a: number, b: number) => a + b, 0) || 0;
+  const processedCount = (dashboardData.transcriptStatus.datasets.find((d: any) => d.name === "PROCESSED") as any)?.data?.reduce((a: number, b: number) => a + b, 0) || 0;
+  const failedCount = (dashboardData.transcriptStatus.datasets.find((d: any) => d.name === "FAILED") as any)?.data?.reduce((a: number, b: number) => a + b, 0) || 0;
 
   // Chart options with glassmorphic styling
   const getBarChartOptions = (categories: string[]): ApexOptions => ({

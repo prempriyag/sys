@@ -285,6 +285,25 @@ export default function App() {
             }
           />
 
+          
+          {/* School - Uploads */}
+          <Route
+            path="/school/transcripts/add"
+            element={
+              <PermissionRoute permission="college_upload_transcripts">
+                <TranscriptsUpload />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/school/transcripts"
+            element={
+              <PermissionRoute permission="college_downloaded_transcripts">
+                <TranscriptsList />
+              </PermissionRoute>
+            }
+          />
+
           {/* College - Setup */}
           <Route
             path="/college/degreemapping"

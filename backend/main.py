@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from controllers import auth_controller, users_controller, theme_settings_controller, sso_controller
 from controllers.college import transcriptreports_controller
+from controllers.school import school_transcriptreports_controller
 
 # Import digiscript reports controller
 try:
@@ -114,13 +115,24 @@ except Exception as e:
     print(f"[MAIN] ERROR importing dashboard_controller: {e}")
     import traceback
     traceback.print_exc()
-    dashboard_controller = None
+    school_dashboard_controller = None
+
+# Import School dashboard controller
+try:
+    from backend.controllers.school import school_dashboard_controller
+    print("[MAIN] Successfully imported dashboard_controller")
+except Exception as e:
+    print(f"[MAIN] ERROR importing dashboard_controller: {e}")
+    import traceback
+    traceback.print_exc()
+    school_dashboard_controller = None
 
 # Include routers
 app.include_router(auth_controller.router)
 app.include_router(users_controller.router)
 app.include_router(theme_settings_controller.router)
 app.include_router(transcriptreports_controller.router)
+app.include_router(school_transcriptreports_controller.router)
 
 # Include school transcriptreports router if imported successfully
 if school_transcriptreports_controller is not None:
@@ -131,7 +143,7 @@ else:
 
 # Import school dashboard controller
 try:
-    from controllers.school import dashboard_controller as school_dashboard_controller
+    from backend.controllers.school import school_dashboard_controller as school_dashboard_controller
     print("[MAIN] Successfully imported school_dashboard_controller")
 except Exception as e:
     print(f"[MAIN] ERROR importing school_dashboard_controller: {e}")
@@ -162,8 +174,8 @@ except Exception as e:
     traceback.print_exc()
 
 # Include dashboard router if imported successfully
-if dashboard_controller is not None:
-    app.include_router(dashboard_controller.router)
+if school_dashboard_controller is not None:
+    app.include_router(school_dashboard_controller.router)
     print("[MAIN] Successfully registered dashboard_controller router")
 
 # Include digiscript reports router if imported successfully
@@ -203,11 +215,26 @@ except Exception as e:
     print(f"[MAIN] ERROR importing transcripts_controller: {e}")
     import traceback
     traceback.print_exc()
-    transcripts_controller = None
+    school_transcripts_controller = None
 
 # Include transcripts router if imported successfully
-if transcripts_controller is not None:
-    app.include_router(transcripts_controller.router)
+if school_transcripts_controller is not None:
+    app.include_router(school_transcripts_controller.router)
+    print("[MAIN] Successfully registered transcripts_controller router")
+
+# Import transcripts controller
+try:
+    from backend.controllers.school import school_transcripts_controller
+    print("[MAIN] Successfully imported transcripts_controller")
+except Exception as e:
+    print(f"[MAIN] ERROR importing transcripts_controller: {e}")
+    import traceback
+    traceback.print_exc()
+    school_transcripts_controller = None
+
+# Include transcripts router if imported successfully
+if school_transcripts_controller is not None:
+    app.include_router(school_transcripts_controller.router)
     print("[MAIN] Successfully registered transcripts_controller router")
 
 # Import stored procedure controller

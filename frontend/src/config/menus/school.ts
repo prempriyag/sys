@@ -131,37 +131,44 @@ export const schoolMenu: MenuConfig = {
     {
       name: "Setup",
       icon: "settings",
-      permission: "school_setup",
+      // Uses checkallpermission - show if user has any of these permissions
+      permissions: ["school_maths", "school_science", "gpa_pick_mapping", "gpa_scale_mapping", "institutions_mapping"],
       subItems: [
         {
           name: "Maths",
           path: "/school/maths",
           permission: "school_maths",
+          icon: "calculator",
         },
         {
           name: "Science",
           path: "/school/science",
           permission: "school_science",
+          icon: "flask",
         },
         {
           name: "GPA Pick",
           path: "/school/GpapickMapping",
           permission: "gpa_pick_mapping",
+          icon: "list",
         },
         {
           name: "GPA Scale",
           path: "/school/Gpascalemapping",
           permission: "gpa_scale_mapping",
+          icon: "bar-chart",
         },
         {
           name: "Institution Mapping",
           path: "/school/institutionmapping",
           permission: "institutions_mapping",
+          icon: "folder",
         },
         {
           name: "Tech Center Mapping",
           path: "/school/techinstitutionmapping",
           permission: "institutions_mapping",
+          icon: "box-cube",
         },
       ],
     },

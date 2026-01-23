@@ -48,6 +48,57 @@ def serialize_user_data_for_url(data: dict) -> str:
     return json.dumps(serializable_data)
 
 
+def format_user_data_for_response(user_data: dict) -> dict:
+    """
+    Format user data to include all necessary fields including permissions
+    This ensures consistency with the login endpoint response
+    """
+    formatted_data = {
+        'id': user_data.get('id'),
+        'name': user_data.get('name'),
+        'email': user_data.get('email'),
+        'role_id': user_data.get('role_id'),
+        'status': user_data.get('status'),
+        'college_perm': user_data.get('college_perm', ''),
+        'hs_perm': user_data.get('hs_perm', ''),
+        'ocr_perm': user_data.get('ocr_perm', ''),
+        'last_login': user_data.get('last_login')
+    }
+    
+    # Convert string numbers to integers for consistency
+    # Handle role_id
+    if isinstance(formatted_data['role_id'], str) and formatted_data['role_id'].isdigit():
+        formatted_data['role_id'] = int(formatted_data['role_id'])
+    
+    # Handle status - convert "1" to 1
+    if isinstance(formatted_data['status'], str) and formatted_data['status'].isdigit():
+        formatted_data['status'] = int(formatted_data['status'])
+    
+    # Handle college_perm
+    if isinstance(formatted_data['college_perm'], str) and formatted_data['college_perm'].isdigit():
+        formatted_data['college_perm'] = int(formatted_data['college_perm'])
+    elif formatted_data['college_perm'] == '':
+        formatted_data['college_perm'] = 0  # Default to 0 if empty
+    
+    # Handle hs_perm
+    if isinstance(formatted_data['hs_perm'], str) and formatted_data['hs_perm'].isdigit():
+        formatted_data['hs_perm'] = int(formatted_data['hs_perm'])
+    elif formatted_data['hs_perm'] == '':
+        formatted_data['hs_perm'] = 0  # Default to 0 if empty
+    
+    # Handle ocr_perm
+    if isinstance(formatted_data['ocr_perm'], str) and formatted_data['ocr_perm'].isdigit():
+        formatted_data['ocr_perm'] = int(formatted_data['ocr_perm'])
+    elif formatted_data['ocr_perm'] == '':
+        formatted_data['ocr_perm'] = 0  # Default to 0 if empty
+
+    # Handle datetime conversion for last_login
+    if formatted_data['last_login'] and isinstance(formatted_data['last_login'], datetime):
+        formatted_data['last_login'] = formatted_data['last_login'].isoformat()
+    
+    return formatted_data
+
+
 # ==================== UNIFIED SSO ENTRY POINTS ====================
 
 @router.get("/client")
@@ -356,16 +407,18 @@ async def client_saml_callback(request: Request, db: Session = Depends(get_db)):
         from urllib.parse import urlencode
         import json
         
+        # Format user data to include all fields including permissions
+        if 'user' in result:
+            formatted_user_data = format_user_data_for_response(result['user'])
+            user_data_json = serialize_user_data_for_url(formatted_user_data)
+        else:
+            user_data_json = "{}"
+        
         # Build redirect URL with token and user data
         params = {
             'access_token': result['access_token'],
+            'user': user_data_json
         }
-        
-        # Add user data to URL (frontend will use this instead of calling /api/me)
-        if 'user' in result:
-            # Encode user data as JSON in URL parameter, handling datetime objects
-            user_data_json = serialize_user_data_for_url(result['user'])
-            params['user'] = user_data_json
         
         # Add permissions if available
         if 'permissions' in result:
@@ -492,16 +545,18 @@ async def ktech_oauth_callback(
         from urllib.parse import urlencode
         import json
         
+        # Format user data to include all fields including permissions
+        if 'user' in result:
+            formatted_user_data = format_user_data_for_response(result['user'])
+            user_data_json = serialize_user_data_for_url(formatted_user_data)
+        else:
+            user_data_json = "{}"
+        
         # Build redirect URL with token and user data
         params = {
             'access_token': result['access_token'],
+            'user': user_data_json
         }
-        
-        # Add user data to URL (frontend will use this instead of calling /api/me)
-        if 'user' in result:
-            # Encode user data as JSON in URL parameter, handling datetime objects
-            user_data_json = serialize_user_data_for_url(result['user'])
-            params['user'] = user_data_json
         
         # Add permissions if available
         if 'permissions' in result:
@@ -612,16 +667,18 @@ async def ktech_saml_callback(request: Request, db: Session = Depends(get_db)):
         from urllib.parse import urlencode
         import json
         
+        # Format user data to include all fields including permissions
+        if 'user' in result:
+            formatted_user_data = format_user_data_for_response(result['user'])
+            user_data_json = serialize_user_data_for_url(formatted_user_data)
+        else:
+            user_data_json = "{}"
+        
         # Build redirect URL with token and user data
         params = {
             'access_token': result['access_token'],
+            'user': user_data_json
         }
-        
-        # Add user data to URL (frontend will use this instead of calling /api/me)
-        if 'user' in result:
-            # Encode user data as JSON in URL parameter, handling datetime objects
-            user_data_json = serialize_user_data_for_url(result['user'])
-            params['user'] = user_data_json
         
         # Add permissions if available
         if 'permissions' in result:

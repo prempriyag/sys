@@ -93,14 +93,14 @@ export default function SSOCallback() {
 
       // Redirect based on permissions (matching CI3 login/index.php behavior)
       if (userData.college_perm === 1) {
-        navigate("/dashboard");
+        navigate("/college/dashboard");
       } else if (userData.hs_perm === 1) {
         navigate("/school/dashboard");
       } else if (userData.ocr_perm === 1) {
         navigate("/ocrverify/dashboard");
       } else {
         // No specific permission, redirect to dashboard anyway
-        navigate("/dashboard");
+        navigate("/college/dashboard");
       }
     } catch (err) {
       console.error("SSO Login Error:", err);

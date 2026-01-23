@@ -25,7 +25,7 @@ export default function PermissionRoute({
   children, 
   permission, 
   action = "VIEW",
-  redirectTo = "/dashboard"
+  redirectTo = "/college/dashboard"
 }: PermissionRouteProps) {
   const { user, loading, isAuthenticated } = useAuth();
   const location = useLocation();

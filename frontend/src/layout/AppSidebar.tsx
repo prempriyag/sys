@@ -435,11 +435,7 @@ const AppSidebar: React.FC = () => {
         }`}
       >
         <Link
-          to={
-            currentModule === "college"
-              ? "/dashboard"
-              : `/${currentModule}/dashboard`
-          }
+          to={`/${currentModule}/dashboard`}
         >
           {isExpanded || isHovered || isMobileOpen ? (
             <>

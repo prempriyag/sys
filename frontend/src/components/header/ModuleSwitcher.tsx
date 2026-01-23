@@ -35,11 +35,11 @@ const ModuleSwitcher: React.FC = () => {
     setIsOpen(false);
     // Navigate to the module's dashboard - ModuleContext will update automatically based on URL
     // College is the default module, so use /dashboard instead of /college/dashboard
-    if (module === "college") {
-      navigate("/dashboard");
-    } else {
+    // if (module === "college") {
+    //   navigate("/dashboard");
+    // } else {
       navigate(`/${module}/dashboard`);
-    }
+    // }
   };
 
   return (

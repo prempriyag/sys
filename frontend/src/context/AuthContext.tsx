@@ -112,7 +112,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
         // Redirect based on permissions
         if (response.user.college_perm === 1) {
-          navigate("/dashboard");
+          navigate("/college/dashboard");
         } else if (response.user.hs_perm === 1) {
           navigate("/school/dashboard");
         } else if (response.user.ocr_perm === 1) {

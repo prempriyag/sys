@@ -6,7 +6,7 @@ export const collegeMenu: MenuConfig = {
   items: [
     {
       name: "Dashboard",
-      path: "/dashboard",
+      path: "/college/dashboard",
       icon: "dashboard",
       permission: "college_dashboard",
     },

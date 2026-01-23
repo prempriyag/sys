@@ -14,14 +14,14 @@ export default function SignIn() {
     if (!loading && isAuthenticated && user) {
       // Redirect based on permissions
       if (user.college_perm === 1) {
-        navigate("/dashboard", { replace: true });
+        navigate("/college/dashboard", { replace: true });
       } else if (user.hs_perm === 1) {
         navigate("/school/dashboard", { replace: true });
       } else if (user.ocr_perm === 1) {
         navigate("/ocrverify/dashboard", { replace: true });
       } else {
         // Default to college dashboard if no permissions match
-        navigate("/dashboard", { replace: true });
+        navigate("/college/dashboard", { replace: true });
       }
     }
   }, [isAuthenticated, user, loading, navigate]);

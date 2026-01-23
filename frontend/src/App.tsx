@@ -294,7 +294,11 @@ export default function App() {
 
           {/* Others Page */}
           <Route path="/profile" element={<UserProfiles />} />
+          <Route path="/school/profile" element={<UserProfiles />} />
+
           <Route path="/settings" element={<Settings />} />
+          <Route path="/school/settings" element={<Settings />} />
+
           <Route path="/calendar" element={<Calendar />} />
           <Route path="/blank" element={<Blank />} />
 

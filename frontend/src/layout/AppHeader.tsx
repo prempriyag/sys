@@ -54,7 +54,7 @@ const AppHeader: React.FC = () => {
       <div className="flex items-center justify-between w-full gap-2 px-3 py-3 lg:px-4 lg:py-4">
         {/* Left side: Hamburger + Logo */}
         <div className="flex items-center gap-2 sm:gap-3">
-          <button
+          {menuLayout === "vertical" ? (<button
             className="flex items-center justify-center w-10 h-10 text-gray-500 border-gray-200 rounded-lg z-99999 dark:border-gray-800 dark:text-gray-400 lg:h-11 lg:w-11 lg:border"
             onClick={handleToggle}
             aria-label="Toggle Sidebar"
@@ -90,7 +90,7 @@ const AppHeader: React.FC = () => {
                 />
               </svg>
             )}
-          </button>
+          </button>):''}
 
           {/* Logo - mobile view only */}
           <Link to="/" className="flex-shrink-0 lg:hidden">
@@ -115,7 +115,7 @@ const AppHeader: React.FC = () => {
           {/* Logo for horizontal menu on desktop */}
           {menuLayout === "horizontal" && (
             <Link
-              to={currentModule === "college" ? "/dashboard" : `/${currentModule}/dashboard`}
+              to={currentModule === "college" ? "college/dashboard" : `/${currentModule}/dashboard`}
               className="hidden lg:block ml-4"
             >
               <img

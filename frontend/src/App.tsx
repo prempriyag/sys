@@ -95,235 +95,231 @@ export default function App() {
     <>
       <ScrollToTop />
       <ToastContainer />
-        <Routes>
-          {/* Auth Layout - Public Routes */}
-          {/* <Route path="/signin" element={<SignIn />} /> */}
-          <Route path="/login" element={<SignIn />} />
-          <Route path="/signup" element={<SignUp />} />
-          <Route path="/sso/callback" element={<SSOCallback />} />
-          <Route path="/sso/client" element={<SSORedirect />} />
-          <Route path="/sso/ktech" element={<SSORedirect />} />
+      <Routes>
+        {/* Auth Layout - Public Routes */}
+        {/* <Route path="/signin" element={<SignIn />} /> */}
+        <Route path="/login" element={<SignIn />} />
+        <Route path="/signup" element={<SignUp />} />
+        <Route path="/sso/callback" element={<SSOCallback />} />
+        <Route path="/sso/client" element={<SSORedirect />} />
+        <Route path="/sso/ktech" element={<SSORedirect />} />
 
-          {/* Protected Routes - Require Authentication */}
+        {/* Protected Routes - Require Authentication */}
+        <Route
+          element={
+            <ProtectedRoute>
+              <AppLayout />
+            </ProtectedRoute>
+          }
+        >
+          {/* Default route - college dashboard */}
+          <Route index element={<CollegeDashboard />} />
+          <Route path="college/dashboard" element={<CollegeDashboard />} />
+
+          {/* College module routes (default module) */}
+          <Route path="/college/dashboard" element={<CollegeDashboard />} />
+          <Route path="/college/dashboard2" element={<Dashboard2 />} />
+          <Route path="/college/dashboard3" element={<Dashboard3 />} />
+
+          {/* College - User Management */}
           <Route
+            path="/college/users"
             element={
-              <ProtectedRoute>
-                <AppLayout />
-              </ProtectedRoute>
+              <PermissionRoute permission="user_management" action="VIEW">
+                <UserManagement />
+              </PermissionRoute>
             }
-          >
-            {/* Default route - college dashboard */}
-            <Route index element={<CollegeDashboard />} />
-            <Route path="/dashboard" element={<CollegeDashboard />} />
+          />
+          <Route
+            path="/college/users/add"
+            element={
+              <PermissionRoute permission="user_management" action="ADD">
+                <AddUser />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/college/users/edit/:id"
+            element={
+              <PermissionRoute permission="user_management" action="UPDATE">
+                <EditUser />
+              </PermissionRoute>
+            }
+          />
 
-            {/* School dashboard */}
-            <Route index element={<SchoolDashboard />} />
-            <Route path="school/dashboard" element={<SchoolDashboard />} />
-            
-            {/* College module routes (default module) */}
-            <Route path="/college/dashboard" element={<CollegeDashboard />} />
-            <Route path="/college/dashboard2" element={<Dashboard2 />} />
-            <Route path="/college/dashboard3" element={<Dashboard3 />} />
-            
-                    {/* College - User Management */}
-                    <Route 
-                      path="/college/users" 
-                      element={
-                        <PermissionRoute permission="user_management" action="VIEW">
-                          <UserManagement />
-                        </PermissionRoute>
-                      } 
-                    />
-                    <Route 
-                      path="/college/users/add" 
-                      element={
-                        <PermissionRoute permission="user_management" action="ADD">
-                          <AddUser />
-                        </PermissionRoute>
-                      } 
-                    />
-                    <Route 
-                      path="/college/users/edit/:id" 
-                      element={
-                        <PermissionRoute permission="user_management" action="UPDATE">
-                          <EditUser />
-                        </PermissionRoute>
-                      } 
-                    />
-            
-            {/* College - Transcripts (all handled by single TranscriptReports component with type parameter) */}
-            <Route path="/college/transcriptkickouts" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><TranscriptReports /></PermissionRoute>} />
-            <Route path="/college/transcript_articulationkickouts" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><TranscriptReports /></PermissionRoute>} />
-            <Route path="/college/transcriptprocessed" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><TranscriptReports /></PermissionRoute>} />
-            <Route path="/college/transcriptrerun" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><TranscriptReports /></PermissionRoute>} />
-            
-            {/* School - Transcripts (all handled by single TranscriptReports component with type parameter) */}
-            <Route path="/school/transcriptkickouts" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><SchoolTranscriptReports /></PermissionRoute>} />
-            <Route path="/school/transcriptprocessed" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><SchoolTranscriptReports /></PermissionRoute>} />
-            <Route path="/school/transcriptrerun" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><SchoolTranscriptReports /></PermissionRoute>} />
+          {/* College - Transcripts (all handled by single TranscriptReports component with type parameter) */}
+          <Route path="/college/transcriptkickouts" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><TranscriptReports /></PermissionRoute>} />
+          <Route path="/college/transcript_articulationkickouts" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><TranscriptReports /></PermissionRoute>} />
+          <Route path="/college/transcriptprocessed" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><TranscriptReports /></PermissionRoute>} />
+          <Route path="/college/transcriptrerun" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><TranscriptReports /></PermissionRoute>} />
 
-            {/* College - Articulation */}
-            <Route path="/college/articulationkickouts" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><ArticulationReports /></PermissionRoute>} />
-            <Route path="/college/articulationphase2kickouts" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><ArticulationReports /></PermissionRoute>} />
-            <Route path="/college/articulationprocessed" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><ArticulationReports /></PermissionRoute>} />
-            <Route path="/college/articulationrerun" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><ArticulationReports /></PermissionRoute>} />
-            
-            {/* College - Student Action Center */}
-            <Route path="/college/studentlogkickouts" element={<PermissionRoute permission="student_log_kickout" action="VIEW"><StudentLogKickouts /></PermissionRoute>} />
-            <Route path="/college/studentlogprocessed" element={<PermissionRoute permission="student_log_processed" action="VIEW"><StudentLogProcessed /></PermissionRoute>} />
-            <Route path="/college/studentlogreprocessed" element={<PermissionRoute permission="student_log_rerun" action="VIEW"><StudentLogRerun /></PermissionRoute>} />
-            <Route path="/college/studentview" element={<PermissionRoute permission="student_view" action="VIEW"><StudentView /></PermissionRoute>} />
-            
-            {/* School - Student Action Center */}
-            <Route path="/school/studentlogkickouts" element={<PermissionRoute permission="student_log_kickout" action="VIEW"><StudentLogKickouts /></PermissionRoute>} />
-            <Route path="/school/studentlogprocessed" element={<PermissionRoute permission="student_log_processed" action="VIEW"><StudentLogProcessed /></PermissionRoute>} />
-            <Route path="/school/studentlogreprocessed" element={<PermissionRoute permission="student_log_rerun" action="VIEW"><StudentLogRerun /></PermissionRoute>} />
-            <Route path="/school/studentview" element={<PermissionRoute permission="student_view" action="VIEW"><StudentView /></PermissionRoute>} />
+          {/* School - Transcripts (all handled by single TranscriptReports component with type parameter) */}
+          <Route path="/school/transcriptkickouts" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><SchoolTranscriptReports /></PermissionRoute>} />
+          <Route path="/school/transcriptprocessed" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><SchoolTranscriptReports /></PermissionRoute>} />
+          <Route path="/school/transcriptrerun" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><SchoolTranscriptReports /></PermissionRoute>} />
 
-            {/* College - Reports */}
-            <Route path="/college/transcriptreports" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><TranscriptReports /></PermissionRoute>} />
-            <Route path="/college/transcriptequivalenthours" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><TranscriptReports /></PermissionRoute>} />
-            <Route path="/college/articulationreports" element={<ArticulationReports />} />
-            <Route path="/college/digiscriptreports" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><DigiScriptReports /></PermissionRoute>} />
-            <Route path="/college/batchdetails/:batchId" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><BatchDetails /></PermissionRoute>} />
-            <Route path="/college/errorscreenshot/:batchId" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><ErrorScreenshot /></PermissionRoute>} />
-            
-            {/* College - Uploads */}
-            <Route
-              path="/college/transcripts/add"
-              element={
-                <PermissionRoute permission="college_upload_transcripts">
-                  <TranscriptsUpload />
-                </PermissionRoute>
-              }
-            />
-            <Route
-              path="/college/transcripts"
-              element={
-                <PermissionRoute permission="college_downloaded_transcripts">
-                  <TranscriptsList />
-                </PermissionRoute>
-              }
-            />
-            
-            {/* College - Setup */}
-            <Route
-              path="/college/degreemapping"
-              element={
-                <PermissionRoute permission="college_degree">
-                  <DegreeMapping />
-                </PermissionRoute>
-              }
-            />
-            <Route
-              path="/college/termmapping"
-              element={
-                <PermissionRoute permission="college_terms">
-                  <TermMapping />
-                </PermissionRoute>
-              }
-            />
-            <Route
-              path="/college/termnamemapping"
-              element={
-                <PermissionRoute permission="college_term_names">
-                  <TermNameMapping />
-                </PermissionRoute>
-              }
-            />
-            <Route
-              path="/college/grademapping"
-              element={
-                <PermissionRoute permission="par_grade_mapping">
-                  <GradeMapping />
-                </PermissionRoute>
-              }
-            />
-            <Route path="/college/osuskipkeywords" element={<PermissionRoute permission="osu_skip_keywords" action="VIEW"><SkipKeywords /></PermissionRoute>} />
-            <Route path="/college/acceptGradeMapping" element={<PermissionRoute permission="accepted_grades_mapping" action="VIEW"><AcceptedGradesMapping /></PermissionRoute>} />
-            <Route path="/college/accreditedInstitution" element={<PermissionRoute permission="accredited_institution" action="VIEW"><AccreditedInstitution /></PermissionRoute>} />
-            <Route path="/college/transfergrademapping" element={<PermissionRoute permission="transfer_grade_mapping" action="VIEW"><TransferGradesMapping /></PermissionRoute>} />
-            <Route path="/college/yearmapping" element={<PermissionRoute permission="year_mapping" action="VIEW"><YearMapping /></PermissionRoute>} />
-            <Route path="/college/institutionmapping" element={<PermissionRoute permission="institutions_mapping" action="VIEW"><InstitutionMapping /></PermissionRoute>} />
-            <Route path="/college/techinstitutionmapping" element={<PermissionRoute permission="institutions_mapping" action="VIEW"><InstitutionMapping instType="TECH" /></PermissionRoute>} />
-            <Route path="/college/skipcourses" element={<PermissionRoute permission="skip_exclude_courses" action="VIEW"><SkipCourses /></PermissionRoute>} />
-            <Route path="/college/overrideeditmapping" element={<PermissionRoute permission="override_edit_mapping" action="VIEW"><OverrideEditMapping /></PermissionRoute>} />
-            <Route path="/college/suffixname" element={<PermissionRoute permission="suffix_names" action="VIEW"><SuffixName /></PermissionRoute>} />
-            <Route path="/college/prefixname" element={<PermissionRoute permission="prefix_words" action="VIEW"><PrefixName /></PermissionRoute>} />
-            <Route path="/college/combinedname" element={<PermissionRoute permission="combine_words" action="VIEW"><CombinedName /></PermissionRoute>} />
-            <Route path="/college/botschedule" element={<PermissionRoute permission="bot_schedule" action="VIEW"><BotSchedule /></PermissionRoute>} />
-            <Route path="/college/botstatusreport" element={<PermissionRoute permission="bot_status_report" action="VIEW"><BotStatusReport /></PermissionRoute>} />
-            
-            {/* College - OCR [P1] */}
-            <Route path="/college/transcripthdrocr" element={<PermissionRoute permission="college_transcript_header_ocr" action="VIEW"><TranscriptHdrOcr /></PermissionRoute>} />
-            <Route path="/college/transcriptlineocr" element={<PermissionRoute permission="college_transcript_line_ocr" action="VIEW"><TranscriptLineOcr /></PermissionRoute>} />
-            
-            {/* College - DATA [P2] */}
-            <Route path="/college/transcripthdrdata" element={<PermissionRoute permission="college_transcript_header_data" action="VIEW"><TranscriptHdrData /></PermissionRoute>} />
-            <Route path="/college/transcriptlinedata" element={<PermissionRoute permission="college_transcript_line_data" action="VIEW"><TranscriptLineData /></PermissionRoute>} />
-            
-            {/* College - Audit Log [P3] */}
-            <Route path="/college/digiscriptbotlog" element={<PermissionRoute permission="transcript_log" action="VIEW"><DigiScriptBotLog /></PermissionRoute>} />
-            <Route path="/college/articulationbotlog" element={<PermissionRoute permission="articulation_log" action="VIEW"><ArticulationBotLog /></PermissionRoute>} />
-            
-            {/* College - Reset Batch ID */}
-            <Route
-              path="/college/storedprocedure"
-              element={
-                <PermissionRoute permission="stored_procedure">
-                  <StoredProcedure />
-                </PermissionRoute>
-              }
-            />
-            
-            {/* College - Settings */}
-            <Route path="/college/permissions" element={<Permissions />} />
-            <Route path="/college/roles" element={<Roles />} />
-            <Route path="/college/roles/add" element={<AddRole />} />
-            <Route path="/college/roles/edit/:id" element={<EditRole />} />
-            <Route path="/college/roles/view/:id" element={<EditRole />} />
-            <Route path="/college/Error_log" element={<ErrorLog />} />
-            <Route path="/college/master_setup" element={<MasterSettings />} />
-            {/* SMTP route hidden - now accessible via /settings page */}
-            {/* <Route path="/college/smtp" element={<SmtpSetup />} /> */}
-            
-            {/* College - User Manual */}
-            <Route path="/college/Help" element={<Help />} />
-            
-            {/* School module routes */}
-            <Route path="/school/dashboard" element={<Home />} />
-            
-            {/* OCR Verify module routes */}
-            <Route path="/ocrverify/dashboard" element={<Home />} />
+          {/* College - Articulation */}
+          <Route path="/college/articulationkickouts" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><ArticulationReports /></PermissionRoute>} />
+          <Route path="/college/articulationphase2kickouts" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><ArticulationReports /></PermissionRoute>} />
+          <Route path="/college/articulationprocessed" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><ArticulationReports /></PermissionRoute>} />
+          <Route path="/college/articulationrerun" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><ArticulationReports /></PermissionRoute>} />
 
-            {/* Others Page */}
-            <Route path="/profile" element={<UserProfiles />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="/calendar" element={<Calendar />} />
-            <Route path="/blank" element={<Blank />} />
+          {/* College - Student Action Center */}
+          <Route path="/college/studentlogkickouts" element={<PermissionRoute permission="student_log_kickout" action="VIEW"><StudentLogKickouts /></PermissionRoute>} />
+          <Route path="/college/studentlogprocessed" element={<PermissionRoute permission="student_log_processed" action="VIEW"><StudentLogProcessed /></PermissionRoute>} />
+          <Route path="/college/studentlogreprocessed" element={<PermissionRoute permission="student_log_rerun" action="VIEW"><StudentLogRerun /></PermissionRoute>} />
+          <Route path="/college/studentview" element={<PermissionRoute permission="student_view" action="VIEW"><StudentView /></PermissionRoute>} />
 
-            {/* Forms */}
-            <Route path="/form-elements" element={<FormElements />} />
+          {/* School - Student Action Center */}
+          <Route path="/school/studentlogkickouts" element={<PermissionRoute permission="student_log_kickout" action="VIEW"><StudentLogKickouts /></PermissionRoute>} />
+          <Route path="/school/studentlogprocessed" element={<PermissionRoute permission="student_log_processed" action="VIEW"><StudentLogProcessed /></PermissionRoute>} />
+          <Route path="/school/studentlogreprocessed" element={<PermissionRoute permission="student_log_rerun" action="VIEW"><StudentLogRerun /></PermissionRoute>} />
+          <Route path="/school/studentview" element={<PermissionRoute permission="student_view" action="VIEW"><StudentView /></PermissionRoute>} />
 
-            {/* Tables */}
-            <Route path="/basic-tables" element={<BasicTables />} />
+          {/* College - Reports */}
+          <Route path="/college/transcriptreports" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><TranscriptReports /></PermissionRoute>} />
+          <Route path="/college/transcriptequivalenthours" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><TranscriptReports /></PermissionRoute>} />
+          <Route path="/college/articulationreports" element={<ArticulationReports />} />
+          <Route path="/college/digiscriptreports" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><DigiScriptReports /></PermissionRoute>} />
+          <Route path="/college/batchdetails/:batchId" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><BatchDetails /></PermissionRoute>} />
+          <Route path="/college/errorscreenshot/:batchId" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><ErrorScreenshot /></PermissionRoute>} />
 
-            {/* Ui Elements */}
-            <Route path="/alerts" element={<Alerts />} />
-            <Route path="/avatars" element={<Avatars />} />
-            <Route path="/badge" element={<Badges />} />
-            <Route path="/buttons" element={<Buttons />} />
-            <Route path="/images" element={<Images />} />
-            <Route path="/videos" element={<Videos />} />
+          {/* College - Uploads */}
+          <Route
+            path="/college/transcripts/add"
+            element={
+              <PermissionRoute permission="college_upload_transcripts">
+                <TranscriptsUpload />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/college/transcripts"
+            element={
+              <PermissionRoute permission="college_downloaded_transcripts">
+                <TranscriptsList />
+              </PermissionRoute>
+            }
+          />
 
-            {/* Charts */}
-            <Route path="/line-chart" element={<LineChart />} />
-            <Route path="/bar-chart" element={<BarChart />} />
-          </Route>
+          {/* College - Setup */}
+          <Route
+            path="/college/degreemapping"
+            element={
+              <PermissionRoute permission="college_degree">
+                <DegreeMapping />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/college/termmapping"
+            element={
+              <PermissionRoute permission="college_terms">
+                <TermMapping />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/college/termnamemapping"
+            element={
+              <PermissionRoute permission="college_term_names">
+                <TermNameMapping />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/college/grademapping"
+            element={
+              <PermissionRoute permission="par_grade_mapping">
+                <GradeMapping />
+              </PermissionRoute>
+            }
+          />
+          <Route path="/college/osuskipkeywords" element={<PermissionRoute permission="osu_skip_keywords" action="VIEW"><SkipKeywords /></PermissionRoute>} />
+          <Route path="/college/acceptGradeMapping" element={<PermissionRoute permission="accepted_grades_mapping" action="VIEW"><AcceptedGradesMapping /></PermissionRoute>} />
+          <Route path="/college/accreditedInstitution" element={<PermissionRoute permission="accredited_institution" action="VIEW"><AccreditedInstitution /></PermissionRoute>} />
+          <Route path="/college/transfergrademapping" element={<PermissionRoute permission="transfer_grade_mapping" action="VIEW"><TransferGradesMapping /></PermissionRoute>} />
+          <Route path="/college/yearmapping" element={<PermissionRoute permission="year_mapping" action="VIEW"><YearMapping /></PermissionRoute>} />
+          <Route path="/college/institutionmapping" element={<PermissionRoute permission="institutions_mapping" action="VIEW"><InstitutionMapping /></PermissionRoute>} />
+          <Route path="/college/techinstitutionmapping" element={<PermissionRoute permission="institutions_mapping" action="VIEW"><InstitutionMapping instType="TECH" /></PermissionRoute>} />
+          <Route path="/college/skipcourses" element={<PermissionRoute permission="skip_exclude_courses" action="VIEW"><SkipCourses /></PermissionRoute>} />
+          <Route path="/college/overrideeditmapping" element={<PermissionRoute permission="override_edit_mapping" action="VIEW"><OverrideEditMapping /></PermissionRoute>} />
+          <Route path="/college/suffixname" element={<PermissionRoute permission="suffix_names" action="VIEW"><SuffixName /></PermissionRoute>} />
+          <Route path="/college/prefixname" element={<PermissionRoute permission="prefix_words" action="VIEW"><PrefixName /></PermissionRoute>} />
+          <Route path="/college/combinedname" element={<PermissionRoute permission="combine_words" action="VIEW"><CombinedName /></PermissionRoute>} />
+          <Route path="/college/botschedule" element={<PermissionRoute permission="bot_schedule" action="VIEW"><BotSchedule /></PermissionRoute>} />
+          <Route path="/college/botstatusreport" element={<PermissionRoute permission="bot_status_report" action="VIEW"><BotStatusReport /></PermissionRoute>} />
 
-          {/* Fallback Route */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+          {/* College - OCR [P1] */}
+          <Route path="/college/transcripthdrocr" element={<PermissionRoute permission="college_transcript_header_ocr" action="VIEW"><TranscriptHdrOcr /></PermissionRoute>} />
+          <Route path="/college/transcriptlineocr" element={<PermissionRoute permission="college_transcript_line_ocr" action="VIEW"><TranscriptLineOcr /></PermissionRoute>} />
+
+          {/* College - DATA [P2] */}
+          <Route path="/college/transcripthdrdata" element={<PermissionRoute permission="college_transcript_header_data" action="VIEW"><TranscriptHdrData /></PermissionRoute>} />
+          <Route path="/college/transcriptlinedata" element={<PermissionRoute permission="college_transcript_line_data" action="VIEW"><TranscriptLineData /></PermissionRoute>} />
+
+          {/* College - Audit Log [P3] */}
+          <Route path="/college/digiscriptbotlog" element={<PermissionRoute permission="transcript_log" action="VIEW"><DigiScriptBotLog /></PermissionRoute>} />
+          <Route path="/college/articulationbotlog" element={<PermissionRoute permission="articulation_log" action="VIEW"><ArticulationBotLog /></PermissionRoute>} />
+
+          {/* College - Reset Batch ID */}
+          <Route
+            path="/college/storedprocedure"
+            element={
+              <PermissionRoute permission="stored_procedure">
+                <StoredProcedure />
+              </PermissionRoute>
+            }
+          />
+
+          {/* College - Settings */}
+          <Route path="/college/permissions" element={<Permissions />} />
+          <Route path="/college/roles" element={<Roles />} />
+          <Route path="/college/roles/add" element={<AddRole />} />
+          <Route path="/college/roles/edit/:id" element={<EditRole />} />
+          <Route path="/college/roles/view/:id" element={<EditRole />} />
+          <Route path="/college/Error_log" element={<ErrorLog />} />
+          <Route path="/college/master_setup" element={<MasterSettings />} />
+          {/* SMTP route hidden - now accessible via /settings page */}
+          {/* <Route path="/college/smtp" element={<SmtpSetup />} /> */}
+
+          {/* College - User Manual */}
+          <Route path="/college/Help" element={<Help />} />
+
+          {/* School module routes */}
+          <Route path="/school/dashboard" element={<SchoolDashboard />} />
+
+          {/* OCR Verify module routes */}
+          <Route path="/ocrverify/dashboard" element={<Home />} />
+
+          {/* Others Page */}
+          <Route path="/profile" element={<UserProfiles />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="/calendar" element={<Calendar />} />
+          <Route path="/blank" element={<Blank />} />
+
+          {/* Forms */}
+          <Route path="/form-elements" element={<FormElements />} />
+
+          {/* Tables */}
+          <Route path="/basic-tables" element={<BasicTables />} />
+
+          {/* Ui Elements */}
+          <Route path="/alerts" element={<Alerts />} />
+          <Route path="/avatars" element={<Avatars />} />
+          <Route path="/badge" element={<Badges />} />
+          <Route path="/buttons" element={<Buttons />} />
+          <Route path="/images" element={<Images />} />
+          <Route path="/videos" element={<Videos />} />
+
+          {/* Charts */}
+          <Route path="/line-chart" element={<LineChart />} />
+          <Route path="/bar-chart" element={<BarChart />} />
+        </Route>
+
+        {/* Fallback Route */}
+        <Route path="*" element={<NotFound />} />
+      </Routes>
     </>
   );
 }

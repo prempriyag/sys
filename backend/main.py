@@ -139,6 +139,22 @@ if school_transcriptreports_controller is not None:
 else:
     print("[MAIN] WARNING: school_transcriptreports_controller router NOT registered due to import error")
 
+# Import school dashboard controller
+try:
+    from controllers.school import dashboard_controller as school_dashboard_controller
+    print("[MAIN] Successfully imported school_dashboard_controller")
+except Exception as e:
+    print(f"[MAIN] ERROR importing school_dashboard_controller: {e}")
+    import traceback
+    traceback.print_exc()
+    school_dashboard_controller = None
+
+# Include school dashboard router if imported successfully
+if school_dashboard_controller is not None:
+    app.include_router(school_dashboard_controller.router)
+    print("[MAIN] Successfully registered school_dashboard_controller router")
+
+
 # Include SSO router
 try:
     from fastapi import APIRouter

@@ -20,12 +20,20 @@ export default function HorizontalMenuItem({
   openSubmenu,
   onSubmenuToggle,
 }: HorizontalMenuItemProps) {
+  // All hooks must be called before any conditional returns
   const location = useLocation();
   const { user } = useAuth();
   const buttonRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
+  const iconRef = useRef<HTMLSpanElement>(null);
+  const [showTooltip, setShowTooltip] = useState(false);
+  const [tooltipPosition, setTooltipPosition] = useState<{ top: number; left: number; placement: "top" | "bottom" } | null>(null);
+  
   const key = `${index}`;
   const isSubmenuOpen = openSubmenu[key] || false;
+  const hasSubItems = item.subItems && item.subItems.length > 0;
+  const showIconOnly = !hasSubItems && (item.name === "Dashboard" || item.name === "User Management");
 
   const isActive = (path?: string) => {
     if (!path) return false;
@@ -33,21 +41,7 @@ export default function HorizontalMenuItem({
     return location.pathname === pathWithoutQuery || location.pathname.startsWith(pathWithoutQuery + "/");
   };
 
-  // Check permission for this item (single permission)
-  if (item.permission && !checkPermission(user, item.permission, "VIEW")) {
-    return null;
-  }
-  
-  // Check permissions array (show if user has ANY of the permissions)
-  if (item.permissions && item.permissions.length > 0) {
-    const hasAnyPermission = item.permissions.some(perm => checkPermission(user, perm, "VIEW"));
-    if (!hasAnyPermission) {
-      return null;
-    }
-  }
-
   const isItemActive = isActive(item.path);
-  const hasSubItems = item.subItems && item.subItems.length > 0;
 
   // Calculate dropdown position - update on scroll and resize
   useEffect(() => {
@@ -75,71 +69,78 @@ export default function HorizontalMenuItem({
     }
   }, [isSubmenuOpen]);
 
-  if (!hasSubItems) {
-    // Show icon only for Dashboard and User Management
-    const showIconOnly = item.name === "Dashboard" || item.name === "User Management";
-    const tooltipRef = useRef<HTMLDivElement>(null);
-    const iconRef = useRef<HTMLSpanElement>(null);
-    const [showTooltip, setShowTooltip] = useState(false);
-    const [tooltipPosition, setTooltipPosition] = useState<{ top: number; left: number; placement: "top" | "bottom" } | null>(null);
-    
-    // Check tooltip position on hover - use portal to escape scroll container
-    useEffect(() => {
-      if (showIconOnly && iconRef.current) {
-        const updateTooltipPosition = () => {
-          if (!iconRef.current) return;
-          const iconRect = iconRef.current.getBoundingClientRect();
-          const viewportHeight = window.innerHeight;
-          const spaceAbove = iconRect.top;
-          const spaceBelow = viewportHeight - iconRect.bottom;
-          const tooltipHeight = 32; // Approximate tooltip height
-          
-          // Calculate position
-          let top: number;
-          let placement: "top" | "bottom";
-          
-          if (spaceBelow >= tooltipHeight + 8 || spaceAbove < tooltipHeight + 8) {
-            // Show below
-            top = iconRect.bottom + 8;
-            placement = "bottom";
-          } else {
-            // Show above
-            top = iconRect.top - tooltipHeight - 8;
-            placement = "top";
-          }
-          
-          setTooltipPosition({
-            top,
-            left: iconRect.left + iconRect.width / 2,
-            placement
-          });
+  // Check tooltip position on hover - use portal to escape scroll container
+  useEffect(() => {
+    if (showIconOnly && iconRef.current) {
+      const updateTooltipPosition = () => {
+        if (!iconRef.current) return;
+        const iconRect = iconRef.current.getBoundingClientRect();
+        const viewportHeight = window.innerHeight;
+        const spaceAbove = iconRect.top;
+        const spaceBelow = viewportHeight - iconRect.bottom;
+        const tooltipHeight = 32; // Approximate tooltip height
+        
+        // Calculate position
+        let top: number;
+        let placement: "top" | "bottom";
+        
+        if (spaceBelow >= tooltipHeight + 8 || spaceAbove < tooltipHeight + 8) {
+          // Show below
+          top = iconRect.bottom + 8;
+          placement = "bottom";
+        } else {
+          // Show above
+          top = iconRect.top - tooltipHeight - 8;
+          placement = "top";
+        }
+        
+        setTooltipPosition({
+          top,
+          left: iconRect.left + iconRect.width / 2,
+          placement
+        });
+      };
+      
+      const linkElement = iconRef.current.closest('a');
+      if (linkElement) {
+        const handleMouseEnter = () => {
+          updateTooltipPosition();
+          setShowTooltip(true);
         };
         
-        const linkElement = iconRef.current.closest('a');
-        if (linkElement) {
-          const handleMouseEnter = () => {
-            updateTooltipPosition();
-            setShowTooltip(true);
-          };
-          
-          const handleMouseLeave = () => {
-            setShowTooltip(false);
-          };
-          
-          linkElement.addEventListener('mouseenter', handleMouseEnter);
-          linkElement.addEventListener('mouseleave', handleMouseLeave);
-          window.addEventListener('scroll', updateTooltipPosition, true);
-          window.addEventListener('resize', updateTooltipPosition);
-          
-          return () => {
-            linkElement.removeEventListener('mouseenter', handleMouseEnter);
-            linkElement.removeEventListener('mouseleave', handleMouseLeave);
-            window.removeEventListener('scroll', updateTooltipPosition, true);
-            window.removeEventListener('resize', updateTooltipPosition);
-          };
-        }
+        const handleMouseLeave = () => {
+          setShowTooltip(false);
+        };
+        
+        linkElement.addEventListener('mouseenter', handleMouseEnter);
+        linkElement.addEventListener('mouseleave', handleMouseLeave);
+        window.addEventListener('scroll', updateTooltipPosition, true);
+        window.addEventListener('resize', updateTooltipPosition);
+        
+        return () => {
+          linkElement.removeEventListener('mouseenter', handleMouseEnter);
+          linkElement.removeEventListener('mouseleave', handleMouseLeave);
+          window.removeEventListener('scroll', updateTooltipPosition, true);
+          window.removeEventListener('resize', updateTooltipPosition);
+        };
       }
-    }, [showIconOnly]);
+    }
+  }, [showIconOnly]);
+
+  // Check permission for this item (single permission)
+  if (item.permission && !checkPermission(user, item.permission, "VIEW")) {
+    return null;
+  }
+  
+  // Check permissions array (show if user has ANY of the permissions)
+  if (item.permissions && item.permissions.length > 0) {
+    const hasAnyPermission = item.permissions.some(perm => checkPermission(user, perm, "VIEW"));
+    if (!hasAnyPermission) {
+      return null;
+    }
+  }
+
+  if (!hasSubItems) {
     
     return (
       <li className="flex-shrink-0">

@@ -81,8 +81,8 @@ export default function UserDropdown() {
         className="flex items-center text-gray-700 dropdown-toggle dark:text-gray-400"
       >
         <span className="mr-3 overflow-hidden rounded-full h-11 w-11">
-          <img 
-            src={user?.id ? `/assets/userprofile/${user.id}.png?time=${Date.now()}` : "/images/user/owner.jpg"} 
+          <img
+            src={user?.id ? `/assets/userprofile/${user.id}.png?time=${Date.now()}` : "/images/user/owner.jpg"}
             alt="User"
             onError={(e) => {
               // Fallback to default image if user profile image doesn't exist
@@ -93,9 +93,8 @@ export default function UserDropdown() {
 
         <span className="hidden mr-1 font-medium text-theme-sm lg:block">{userName}</span>
         <svg
-          className={`stroke-gray-500 dark:stroke-gray-400 transition-transform duration-200 ${
-            isOpen ? "rotate-180" : ""
-          }`}
+          className={`stroke-gray-500 dark:stroke-gray-400 transition-transform duration-200 ${isOpen ? "rotate-180" : ""
+            }`}
           width="18"
           height="20"
           viewBox="0 0 18 20"

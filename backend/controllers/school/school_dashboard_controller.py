@@ -14,7 +14,7 @@ import logging
 from database.connection import get_db
 from helpers.permission_dependency import require_permission
 from models import User
-from models.dashboard_model import DashboardModel
+from models.school_dashboard_model import SchoolDashboardModel
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +63,7 @@ async def get_dashboard_data(
         use_daily = date_diff > 0 and date_diff < max_days
 
         # Get dashboard data
-        dashboard_data = DashboardModel.get_dashboard_data(
+        dashboard_data = SchoolDashboardModel.get_dashboard_data(
             db=db,
             college_name=request.college_name or "",
             fromdate=fromdate_str,
@@ -89,7 +89,7 @@ async def get_colleges_list(
     Matches CI3 Dashboard::getcollegelist() method
     """
     try:
-        colleges = DashboardModel.get_colleges_list(db=db, search_term=q or "")
+        colleges = SchoolDashboardModel.get_colleges_list(db=db, search_term=q or "")
         return colleges
     except Exception as e:
         logger.exception("Get colleges list error")

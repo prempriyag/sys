@@ -89,6 +89,9 @@ import SchoolStudentLogRerun from "./pages/School/studentlogs/rerun/StudentLogRe
 import SchoolStudentView from "./pages/School/StudentView";
 import SchoolTranscriptsUpload from "./pages/School/transcripts/TranscriptsUpload";
 import SchoolTranscriptsList from "./pages/School/transcripts/TranscriptsList";
+import SchoolInstitutionMapping from "./pages/School/setup/institutionmapping/InstitutionMapping";
+import SchoolGpaPickMapping from "./pages/School/setup/gpapickmapping/GpaPickMapping";
+import SchoolGpaScaleMapping from "./pages/School/setup/gpascalemapping/GpaScaleMapping";
 
 export default function App() {
   return (
@@ -152,13 +155,93 @@ export default function App() {
           <Route path="/college/transcript_articulationkickouts" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><TranscriptReports /></PermissionRoute>} />
           <Route path="/college/transcriptprocessed" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><TranscriptReports /></PermissionRoute>} />
           <Route path="/college/transcriptrerun" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><TranscriptReports /></PermissionRoute>} />
+            {/* School dashboard */}
+            <Route index element={<SchoolDashboard />} />
+            <Route path="school/dashboard" element={<SchoolDashboard />} />
+            
+            {/* College module routes (default module) */}
+            <Route path="/college/dashboard" element={<CollegeDashboard />} />
+            <Route path="/college/dashboard2" element={<Dashboard2 />} />
+            <Route path="/college/dashboard3" element={<Dashboard3 />} />
+            
+                    {/* College - User Management */}
+                    <Route 
+                      path="/college/users" 
+                      element={
+                        <PermissionRoute permission="user_management" action="VIEW">
+                          <UserManagement />
+                        </PermissionRoute>
+                      } 
+                    />
+                    <Route 
+                      path="/college/users/add" 
+                      element={
+                        <PermissionRoute permission="user_management" action="ADD">
+                          <AddUser />
+                        </PermissionRoute>
+                      } 
+                    />
+                    <Route 
+                      path="/college/users/edit/:id" 
+                      element={
+                        <PermissionRoute permission="user_management" action="UPDATE">
+                          <EditUser />
+                        </PermissionRoute>
+                      } 
+                    />
+            
+            {/* College - Transcripts (all handled by single TranscriptReports component with type parameter) */}
+            <Route path="/college/transcriptkickouts" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><TranscriptReports /></PermissionRoute>} />
+            <Route path="/college/transcript_articulationkickouts" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><TranscriptReports /></PermissionRoute>} />
+            <Route path="/college/transcriptprocessed" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><TranscriptReports /></PermissionRoute>} />
+            <Route path="/college/transcriptrerun" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><TranscriptReports /></PermissionRoute>} />
+            
+            {/* School - Transcripts (all handled by single TranscriptReports component with type parameter) */}
+            <Route path="/school/transcriptreports" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><SchoolTranscriptReports /></PermissionRoute>} />
+            <Route path="/school/transcriptkickouts" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><SchoolTranscriptReports /></PermissionRoute>} />
+            <Route path="/school/transcriptprocessed" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><SchoolTranscriptReports /></PermissionRoute>} />
+            <Route path="/school/transcriptrerun" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><SchoolTranscriptReports /></PermissionRoute>} />
 
-          {/* School - Transcripts (all handled by single TranscriptReports component with type parameter) */}
-          <Route path="/school/transcriptkickouts" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><SchoolTranscriptReports /></PermissionRoute>} />
-          <Route path="/school/transcriptprocessed" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><SchoolTranscriptReports /></PermissionRoute>} />
-          <Route path="/school/transcriptrerun" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><SchoolTranscriptReports /></PermissionRoute>} />
+        {/* School - Transcripts (all handled by single TranscriptReports component with type parameter) */}
+        <Route path="/school/transcriptkickouts" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><SchoolTranscriptReports /></PermissionRoute>} />
+        <Route path="/school/transcriptprocessed" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><SchoolTranscriptReports /></PermissionRoute>} />
+        <Route path="/school/transcriptrerun" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><SchoolTranscriptReports /></PermissionRoute>} />
 
-          {/* College - Articulation */}
+        {/* School - Setup */}
+        <Route
+          path="/school/institutionmapping"
+          element={
+            <PermissionRoute permission="institutions_mapping" action="VIEW">
+              <SchoolInstitutionMapping />
+            </PermissionRoute>
+          }
+        />
+        <Route
+          path="/school/techinstitutionmapping"
+          element={
+            <PermissionRoute permission="institutions_mapping" action="VIEW">
+              <SchoolInstitutionMapping instType="TECH" />
+            </PermissionRoute>
+          }
+        />
+        <Route
+          path="/school/GpapickMapping"
+          element={
+            <PermissionRoute permission="gpa_pick_mapping" action="VIEW">
+              <SchoolGpaPickMapping />
+            </PermissionRoute>
+          }
+        />
+        <Route
+          path="/school/Gpascalemapping"
+          element={
+            <PermissionRoute permission="gpa_scale_mapping" action="VIEW">
+              <SchoolGpaScaleMapping />
+            </PermissionRoute>
+          }
+        />
+
+        {/* College - Articulation */}
           <Route path="/college/articulationkickouts" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><ArticulationReports /></PermissionRoute>} />
           <Route path="/college/articulationphase2kickouts" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><ArticulationReports /></PermissionRoute>} />
           <Route path="/college/articulationprocessed" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><ArticulationReports /></PermissionRoute>} />
@@ -195,6 +278,25 @@ export default function App() {
           />
           <Route
             path="/college/transcripts"
+            element={
+              <PermissionRoute permission="college_downloaded_transcripts">
+                <TranscriptsList />
+              </PermissionRoute>
+            }
+          />
+
+          
+          {/* School - Uploads */}
+          <Route
+            path="/school/transcripts/add"
+            element={
+              <PermissionRoute permission="college_upload_transcripts">
+                <TranscriptsUpload />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/school/transcripts"
             element={
               <PermissionRoute permission="college_downloaded_transcripts">
                 <TranscriptsList />

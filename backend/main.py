@@ -115,7 +115,19 @@ except Exception as e:
     print(f"[MAIN] ERROR importing dashboard_controller: {e}")
     import traceback
     traceback.print_exc()
-    school_dashboard_controller = None
+    dashboard_controller = None
+
+    # === ADD THIS ===
+# Register dashboard router
+if dashboard_controller is not None:
+    app.include_router(dashboard_controller.router)
+    print("[MAIN] Successfully registered dashboard_controller router")
+    # Debug: Print the routes
+    for route in dashboard_controller.router.routes:
+        print(f"  Route: {route.path}")
+else:
+    print("[MAIN] WARNING: dashboard_controller not registered")
+    
 
 # Import School dashboard controller
 try:

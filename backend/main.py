@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from controllers import auth_controller, users_controller, theme_settings_controller, sso_controller
 from controllers.college import transcriptreports_controller
-from controllers.school import school_transcriptreports_controller
+from controllers.school import school_transcriptreports_controller, school_transcripts_controller
 
 # Import digiscript reports controller
 try:

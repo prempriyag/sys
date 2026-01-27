@@ -60,7 +60,25 @@ export default function CollegeDashboard() {
 
       if (response.ok) {
         const data = await response.json();
-        setDashboardData(data);
+        
+        // Clean null labels from the data
+        const cleanData = {
+          ...data,
+          articulationStatusDonut: {
+            ...data.articulationStatusDonut,
+            labels: data.articulationStatusDonut?.labels?.filter((label: string | null) => label !== null) || []
+          },
+          transcriptStatusDonut: {
+            ...data.transcriptStatusDonut,
+            labels: data.transcriptStatusDonut?.labels?.filter((label: string | null) => label !== null) || []
+          },
+          articulationCoursesStatusDonut: {
+            ...data.articulationCoursesStatusDonut,
+            labels: data.articulationCoursesStatusDonut?.labels?.filter((label: string | null) => label !== null) || []
+          }
+        };
+        
+        setDashboardData(cleanData);
       } else {
         console.error("Failed to fetch dashboard data");
       }
@@ -75,11 +93,17 @@ export default function CollegeDashboard() {
     fetchDashboardData();
   }, []);
 
-  // Calculate statistics
-  const totalTranscripts = dashboardData.transcriptStatusDonut.series.reduce((a: number, b: number) => a + b, 0);
-  const totalArticulations = dashboardData.articulationStatusDonut.series.reduce((a: number, b: number) => a + b, 0);
-  const processedCount = dashboardData.transcriptStatus.datasets.find((d: any) => d.name === "PROCESSED")?.data.reduce((a: number, b: number) => a + b, 0) || 0;
-  const failedCount = dashboardData.transcriptStatus.datasets.find((d: any) => d.name === "FAILED")?.data.reduce((a: number, b: number) => a + b, 0) || 0;
+  // Safe formatter function to handle null/undefined values
+  const safeFormatter = (seriesName: string | null | undefined): string => {
+    if (!seriesName) return "";
+    return seriesName.charAt(0).toUpperCase() + seriesName.slice(1).toLowerCase();
+  };
+
+  // Calculate statistics with null checks
+  const totalTranscripts = dashboardData.transcriptStatusDonut?.series?.reduce((a: number, b: number) => a + b, 0) || 0;
+  const totalArticulations = dashboardData.articulationStatusDonut?.series?.reduce((a: number, b: number) => a + b, 0) || 0;
+  const processedCount = dashboardData.transcriptStatus?.datasets?.find((d: any) => d?.name === "PROCESSED")?.data?.reduce((a: number, b: number) => a + b, 0) || 0;
+  const failedCount = dashboardData.transcriptStatus?.datasets?.find((d: any) => d?.name === "FAILED")?.data?.reduce((a: number, b: number) => a + b, 0) || 0;
 
   // Chart options with glassmorphic styling
   const getBarChartOptions = (categories: string[]): ApexOptions => ({
@@ -104,7 +128,7 @@ export default function CollegeDashboard() {
       colors: ["transparent"]
     },
     xaxis: { 
-      categories: categories,
+      categories: categories || [],
       labels: { style: { colors: "#64748b" } }
     },
     yaxis: { 
@@ -122,7 +146,7 @@ export default function CollegeDashboard() {
         shape: "circle",
       },
       formatter: function(seriesName: string) {
-        return seriesName.charAt(0).toUpperCase() + seriesName.slice(1).toLowerCase();
+        return safeFormatter(seriesName);
       }
     },
     colors: ["#3C50E0", "#8FD0EF", "#80CAEE", "#F59E0B", "#EF4444"],
@@ -144,7 +168,6 @@ export default function CollegeDashboard() {
     },
   });
 
-
   const getLineChartOptions = (categories: string[]): ApexOptions => ({
     chart: {
       type: "line",
@@ -156,7 +179,7 @@ export default function CollegeDashboard() {
     stroke: { curve: "smooth", width: 3, show: true },
     dataLabels: { enabled: false },
     xaxis: { 
-      categories: categories,
+      categories: categories || [],
       labels: { style: { colors: "#64748b" } }
     },
     yaxis: { 
@@ -173,7 +196,7 @@ export default function CollegeDashboard() {
         shape: "circle",
       },
       formatter: function(seriesName: string) {
-        return seriesName.charAt(0).toUpperCase() + seriesName.slice(1).toLowerCase();
+        return safeFormatter(seriesName);
       }
     },
     colors: ["#3C50E0", "#10B981", "#F59E0B", "#EF4444"],
@@ -205,7 +228,7 @@ export default function CollegeDashboard() {
       fontFamily: "Inter, sans-serif",
       background: "transparent",
     },
-    labels,
+    labels: labels || [],
     legend: { 
       position: "bottom",
       labels: { 
@@ -215,8 +238,8 @@ export default function CollegeDashboard() {
       markers: {
         shape: "circle",
       },
-      formatter: function(seriesName: string) {
-        return seriesName.charAt(0).toUpperCase() + seriesName.slice(1).toLowerCase();
+      formatter: function(seriesName: string, opts?: any) {
+        return safeFormatter(seriesName);
       }
     },
     colors: ["#3C50E0", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899"],
@@ -225,6 +248,11 @@ export default function CollegeDashboard() {
       style: {
         fontSize: "12px",
       },
+      y: {
+        formatter: function(val: number) {
+          return val.toString();
+        }
+      }
     },
     plotOptions: {
       pie: {
@@ -399,7 +427,7 @@ export default function CollegeDashboard() {
                 value={totalTranscripts}
                 subtitle="All transcript records"
                 gradient="from-blue-500 to-blue-600"
-                trendData={(dashboardData.transcriptSources.datasets[0] as any)?.data || []}
+                trendData={dashboardData.transcriptSources?.datasets?.[0]?.data || []}
                 totalData={totalTranscripts}
               />
               <StatCard
@@ -407,7 +435,7 @@ export default function CollegeDashboard() {
                 value={processedCount}
                 subtitle="Successfully processed"
                 gradient="from-green-500 to-green-600"
-                trendData={(dashboardData.transcriptStatus.datasets.find((d: any) => d.name === "PROCESSED") as any)?.data || []}
+                trendData={dashboardData.transcriptStatus?.datasets?.find((d: any) => d?.name === "PROCESSED")?.data || []}
                 totalData={totalTranscripts}
               />
               <StatCard
@@ -415,7 +443,7 @@ export default function CollegeDashboard() {
                 value={failedCount}
                 subtitle="Processing errors"
                 gradient="from-red-500 to-red-600"
-                trendData={(dashboardData.transcriptStatus.datasets.find((d: any) => d.name === "FAILED") as any)?.data || []}
+                trendData={dashboardData.transcriptStatus?.datasets?.find((d: any) => d?.name === "FAILED")?.data || []}
                 totalData={totalTranscripts}
               />
               <StatCard
@@ -423,7 +451,7 @@ export default function CollegeDashboard() {
                 value={totalArticulations}
                 subtitle="Articulation records"
                 gradient="from-purple-500 to-purple-600"
-                trendData={dashboardData.articulationStatusDonut.series || []}
+                trendData={dashboardData.articulationStatusDonut?.series || []}
                 totalData={totalArticulations}
               />
             </div>
@@ -442,7 +470,12 @@ export default function CollegeDashboard() {
                     </div>
                   </div>
                   <div className="rounded-lg bg-white/80 p-3 shadow-inner dark:bg-gray-900/50">
-                    <Chart options={getLineChartOptions(dashboardData.transcriptSources.labels)} series={dashboardData.transcriptSources.datasets} type="line" height={280} />
+                    <Chart 
+                      options={getLineChartOptions(dashboardData.transcriptSources?.labels || [])} 
+                      series={dashboardData.transcriptSources?.datasets || []} 
+                      type="line" 
+                      height={280} 
+                    />
                   </div>
                 </div>
               </div>
@@ -459,13 +492,18 @@ export default function CollegeDashboard() {
                     </div>
                   </div>
                   <div className="rounded-lg bg-white/80 p-3 shadow-inner dark:bg-gray-900/50">
-                    <Chart options={getBarChartOptions(dashboardData.transcriptStatus.labels)} series={dashboardData.transcriptStatus.datasets} type="bar" height={280} />
+                    <Chart 
+                      options={getBarChartOptions(dashboardData.transcriptStatus?.labels || [])} 
+                      series={dashboardData.transcriptStatus?.datasets || []} 
+                      type="bar" 
+                      height={280} 
+                    />
                   </div>
                 </div>
               </div>
 
               {/* Transcripts Processed In Banner */}
-              {dashboardData.transcriptProcessed.labels.length > 0 && (
+              {dashboardData.transcriptProcessed?.labels?.length > 0 && (
                 <div className="group relative overflow-hidden rounded-xl border border-gray-200/80 bg-gradient-to-br from-white via-white to-green-50/30 p-5 shadow-lg transition-all duration-300 hover:scale-[1.01] hover:shadow-xl hover:border-green-300 dark:border-gray-700/80 dark:from-gray-800/90 dark:via-gray-800/90 dark:to-green-900/20 dark:hover:border-green-600 lg:col-span-2">
                   <div className="absolute top-0 right-0 h-20 w-20 bg-green-500/10 rounded-full blur-2xl group-hover:bg-green-500/20 transition-all duration-300"></div>
                   <div className="relative">
@@ -477,7 +515,12 @@ export default function CollegeDashboard() {
                       </div>
                     </div>
                     <div className="rounded-lg bg-white/80 p-3 shadow-inner dark:bg-gray-900/50">
-                      <Chart options={getLineChartOptions(dashboardData.transcriptProcessed.labels)} series={dashboardData.transcriptProcessed.datasets} type="line" height={280} />
+                      <Chart 
+                        options={getLineChartOptions(dashboardData.transcriptProcessed?.labels || [])} 
+                        series={dashboardData.transcriptProcessed?.datasets || []} 
+                        type="line" 
+                        height={280} 
+                      />
                     </div>
                   </div>
                 </div>
@@ -492,7 +535,12 @@ export default function CollegeDashboard() {
                 <div className="relative">
                   <h3 className="mb-4 text-sm font-bold text-gray-800 dark:text-white">Initial Kickouts</h3>
                   <div className="rounded-lg bg-white/80 p-3 shadow-inner dark:bg-gray-900/50">
-                    <Chart options={getBarChartOptions(dashboardData.initialKickouts.labels)} series={dashboardData.initialKickouts.datasets} type="bar" height={250} />
+                    <Chart 
+                      options={getBarChartOptions(dashboardData.initialKickouts?.labels || [])} 
+                      series={dashboardData.initialKickouts?.datasets || []} 
+                      type="bar" 
+                      height={250} 
+                    />
                   </div>
                 </div>
               </div>
@@ -503,7 +551,12 @@ export default function CollegeDashboard() {
                 <div className="relative">
                   <h3 className="mb-4 text-sm font-bold text-gray-800 dark:text-white">Transcripts Kickouts</h3>
                   <div className="rounded-lg bg-white/80 p-3 shadow-inner dark:bg-gray-900/50">
-                    <Chart options={getBarChartOptions(dashboardData.transcriptKickouts.labels)} series={dashboardData.transcriptKickouts.datasets} type="bar" height={250} />
+                    <Chart 
+                      options={getBarChartOptions(dashboardData.transcriptKickouts?.labels || [])} 
+                      series={dashboardData.transcriptKickouts?.datasets || []} 
+                      type="bar" 
+                      height={250} 
+                    />
                   </div>
                 </div>
               </div>
@@ -514,7 +567,12 @@ export default function CollegeDashboard() {
                 <div className="relative">
                   <h3 className="mb-4 text-sm font-bold text-gray-800 dark:text-white">Articulation Kickouts</h3>
                   <div className="rounded-lg bg-white/80 p-3 shadow-inner dark:bg-gray-900/50">
-                    <Chart options={getBarChartOptions(dashboardData.articulationKickouts.labels)} series={dashboardData.articulationKickouts.datasets} type="bar" height={250} />
+                    <Chart 
+                      options={getBarChartOptions(dashboardData.articulationKickouts?.labels || [])} 
+                      series={dashboardData.articulationKickouts?.datasets || []} 
+                      type="bar" 
+                      height={250} 
+                    />
                   </div>
                 </div>
               </div>
@@ -525,7 +583,12 @@ export default function CollegeDashboard() {
                 <div className="relative">
                   <h3 className="mb-4 text-sm font-bold text-gray-800 dark:text-white">Articulation Courses</h3>
                   <div className="rounded-lg bg-white/80 p-3 shadow-inner dark:bg-gray-900/50">
-                    <Chart options={getBarChartOptions(dashboardData.articulationCoursesKickouts.labels)} series={dashboardData.articulationCoursesKickouts.datasets} type="bar" height={250} />
+                    <Chart 
+                      options={getBarChartOptions(dashboardData.articulationCoursesKickouts?.labels || [])} 
+                      series={dashboardData.articulationCoursesKickouts?.datasets || []} 
+                      type="bar" 
+                      height={250} 
+                    />
                   </div>
                 </div>
               </div>
@@ -540,8 +603,8 @@ export default function CollegeDashboard() {
                   <h3 className="mb-4 text-sm font-bold text-gray-800 dark:text-white">Transcript Status</h3>
                   <div className="rounded-lg bg-white/80 p-3 shadow-inner dark:bg-gray-900/50">
                     <Chart
-                      options={donutChartOptions(dashboardData.transcriptStatusDonut.labels)}
-                      series={dashboardData.transcriptStatusDonut.series}
+                      options={donutChartOptions(dashboardData.transcriptStatusDonut?.labels || [])}
+                      series={dashboardData.transcriptStatusDonut?.series || []}
                       type="donut"
                       height={240}
                     />
@@ -556,8 +619,8 @@ export default function CollegeDashboard() {
                   <h3 className="mb-4 text-sm font-bold text-gray-800 dark:text-white">Articulation Status</h3>
                   <div className="rounded-lg bg-white/80 p-3 shadow-inner dark:bg-gray-900/50">
                     <Chart
-                      options={donutChartOptions(dashboardData.articulationStatusDonut.labels)}
-                      series={dashboardData.articulationStatusDonut.series}
+                      options={donutChartOptions(dashboardData.articulationStatusDonut?.labels || [])}
+                      series={dashboardData.articulationStatusDonut?.series || []}
                       type="donut"
                       height={240}
                     />
@@ -572,8 +635,8 @@ export default function CollegeDashboard() {
                   <h3 className="mb-4 text-sm font-bold text-gray-800 dark:text-white">Articulation Courses Status</h3>
                   <div className="rounded-lg bg-white/80 p-3 shadow-inner dark:bg-gray-900/50">
                     <Chart
-                      options={donutChartOptions(dashboardData.articulationCoursesStatusDonut.labels)}
-                      series={dashboardData.articulationCoursesStatusDonut.series}
+                      options={donutChartOptions(dashboardData.articulationCoursesStatusDonut?.labels || [])}
+                      series={dashboardData.articulationCoursesStatusDonut?.series || []}
                       type="donut"
                       height={240}
                     />

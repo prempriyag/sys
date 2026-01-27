@@ -10,6 +10,7 @@ import { ThemeProvider } from "./context/ThemeContext.tsx";
 import { ThemeColorProvider } from "./context/ThemeColorContext.tsx";
 import { AuthProvider } from "./context/AuthContext.tsx";
 import { ToastProvider } from "./context/ToastContext.tsx";
+import { SettingsProvider } from "./context/SettingsContext.tsx";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -17,11 +18,13 @@ createRoot(document.getElementById("root")!).render(
       <ThemeColorProvider>
         <Router>
           <AuthProvider>
-            <ToastProvider>
-              <AppWrapper>
-                <App />
-              </AppWrapper>
-            </ToastProvider>
+            <SettingsProvider>
+              <ToastProvider>
+                <AppWrapper>
+                  <App />
+                </AppWrapper>
+              </ToastProvider>
+            </SettingsProvider>
           </AuthProvider>
         </Router>
       </ThemeColorProvider>

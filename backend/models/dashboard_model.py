@@ -318,66 +318,209 @@ class DashboardModel:
         db: Session, college_name: str, fromdate: str, todate: str,
         date_ranges: List, use_daily: bool
     ) -> List[Dict[str, Any]]:
-        """Get transcripts processed in Banner"""
-        # Simplified - return empty for now, can be expanded
-        return []
+        """Get transcripts processed in Banner
+        Matches CI3 transcript_SAAADMS_dashboard() method
+        Queries DIGISCRIPT_LOG (TBL_KICKOUT) for STATUS_SOAPCOL, STATUS_SHATAEQ, STATUS_BDMS
+        """
+        try:
+            status_flags = ['SOAPCOL', 'SHATAEQ', 'BDMS']
+            college_filter = f" AND (t.INSTITUTION_ID = '{college_name}')" if college_name else ""
+            
+            first_start_date = fromdate.split()[0]
+            last_end_date = todate.split()[0]
+            
+            if use_daily:
+                # date_ranges is a list of date strings
+                date_values = ", ".join([f"('{dr}')" for dr in date_ranges])
+            else:
+                # date_ranges is a list of dicts with StartDate
+                date_values = ", ".join([f"('{dr['StartDate']}')" for dr in date_ranges])
+                if date_ranges:
+                    first_start_date = date_ranges[0]['StartDate']
+                    last_end_date = date_ranges[-1]['EndDate']
+
+            datasets = []
+            for status_flag in status_flags:
+                # Build SQL columns for each status flag
+                sql_col = f"ISNULL(SUM(CASE WHEN UPPER(t.STATUS_{status_flag}) = 'PROCESSED' THEN 1 ELSE 0 END), 0) AS {status_flag}Count"
+                
+                if use_daily:
+                    query = text(f"""
+                        SELECT 
+                            month_data.date AS date,
+                            {sql_col}
+                        FROM
+                            (VALUES {date_values}) AS month_data(date)
+                        LEFT JOIN
+                            {TBL_KICKOUT} AS t 
+                            ON CAST(t.LAST_UPDATED_DATETIME AS DATE) = CAST(month_data.date AS DATE)
+                            AND (t.PROJECT_ID = {COLLEGE_PROJECT_ID} OR ISNULL(t.PROJECT_ID, '') = '')
+                            {college_filter}
+                        GROUP BY 
+                            month_data.date
+                        ORDER BY 
+                            month_data.date
+                    """)
+                else:
+                    query = text(f"""
+                        SELECT 
+                            LEFT(DATENAME(month, CAST(month_data.date AS DATE)), 3) AS month,
+                            YEAR(CAST(month_data.date AS DATE)) AS year,
+                            DATEPART(MM, CAST(month_data.date AS DATE)) AS mth,
+                            {sql_col}
+                        FROM 
+                            (VALUES {date_values}) AS month_data(date)
+                        LEFT JOIN 
+                            {TBL_KICKOUT} AS t 
+                            ON MONTH(t.LAST_UPDATED_DATETIME) = MONTH(CAST(month_data.date AS DATE))
+                            AND YEAR(t.LAST_UPDATED_DATETIME) = YEAR(CAST(month_data.date AS DATE))
+                            AND (t.PROJECT_ID = {COLLEGE_PROJECT_ID} OR ISNULL(t.PROJECT_ID, '') = '')
+                            AND CAST(t.LAST_UPDATED_DATETIME AS DATE) BETWEEN '{first_start_date}' AND '{last_end_date}'
+                            {college_filter}
+                        GROUP BY 
+                            DATENAME(month, CAST(month_data.date AS DATE)), 
+                            YEAR(CAST(month_data.date AS DATE)), 
+                            DATEPART(MM, CAST(month_data.date AS DATE)),
+                            month_data.date
+                        ORDER BY 
+                            YEAR(CAST(month_data.date AS DATE)), 
+                            DATEPART(MM, CAST(month_data.date AS DATE))
+                    """)
+
+                result = db.execute(query).fetchall()
+
+                data_map = {}
+                for row in result:
+                    if use_daily:
+                        date_val = row[0] if isinstance(row, tuple) else (row.date if hasattr(row, 'date') else row[0])
+                        if hasattr(date_val, 'strftime'):
+                            key = date_val.strftime('%Y-%m-%d')
+                        else:
+                            key = str(date_val)[:10]  # Take first 10 chars for date
+                    else:
+                        year = row[1] if isinstance(row, tuple) else (row.year if hasattr(row, 'year') else row[1])
+                        mth = row[2] if isinstance(row, tuple) else (row.mth if hasattr(row, 'mth') else row[2])
+                        key = f"{year}-{mth:02d}"
+                    # Get count from the status flag column
+                    count_attr = f"{status_flag}Count"
+                    count = row[-1] if isinstance(row, tuple) else (getattr(row, count_attr, 0) if hasattr(row, count_attr) else row[-1])
+                    data_map[key] = count
+
+                data = []
+                for dr in date_ranges:
+                    if use_daily:
+                        key = dr[:10] if len(dr) > 10 else dr
+                    else:
+                        dt = datetime.strptime(dr['StartDate'], '%Y-%m-%d')
+                        key = f"{dt.year}-{dt.month:02d}"
+                    data.append(data_map.get(key, 0))
+
+                datasets.append({
+                    "name": status_flag,
+                    "data": data
+                })
+
+            return datasets
+        except Exception as e:
+            logger.exception("Error in get_transcript_processed_data")
+            return []
 
     @staticmethod
     def get_initial_kickouts_data(
         db: Session, college_name: str, fromdate: str, todate: str,
         date_ranges: List, use_daily: bool
     ) -> List[Dict[str, Any]]:
-        """Get initial kickouts and processed data"""
+        """Get initial kickouts and processed data
+        Matches CI3 initial_transcripts_dashboard() method
+        Queries DIGISCRIPT_BOT_LOG with TRANSCRIPT_STATUS_FLAG filter
+        """
         try:
             status_types = ['FAILED', 'PROCESSED']
-            college_filter = f" AND INSTITUTION_ID = '{college_name}'" if college_name else ""
+            college_filter = f" AND (t.INSTITUTION_ID = '{college_name}' OR t.INSTITUTION_ID IS NULL)" if college_name else ""
+            
+            first_start_date = fromdate.split()[0]
+            last_end_date = todate.split()[0]
+            
+            if use_daily:
+                # date_ranges is a list of date strings
+                date_values = ", ".join([f"('{dr}')" for dr in date_ranges])
+            else:
+                # date_ranges is a list of dicts with StartDate
+                date_values = ", ".join([f"('{dr['StartDate']}')" for dr in date_ranges])
+                if date_ranges:
+                    first_start_date = date_ranges[0]['StartDate']
+                    last_end_date = date_ranges[-1]['EndDate']
 
             datasets = []
             for status in status_types:
                 if use_daily:
                     query = text(f"""
-                        SELECT CAST(AUDIT_DATE AS DATE) as date, COUNT(*) as count
-                        FROM {TBL_DIGISCRIPTBOTLOG}
-                        WHERE UPDATED_BY = 'Transcript BOT'
-                        AND ISNULL(ERROR_REASON, '') <> ''
-                        AND UPPER(PROCESS_STATUS) = 'COMPLETE'
-                        AND CAST(AUDIT_DATE AS DATE) >= :fromdate
-                        AND CAST(AUDIT_DATE AS DATE) <= :todate
-                        {college_filter}
-                        GROUP BY CAST(AUDIT_DATE AS DATE)
-                        ORDER BY CAST(AUDIT_DATE AS DATE)
+                        SELECT 
+                            month_data.date AS date,
+                            ISNULL(SUM(CASE WHEN UPPER(t.TRANSCRIPT_STATUS_FLAG) = '{status}' THEN 1 ELSE 0 END), 0) AS count
+                        FROM
+                            (VALUES {date_values}) AS month_data(date)
+                        LEFT JOIN
+                            {TBL_DIGISCRIPTBOTLOG} AS t 
+                            ON CAST(t.AUDIT_DATE AS DATE) = CAST(month_data.date AS DATE)
+                            AND t.UPDATED_BY = 'Transcript BOT'
+                            AND ISNULL(t.ERROR_REASON, '') <> ''
+                            AND UPPER(t.PROCESS_STATUS) = 'COMPLETE'
+                            {college_filter}
+                        GROUP BY 
+                            month_data.date
+                        ORDER BY 
+                            month_data.date
                     """)
                 else:
                     query = text(f"""
-                        SELECT YEAR(AUDIT_DATE) as year, MONTH(AUDIT_DATE) as month, COUNT(*) as count
-                        FROM {TBL_DIGISCRIPTBOTLOG}
-                        WHERE UPDATED_BY = 'Transcript BOT'
-                        AND ISNULL(ERROR_REASON, '') <> ''
-                        AND UPPER(PROCESS_STATUS) = 'COMPLETE'
-                        AND CAST(AUDIT_DATE AS DATE) >= :fromdate
-                        AND CAST(AUDIT_DATE AS DATE) <= :todate
-                        {college_filter}
-                        GROUP BY YEAR(AUDIT_DATE), MONTH(AUDIT_DATE)
-                        ORDER BY YEAR(AUDIT_DATE), MONTH(AUDIT_DATE)
+                        SELECT 
+                            LEFT(DATENAME(month, CAST(month_data.date AS DATE)), 3) AS month,
+                            YEAR(CAST(month_data.date AS DATE)) AS year,
+                            DATEPART(MM, CAST(month_data.date AS DATE)) AS mth,
+                            ISNULL(SUM(CASE WHEN UPPER(t.TRANSCRIPT_STATUS_FLAG) = '{status}' THEN 1 ELSE 0 END), 0) AS count
+                        FROM 
+                            (VALUES {date_values}) AS month_data(date)
+                        LEFT JOIN 
+                            {TBL_DIGISCRIPTBOTLOG} AS t 
+                            ON MONTH(t.AUDIT_DATE) = MONTH(CAST(month_data.date AS DATE))
+                            AND YEAR(t.AUDIT_DATE) = YEAR(CAST(month_data.date AS DATE))
+                            AND t.UPDATED_BY = 'Transcript BOT'
+                            AND ISNULL(t.ERROR_REASON, '') <> ''
+                            AND UPPER(t.PROCESS_STATUS) = 'COMPLETE'
+                            AND CAST(t.AUDIT_DATE AS DATE) BETWEEN '{first_start_date}' AND '{last_end_date}'
+                            {college_filter}
+                        GROUP BY 
+                            DATENAME(month, CAST(month_data.date AS DATE)), 
+                            YEAR(CAST(month_data.date AS DATE)), 
+                            DATEPART(MM, CAST(month_data.date AS DATE)),
+                            month_data.date
+                        ORDER BY 
+                            YEAR(CAST(month_data.date AS DATE)), 
+                            DATEPART(MM, CAST(month_data.date AS DATE))
                     """)
 
-                result = db.execute(query, {
-                    "fromdate": fromdate.split()[0],
-                    "todate": todate.split()[0]
-                }).fetchall()
+                result = db.execute(query).fetchall()
 
                 data_map = {}
                 for row in result:
                     if use_daily:
-                        key = row.date.strftime('%Y-%m-%d')
+                        date_val = row[0] if isinstance(row, tuple) else (row.date if hasattr(row, 'date') else row[0])
+                        if hasattr(date_val, 'strftime'):
+                            key = date_val.strftime('%Y-%m-%d')
+                        else:
+                            key = str(date_val)[:10]  # Take first 10 chars for date
                     else:
-                        key = f"{row.year}-{row.month:02d}"
-                    data_map[key] = row.count
+                        year = row[1] if isinstance(row, tuple) else (row.year if hasattr(row, 'year') else row[1])
+                        mth = row[2] if isinstance(row, tuple) else (row.mth if hasattr(row, 'mth') else row[2])
+                        key = f"{year}-{mth:02d}"
+                    count = row[-1] if isinstance(row, tuple) else (row.count if hasattr(row, 'count') else row[-1])
+                    data_map[key] = count
 
                 data = []
                 for dr in date_ranges:
                     if use_daily:
-                        key = dr
+                        key = dr[:10] if len(dr) > 10 else dr
                     else:
                         dt = datetime.strptime(dr['StartDate'], '%Y-%m-%d')
                         key = f"{dt.year}-{dt.month:02d}"

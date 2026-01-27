@@ -318,16 +318,71 @@ class SchoolDashboardModel:
         db: Session, college_name: str, fromdate: str, todate: str,
         date_ranges: List, use_daily: bool
     ) -> List[Dict[str, Any]]:
-        """Get transcripts processed in Banner"""
-        # Simplified - return empty for now, can be expanded
-        return []
+        """Get transcripts processed in Banner - queries KICKOUT table for PROCESSED transcripts"""
+        try:
+            college_filter = f" AND INSTITUTION_ID = '{college_name}'" if college_name else ""
+            
+            if use_daily:
+                query = text(f"""
+                    SELECT CAST(LAST_UPDATED_DATETIME AS DATE) as date, COUNT(*) as count
+                    FROM {TBL_KICKOUT}
+                    WHERE (PROJECT_ID = {SCHOOL_PROJECT_ID})
+                    AND UPPER(TRANSCRIPT_STATUS_FLAG) = 'PROCESSED'
+                    AND CAST(LAST_UPDATED_DATETIME AS DATE) >= :fromdate
+                    AND CAST(LAST_UPDATED_DATETIME AS DATE) <= :todate
+                    {college_filter}
+                    GROUP BY CAST(LAST_UPDATED_DATETIME AS DATE)
+                    ORDER BY CAST(LAST_UPDATED_DATETIME AS DATE)
+                """)
+            else:
+                query = text(f"""
+                    SELECT YEAR(LAST_UPDATED_DATETIME) as year, MONTH(LAST_UPDATED_DATETIME) as month, COUNT(*) as count
+                    FROM {TBL_KICKOUT}
+                    WHERE (PROJECT_ID = {SCHOOL_PROJECT_ID})
+                    AND UPPER(TRANSCRIPT_STATUS_FLAG) = 'PROCESSED'
+                    AND CAST(LAST_UPDATED_DATETIME AS DATE) >= :fromdate
+                    AND CAST(LAST_UPDATED_DATETIME AS DATE) <= :todate
+                    {college_filter}
+                    GROUP BY YEAR(LAST_UPDATED_DATETIME), MONTH(LAST_UPDATED_DATETIME)
+                    ORDER BY YEAR(LAST_UPDATED_DATETIME), MONTH(LAST_UPDATED_DATETIME)
+                """)
+            
+            result = db.execute(query, {
+                "fromdate": fromdate.split()[0],
+                "todate": todate.split()[0]
+            }).fetchall()
+            
+            data_map = {}
+            for row in result:
+                if use_daily:
+                    key = row.date.strftime('%Y-%m-%d')
+                else:
+                    key = f"{row.year}-{row.month:02d}"
+                data_map[key] = row.count
+            
+            data = []
+            for dr in date_ranges:
+                if use_daily:
+                    key = dr
+                else:
+                    dt = datetime.strptime(dr['StartDate'], '%Y-%m-%d')
+                    key = f"{dt.year}-{dt.month:02d}"
+                data.append(data_map.get(key, 0))
+            
+            return [{
+                "name": "PROCESSED",
+                "data": data
+            }]
+        except Exception as e:
+            logger.exception("Error in get_transcript_processed_data")
+            return []
 
     @staticmethod
     def get_initial_kickouts_data(
         db: Session, college_name: str, fromdate: str, todate: str,
         date_ranges: List, use_daily: bool
     ) -> List[Dict[str, Any]]:
-        """Get initial kickouts and processed data"""
+        """Get initial kickouts and processed data from DIGISCRIPT_BOT_LOG"""
         try:
             status_types = ['FAILED', 'PROCESSED']
             college_filter = f" AND INSTITUTION_ID = '{college_name}'" if college_name else ""
@@ -341,6 +396,7 @@ class SchoolDashboardModel:
                         WHERE UPDATED_BY = 'Transcript BOT'
                         AND ISNULL(ERROR_REASON, '') <> ''
                         AND UPPER(PROCESS_STATUS) = 'COMPLETE'
+                        AND UPPER(TRANSCRIPT_STATUS_FLAG) = :status
                         AND CAST(AUDIT_DATE AS DATE) >= :fromdate
                         AND CAST(AUDIT_DATE AS DATE) <= :todate
                         {college_filter}
@@ -354,6 +410,7 @@ class SchoolDashboardModel:
                         WHERE UPDATED_BY = 'Transcript BOT'
                         AND ISNULL(ERROR_REASON, '') <> ''
                         AND UPPER(PROCESS_STATUS) = 'COMPLETE'
+                        AND UPPER(TRANSCRIPT_STATUS_FLAG) = :status
                         AND CAST(AUDIT_DATE AS DATE) >= :fromdate
                         AND CAST(AUDIT_DATE AS DATE) <= :todate
                         {college_filter}
@@ -363,7 +420,8 @@ class SchoolDashboardModel:
 
                 result = db.execute(query, {
                     "fromdate": fromdate.split()[0],
-                    "todate": todate.split()[0]
+                    "todate": todate.split()[0],
+                    "status": status
                 }).fetchall()
 
                 data_map = {}

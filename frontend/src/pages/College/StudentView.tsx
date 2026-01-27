@@ -56,6 +56,7 @@ export default function StudentView() {
   const [students, setStudents] = useState<Student[]>([]);
   const [studentData, setStudentData] = useState<StudentViewData | null>(null);
   const [loading, setLoading] = useState(false);
+  const [loadingStudents, setLoadingStudents] = useState(false);
   // Initialize selected values from URL params on mount (matching CI3 behavior)
   const [selectedType, setSelectedType] = useState<string>(searchParams.get("type") || "");
   const [selectedInstitution, setSelectedInstitution] = useState<string>(searchParams.get("institution_id") || "");
@@ -109,6 +110,7 @@ export default function StudentView() {
   // Fetch students list (all students on load, matching CI3 behavior)
   useEffect(() => {
     const fetchStudents = async () => {
+      setLoadingStudents(true);
       try {
         // Fetch all students (no query parameter = get all students)
         const response = await api.get(API_ENDPOINTS.STUDENTVIEW_GET_STUDENTS);
@@ -129,6 +131,8 @@ export default function StudentView() {
         console.error("[StudentView] Error fetching students:", error);
         alerterror(error.message || "Failed to load students list");
         setStudents([]); // Set empty array on error
+      } finally {
+        setLoadingStudents(false);
       }
     };
     fetchStudents();
@@ -404,29 +408,37 @@ export default function StudentView() {
                       onChange={(e) => setSearchQuery(e.target.value)}
                       onFocus={() => setIsInputFocused(true)}
                       placeholder={studentId ? getStudentDisplayName() : "Search by Student Name or ID..."}
-                      className="w-full max-w-md rounded-lg border border-blue-500 bg-white px-4 py-2.5 pr-10 text-sm text-gray-800 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                      disabled={loadingStudents}
+                      className="w-full max-w-md rounded-lg border border-blue-500 bg-white px-4 py-2.5 pr-10 text-sm text-gray-800 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 disabled:opacity-50 disabled:cursor-not-allowed"
                     />
-                    {studentData && studentData.total_transcripts > 0 && (
+                    {loadingStudents && (
+                      <div className="absolute right-12 top-1/2 -translate-y-1/2">
+                        <div className="h-5 w-5 animate-spin rounded-full border-2 border-solid border-brand-500 border-r-transparent"></div>
+                      </div>
+                    )}
+                    {!loadingStudents && studentData && studentData.total_transcripts > 0 && (
                       <span className="absolute right-12 top-1/2 -translate-y-1/2 inline-flex items-center justify-center rounded-full bg-red-500 h-6 w-6 text-xs font-medium text-white">
                         {studentData.total_transcripts}
                       </span>
                     )}
-                    <svg
-                      className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                      />
-                    </svg>
+                    {!loadingStudents && (
+                      <svg
+                        className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                        />
+                      </svg>
+                    )}
 
                     {/* Dropdown Results - Show when input is focused and has students to display */}
-                    {isInputFocused && filteredStudents.length > 0 && (
+                    {isInputFocused && !loadingStudents && filteredStudents.length > 0 && (
                       <div 
                         className="absolute z-50 mt-1 w-full max-w-md bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-auto"
                       >
@@ -453,16 +465,45 @@ export default function StudentView() {
                         })}
                       </div>
                     )}
+                    {isInputFocused && loadingStudents && (
+                      <div className="absolute z-50 mt-1 w-full max-w-md bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4">
+                        <div className="flex items-center justify-center py-4">
+                          <div className="h-6 w-6 animate-spin rounded-full border-2 border-solid border-brand-500 border-r-transparent"></div>
+                          <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">Loading students...</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
                 {/* Tree Structure - matching CI3 lines 46-156 */}
-                {studentData && studentData.institution_name.length > 0 ? (
+                {loading ? (
+                  <div className="mt-4">
+                    <div className="space-y-3">
+                      {/* Skeleton loader for tree structure */}
+                      {[1, 2, 3].map((i) => (
+                        <div key={i} className="animate-pulse">
+                          <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded border mb-2"></div>
+                          <div className="ml-4 space-y-2">
+                            <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                            <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-4 flex items-center justify-center py-4">
+                      <div className="text-center">
+                        <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-brand-500 border-r-transparent"></div>
+                        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Loading tree structure...</p>
+                      </div>
+                    </div>
+                  </div>
+                ) : studentData && studentData.institution_name.length > 0 ? (
                   <div className="mt-4 student-tree">
                     <ul className="tree">
                       {/* Outer tree-parent firstul open - always open (matching CI3 line 61) */}
                       <ul className="tree-parent firstul open">
-                        {studentData.institution_name.map((institution) => {
+                        {studentData.institution_name.map((institution, instIndex) => {
                           const batches = studentData.batch_details[institution.INSTITUTION_ID] || [];
                           console.log(`[StudentView] Processing institution ${institution.INSTITUTION_ID} with batches:`, batches);
                           
@@ -494,8 +535,17 @@ export default function StudentView() {
                               // Check if there are any menu items to show
                               const hasMenuItems = Object.keys(menuWithBatch).length > 0;
 
+                              // Calculate animation delay for progressive rendering (step by step)
+                              const animationDelay = (instIndex * 50) + (batchIndex * 30);
+
                               return (
-                                <li key={uniqueBatchKey} className="tree-item mb-2">
+                                <li 
+                                  key={uniqueBatchKey} 
+                                  className="tree-item mb-2"
+                                  style={{
+                                    animation: `fadeInUp 0.4s ease-out ${animationDelay}ms both`
+                                  }}
+                                >
                                   {/* Batch trigger - matching CI3 line 71-74 */}
                                   <button 
                                     className={`trigger w-full text-left px-3 py-2 rounded border flex items-center gap-2 ${
@@ -931,6 +981,18 @@ export default function StudentView() {
           </div>
         </div>
       </PageContainer>
+      <style>{`
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+      `}</style>
     </PageWrapper>
   );
 }

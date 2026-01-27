@@ -13,7 +13,7 @@ import logging
 from helpers.encryption_helper import file_decrypt, get_encrypt_file_path
 from database.connection import get_db
 from config.settings import Settings
-from config.constants import TBL_KICKOUT
+from config.constants import TBL_KICKOUT, SHARE_PATH_REPLACE, SHARE_PATH_UBUNTU, IS_UBUNTU
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/viewfile", tags=["viewfile"])
@@ -112,7 +112,6 @@ async def error_screenshot(
     """
     try:
         from sqlalchemy import text
-        from config.constants import TBL_KICKOUT
         
         # Get error screenshot path from database
         query = text(f"""
@@ -130,16 +129,30 @@ async def error_screenshot(
         if not error_screenshot or error_screenshot == "":
             raise HTTPException(status_code=404, detail="Error screenshot not found")
         
+        # Handle path conversion for Ubuntu (matches CI3 imagepreview.php lines 28-31)
+        error_path = error_screenshot
+        if IS_UBUNTU:
+            error_path = error_path.replace('\\', '/')
+            if SHARE_PATH_REPLACE and SHARE_PATH_UBUNTU:
+                error_path = error_path.replace(SHARE_PATH_REPLACE, SHARE_PATH_UBUNTU)
+        
         # Check if file exists
-        if not os.path.exists(error_screenshot):
+        if not os.path.exists(error_path):
+            logger.warning(f"Error screenshot file not found at path: {error_path} (original: {error_screenshot})")
             raise HTTPException(status_code=404, detail="Screenshot file not found")
         
         # Determine content type based on file extension
-        ext = os.path.splitext(error_screenshot)[1].lower()
-        content_type = "image/png" if ext == ".png" else "image/jpeg"
+        ext = os.path.splitext(error_path)[1].lower()
+        if ext == ".png":
+            content_type = "image/png"
+        elif ext in [".jpg", ".jpeg"]:
+            content_type = "image/jpeg"
+        else:
+            # Default to jpeg if extension is unknown
+            content_type = "image/jpeg"
         
         return FileResponse(
-            error_screenshot,
+            error_path,
             media_type=content_type,
             headers={"Cache-Control": "public"}
         )

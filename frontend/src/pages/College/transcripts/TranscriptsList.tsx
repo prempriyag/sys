@@ -6,7 +6,7 @@ import DataTable from "../../../components/ui/DataTable";
 import Button from "../../../components/ui/button/Button";
 import StatusBadge from "../../../components/common/StatusBadge";
 import { API_ENDPOINTS, API_BASE_URL } from "../../../config/api";
-import { RefreshIcon, FilterIcon } from "../../../icons";
+import { RefreshIcon, FilterIcon, FileIcon } from "../../../icons";
 import { useAuth } from "../../../context/AuthContext";
 
 export default function TranscriptsList() {
@@ -27,10 +27,31 @@ export default function TranscriptsList() {
     });
   };
 
-  const getPdfUrl = (filePath: string) => {
-    if (!filePath) return "";
+  // Helper function to generate PDF URL (matches reports format)
+  // Backend now returns encrypted URLs in format: /api/viewfile/transcript_file?pdf={encrypted}
+  const getPdfUrl = (filePath: string, type: "transcript" | "articulation" = "transcript") => {
+    if (!filePath || filePath === "" || filePath === null || filePath === undefined) {
+      return "";
+    }
+    
+    // If backend already returns a full URL (starts with http), use it as-is
+    if (filePath.startsWith("http://") || filePath.startsWith("https://")) {
+      return filePath;
+    }
+    
+    // Backend now returns encrypted URL in format: /api/viewfile/transcript_file?pdf={encrypted}
+    // Just prepend API_BASE_URL (same as batchdetails and reports)
+    if (filePath.startsWith("/api/viewfile")) {
+      return `${API_BASE_URL}${filePath}`;
+    }
+    
+    // For backward compatibility: if we get a raw file path (shouldn't happen now)
     const cleanPath = filePath.startsWith("/") ? filePath.substring(1) : filePath;
-    return `${API_BASE_URL.replace("/api", "")}/transcripts/${cleanPath}`;
+    if (type === "transcript") {
+      return `${API_BASE_URL.replace("/api", "")}/transcripts/${cleanPath}`;
+    } else {
+      return `${API_BASE_URL.replace("/api", "")}/articulation/${cleanPath}`;
+    }
   };
 
   const clearFilters = () => {
@@ -170,17 +191,21 @@ export default function TranscriptsList() {
               name: "Formatted Filename", 
               searchable: true, 
               orderable: true,
-              render: (data: any, row: any) => {
-                if (!data) return "-";
-                const filePath = row.FILE_PATH || "";
-                if (filePath) {
-                  const pdfUrl = getPdfUrl(filePath);
+              render: (data: any) => {
+                // If data is an encrypted URL (starts with /api/viewfile), display as link icon (matches reports format)
+                if (data && (data.startsWith("/api/viewfile") || data.startsWith("http"))) {
+                  const pdfUrl = getPdfUrl(data, "transcript");
+                  if (!pdfUrl || pdfUrl === "") {
+                    return "-";
+                  }
                   return (
-                    <a href={pdfUrl} target="_blank" rel="noopener noreferrer" className="text-brand-500 hover:underline">
-                      {data}
+                    <a href={pdfUrl} target="_blank" rel="noopener noreferrer" className="text-brand-500 hover:text-brand-700 inline-flex items-center gap-1" title="View PDF">
+                      <FileIcon className="w-4 h-4" />
                     </a>
                   );
                 }
+                // Fallback: if it's just a filename (backward compatibility)
+                if (!data) return "-";
                 return <span>{data}</span>;
               }
             },

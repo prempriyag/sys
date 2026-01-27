@@ -29,11 +29,17 @@ export default function HorizontalMenuItem({
   const iconRef = useRef<HTMLSpanElement>(null);
   const [showTooltip, setShowTooltip] = useState(false);
   const [tooltipPosition, setTooltipPosition] = useState<{ top: number; left: number; placement: "top" | "bottom" } | null>(null);
+  const [isButtonHovered, setIsButtonHovered] = useState(false);
   
   const key = `${index}`;
   const isSubmenuOpen = openSubmenu[key] || false;
   const hasSubItems = item.subItems && item.subItems.length > 0;
-  const showIconOnly = !hasSubItems && (item.name === "Dashboard" || item.name === "User Management");
+  // Show icon only for items without subItems (Dashboard, User Management) OR items with subItems (for testing)
+  const showIconOnly = 
+    (!hasSubItems);// && (item.name === "Dashboard" || item.name === "User Management"));// ||
+    //(hasSubItems && (item.name === "Transcripts" || item.name === "Dashboard" || item.name === "User Management")); // Add item names here to test icon-only with submenus
+  const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prevLocationRef = useRef<string>(location.pathname);
 
   const isActive = (path?: string) => {
     if (!path) return false;
@@ -42,6 +48,77 @@ export default function HorizontalMenuItem({
   };
 
   const isItemActive = isActive(item.path);
+
+  // Close submenu when location changes (after navigation)
+  useEffect(() => {
+    if (prevLocationRef.current !== location.pathname && isSubmenuOpen) {
+      onSubmenuToggle(key);
+    }
+    prevLocationRef.current = location.pathname;
+  }, [location.pathname, isSubmenuOpen, key, onSubmenuToggle]);
+
+  // Handle hover to open submenu
+  const handleMouseEnter = () => {
+    setIsButtonHovered(true);
+    if (hasSubItems) {
+      // Clear any pending close timeout
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+        hoverTimeoutRef.current = null;
+      }
+      // Open submenu if not already open
+      if (!isSubmenuOpen) {
+        onSubmenuToggle(key);
+      }
+    }
+  };
+
+  // Handle mouse leave with delay to allow moving to dropdown
+  const handleMouseLeave = () => {
+    setIsButtonHovered(false);
+    if (hasSubItems && isSubmenuOpen) {
+      // Set a timeout to close the submenu
+      hoverTimeoutRef.current = setTimeout(() => {
+        onSubmenuToggle(key);
+      }, 200); // 200ms delay to allow moving to dropdown
+    }
+  };
+
+  // Handle mouse enter on dropdown to keep it open
+  const handleDropdownMouseEnter = () => {
+    setIsButtonHovered(true);
+    // Clear any pending close timeout
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+  };
+
+  // Handle mouse leave on dropdown to close it
+  const handleDropdownMouseLeave = () => {
+    setIsButtonHovered(false);
+    if (isSubmenuOpen) {
+      hoverTimeoutRef.current = setTimeout(() => {
+        onSubmenuToggle(key);
+      }, 200);
+    }
+  };
+
+  // Hide tooltip when button is hovered (text expands)
+  useEffect(() => {
+    if (isButtonHovered && showIconOnly) {
+      setShowTooltip(false);
+    }
+  }, [isButtonHovered, showIconOnly]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Calculate dropdown position - update on scroll and resize
   useEffect(() => {
@@ -101,8 +178,12 @@ export default function HorizontalMenuItem({
         });
       };
       
+      // Handle both link (no subItems) and button (with subItems) elements
       const linkElement = iconRef.current.closest('a');
-      if (linkElement) {
+      const buttonElement = iconRef.current.closest('button');
+      const parentElement = linkElement || buttonElement;
+      
+      if (parentElement) {
         const handleMouseEnter = () => {
           updateTooltipPosition();
           setShowTooltip(true);
@@ -112,20 +193,20 @@ export default function HorizontalMenuItem({
           setShowTooltip(false);
         };
         
-        linkElement.addEventListener('mouseenter', handleMouseEnter);
-        linkElement.addEventListener('mouseleave', handleMouseLeave);
+        parentElement.addEventListener('mouseenter', handleMouseEnter);
+        parentElement.addEventListener('mouseleave', handleMouseLeave);
         window.addEventListener('scroll', updateTooltipPosition, true);
         window.addEventListener('resize', updateTooltipPosition);
         
         return () => {
-          linkElement.removeEventListener('mouseenter', handleMouseEnter);
-          linkElement.removeEventListener('mouseleave', handleMouseLeave);
+          parentElement.removeEventListener('mouseenter', handleMouseEnter);
+          parentElement.removeEventListener('mouseleave', handleMouseLeave);
           window.removeEventListener('scroll', updateTooltipPosition, true);
           window.removeEventListener('resize', updateTooltipPosition);
         };
       }
     }
-  }, [showIconOnly]);
+  }, [showIconOnly, isButtonHovered]);
 
   // Check permission for this item (single permission)
   if (item.permission && !checkPermission(user, item.permission, "VIEW")) {
@@ -186,27 +267,67 @@ export default function HorizontalMenuItem({
     );
   }
 
+  // Determine if text should be shown (always show if not icon-only, or show on hover if icon-only)
+  const shouldShowText = !showIconOnly || (showIconOnly && isButtonHovered);
+
   return (
     <li className="relative group flex-shrink-0" style={{ position: "relative" }}>
       <button
         ref={buttonRef}
         onClick={() => onSubmenuToggle(key)}
-        className={`flex items-center gap-0 px-2 py-3 text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        className={`flex items-center ${shouldShowText ? 'gap-0 px-2' : 'justify-center px-3'} py-3 text-sm font-medium rounded-lg transition-all whitespace-nowrap ${
           isItemActive || isSubmenuOpen
             ? "bg-brand-50 text-brand-600 dark:bg-brand-900/20 dark:text-brand-400"
             : "text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
         }`}
+        title={!shouldShowText ? item.name : undefined}
       >
-        {getIcon(item.icon)}
-        <span className="whitespace-nowrap">{item.name}</span>
-        <ChevronDownIcon
-          className={`w-4 h-4 me-1 transition-transform flex-shrink-0 ${isSubmenuOpen ? "rotate-180" : ""}`}
-        />
+        <span ref={iconRef} className="relative">
+          {getIcon(item.icon)}
+        </span>
+        {shouldShowText && (
+          <>
+            <span className="whitespace-nowrap">{item.name}</span>
+            {hasSubItems && (
+              <ChevronDownIcon
+                className={`w-4 h-4 me-1 transition-transform flex-shrink-0 ${isSubmenuOpen ? "rotate-180" : ""}`}
+              />
+            )}
+          </>
+        )}
       </button>
+      {showIconOnly && showTooltip && !isButtonHovered && !isSubmenuOpen && tooltipPosition && createPortal(
+        <div
+          ref={tooltipRef}
+          className="fixed bg-gray-900 text-white text-xs rounded px-2 py-1 pointer-events-none z-[10001] whitespace-nowrap opacity-100 transition-opacity"
+          style={{
+            top: `${tooltipPosition.top}px`,
+            left: `${tooltipPosition.left}px`,
+            transform: 'translateX(-50%)',
+          }}
+        >
+          {item.name}
+          <span 
+            className={`absolute left-1/2 -translate-x-1/2 border-4 border-transparent ${
+              tooltipPosition.placement === "top"
+                ? "top-full border-t-gray-900"
+                : "bottom-full border-b-gray-900"
+            }`}
+            style={{
+              [tooltipPosition.placement === "top" ? "top" : "bottom"]: "100%"
+            }}
+          ></span>
+        </div>,
+        document.body
+      )}
       {isSubmenuOpen &&
         createPortal(
           <div
             ref={dropdownRef}
+            onMouseEnter={handleDropdownMouseEnter}
+            onMouseLeave={handleDropdownMouseLeave}
             className="w-56 bg-white rounded-lg shadow-xl border border-gray-200 dark:bg-gray-800 dark:border-gray-700 py-2 min-w-max"
             style={{ zIndex: 10000, position: "fixed" }}
           >

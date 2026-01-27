@@ -44,14 +44,15 @@ export default function EditUser() {
 
         // Fetch user data
         const userResponse = await api.get(`${API_ENDPOINTS.USERS_EDIT}/${userId}`);
+        console.log("User data response:", userResponse);
         setFormData({
           name: userResponse.name || "",
           email: userResponse.email || "",
-          role_id: userResponse.role_id || userResponse.userid || userId,
-          college_perm: userResponse.college_perm || 0,
-          hs_perm: userResponse.hs_perm || 0,
-          ocr_perm: userResponse.ocr_perm || 0,
-          status: userResponse.status || 1,
+          role_id: userResponse.role_id || 0,
+          college_perm: userResponse.college_perm ?? 0,
+          hs_perm: userResponse.hs_perm ?? 0,
+          ocr_perm: userResponse.ocr_perm ?? 0,
+          status: userResponse.status ?? 1,
         });
       } catch (err: any) {
         if (err?.status === 403) {

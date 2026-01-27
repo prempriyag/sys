@@ -192,10 +192,30 @@ class SchoolTranscriptsModel:
                 file_path = record_dict.get("FILE_PATH", "")
                 filepath = record_dict.get("FILEPATH", "")
 
+                # Build file path (matches CI3 lines 125-130)
+                if file_path:
+                    my_file_path = file_path
+                else:
+                    my_file_path = (filepath + "/" + formatted_filename) if (filepath and formatted_filename) else ""
+
+                # Generate encrypted PDF URL for FORMATTED_FILENAME (matches reports format)
+                # Matches CI3 line 131: $pdfpath = SESSION_PATH.'transcript_file?pdf='.getencryptfilepath($my_file_path);
+                formatted_filename_url = ""
+                if my_file_path:
+                    try:
+                        import os
+                        # Check if file exists (matches CI3 line 145)
+                        if os.path.exists(my_file_path):
+                            from helpers.encryption_helper import get_encrypt_file_path
+                            encrypted_path = get_encrypt_file_path(my_file_path)
+                            formatted_filename_url = f"/api/viewfile/transcript_file?pdf={encrypted_path}"
+                    except Exception as e:
+                        logger.warning(f"Error generating PDF URL for {my_file_path}: {e}")
+
                 data_row = {
                     "SOURCE_TYPE": record_dict.get("SOURCE_TYPE", ""),
                     "FILENAME": record_dict.get("FILENAME", ""),
-                    "FORMATTED_FILENAME": formatted_filename,
+                    "FORMATTED_FILENAME": formatted_filename_url if formatted_filename_url else formatted_filename,  # Return URL if available, else filename
                     "STUDENT_FULL_NAME": record_dict.get("STUDENT_FULL_NAME", ""),
                     "STUDENT_ID": student_id,
                     "INSTITUTION_ID": record_dict.get("INSTITUTION_ID", ""),

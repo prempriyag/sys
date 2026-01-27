@@ -6,6 +6,7 @@ import Button from "../components/ui/button/Button";
 import { useThemeColor } from "../context/ThemeColorContext";
 import { API_BASE_URL, API_ENDPOINTS, api } from "../config/api";
 import { useToast } from "../context/ToastContext";
+import { useSettings } from "../context/SettingsContext";
 import SmtpSetup from "./College/settings/smtpsetup/SmtpSetup";
 
 type SettingsTab = "system" | "sms-smtp" | "logo" | "theme";
@@ -54,6 +55,7 @@ interface Role {
 }
 
 export default function Settings() {
+  const { refreshSettings } = useSettings();
   const [activeTab, setActiveTab] = useState<SettingsTab>("system");
   
   // System Settings State
@@ -489,6 +491,8 @@ export default function Settings() {
       if (response.status === 1) {
         setSystemMessage({ type: 'success', text: response.message });
         alertsuccess(response.message);
+        // Refresh system settings (including system_name) to update page titles
+        await refreshSettings();
       } else {
         setSystemMessage({ type: 'error', text: response.message });
         alerterror(response.message);

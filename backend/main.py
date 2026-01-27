@@ -129,16 +129,6 @@ else:
     print("[MAIN] WARNING: dashboard_controller not registered")
     
 
-# Import School dashboard controller
-try:
-    from backend.controllers.school import school_dashboard_controller
-    print("[MAIN] Successfully imported dashboard_controller")
-except Exception as e:
-    print(f"[MAIN] ERROR importing dashboard_controller: {e}")
-    import traceback
-    traceback.print_exc()
-    school_dashboard_controller = None
-
 # Include routers
 app.include_router(auth_controller.router)
 app.include_router(users_controller.router)
@@ -155,7 +145,7 @@ else:
 
 # Import school dashboard controller
 try:
-    from backend.controllers.school import school_dashboard_controller as school_dashboard_controller
+    from controllers.school import school_dashboard_controller
     print("[MAIN] Successfully imported school_dashboard_controller")
 except Exception as e:
     print(f"[MAIN] ERROR importing school_dashboard_controller: {e}")
@@ -185,10 +175,6 @@ except Exception as e:
     import traceback
     traceback.print_exc()
 
-# Include dashboard router if imported successfully
-if school_dashboard_controller is not None:
-    app.include_router(school_dashboard_controller.router)
-    print("[MAIN] Successfully registered dashboard_controller router")
 
 # Include digiscript reports router if imported successfully
 if digiscriptreports_controller is not None:
@@ -227,11 +213,11 @@ except Exception as e:
     print(f"[MAIN] ERROR importing transcripts_controller: {e}")
     import traceback
     traceback.print_exc()
-    school_transcripts_controller = None
+    transcripts_controller = None
 
 # Include transcripts router if imported successfully
-if school_transcripts_controller is not None:
-    app.include_router(school_transcripts_controller.router)
+if transcripts_controller is not None:
+    app.include_router(transcripts_controller.router)
     print("[MAIN] Successfully registered transcripts_controller router")
 
 # Import transcripts controller

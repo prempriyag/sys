@@ -301,6 +301,7 @@ async def edit(
     """
     Get user details for editing
     Based on edit() method from Users.php
+    Returns all user fields needed for the edit form
     """
     
     user = db.query(User).filter(User.id == user_id).first()
@@ -310,23 +311,18 @@ async def edit(
             detail="User not found"
         )
     
-    role = db.query(Role).filter(Role.ID == user.role_id).first()
-    roles = db.query(Role).all()
-    
-    # Build role list HTML
-    role_list = '<option value="">Select Role</option>'
-    for r in roles:
-        selected = 'selected=""' if user.role_id == r.ID else ''
-        role_list += f'<option {selected} value="{r.ID}">{r.ROLE_NAME}</option>'
-    
+    # Return all user fields in JSON format (not HTML like CI3)
+    # Frontend will handle role selection separately
     return {
         'userid': user.id,
-        'name': user.name,
-        'college_perm': user.college_perm,
-        'hs_perm': user.hs_perm,
-        'ocr_perm': user.ocr_perm,
-        'roles': role_list,
-        'client': ''  # Would need client mapping
+        'id': user.id,  # Also include 'id' for consistency
+        'name': user.name or '',
+        'email': user.email or '',
+        'role_id': user.role_id or 0,
+        'college_perm': user.college_perm or 0,
+        'hs_perm': user.hs_perm or 0,
+        'ocr_perm': user.ocr_perm or 0,
+        'status': user.status if user.status is not None else 1,
     }
 
 

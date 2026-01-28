@@ -1,3 +1,6 @@
+// Import toast functions for error notifications
+import { alerterror } from "../utils/toast";
+
 // API Configuration
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
@@ -123,35 +126,146 @@ export const apiRequest = async (
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...options,
-    headers,
-  });
+  let response: Response;
+  
+  try {
+    response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      ...options,
+      headers,
+    });
+  } catch (fetchError: unknown) {
+    // Network error - backend is not running or unreachable
+    const errorMessage = fetchError instanceof Error ? fetchError.message : "Network error";
+    
+    // Check if it's a network/connection error
+    if (
+      errorMessage.includes("Failed to fetch") ||
+      errorMessage.includes("NetworkError") ||
+      errorMessage.includes("Network request failed") ||
+      errorMessage.includes("ERR_INTERNET_DISCONNECTED") ||
+      errorMessage.includes("ERR_CONNECTION_REFUSED") ||
+      errorMessage.includes("ERR_CONNECTION_TIMED_OUT")
+    ) {
+      alerterror(
+        "Unable to connect to the server. Please check if the backend server is running.",
+        false
+      );
+      const error = new Error("Backend server is not running or unreachable");
+      (error as any).status = 0;
+      (error as any).isNetworkError = true;
+      throw error;
+    }
+    
+    // Re-throw other errors
+    throw fetchError;
+  }
 
   if (!response.ok) {
     // Try to get error message from response
     let errorMessage = `API Error: ${response.status} ${response.statusText}`;
+    let errorDetail = "";
+    
     try {
       const errorData = await response.clone().json();
       if (errorData.detail) {
         errorMessage = errorData.detail;
+        errorDetail = errorData.detail;
+      } else if (errorData.message) {
+        errorMessage = errorData.message;
+        errorDetail = errorData.message;
       }
     } catch {
-      // If JSON parsing fails, use default message
+      // If JSON parsing fails, try to get text
+      try {
+        const errorText = await response.clone().text();
+        if (errorText) {
+          errorDetail = errorText;
+        }
+      } catch {
+        // If text parsing also fails, use default message
+      }
     }
     
-    // Only redirect on 401 if we're NOT on the login page
-    // This prevents page refresh when login fails
+    // Check for database connection errors
+    const isDbError = 
+      errorDetail.toLowerCase().includes("database") ||
+      errorDetail.toLowerCase().includes("db connection") ||
+      errorDetail.toLowerCase().includes("connection to database") ||
+      errorDetail.toLowerCase().includes("operationalerror") ||
+      errorDetail.toLowerCase().includes("could not connect") ||
+      errorDetail.toLowerCase().includes("connection refused") ||
+      response.status === 503; // Service Unavailable often indicates DB issues
+    
+    // Handle session expiry (401 Unauthorized)
     if (response.status === 401) {
       const currentPath = window.location.pathname;
       // Don't redirect if we're already on login page (allows error to be displayed)
       if (currentPath !== "/login" && !currentPath.includes("/login")) {
         removeAuthToken();
-        window.location.href = "/login";
-        return response; // Return early to prevent throwing error during redirect
+        localStorage.removeItem("user");
+        localStorage.removeItem("user_permissions");
+        alerterror("Your session has expired. Please login again.", false);
+        // Use setTimeout to allow toast to show before redirect
+        setTimeout(() => {
+          window.location.href = "/login";
+        }, 1000);
+        const error = new Error("Session expired");
+        (error as any).status = 401;
+        (error as any).isSessionExpired = true;
+        throw error;
       }
       // If on login page, just clear token but don't redirect
       removeAuthToken();
+    }
+    
+    // Show database connection error message
+    if (isDbError) {
+      alerterror(
+        "Database connection error. Please check if the database server is running and accessible.",
+        false
+      );
+      const error = new Error("Database connection error");
+      (error as any).status = response.status;
+      (error as any).isDbError = true;
+      throw error;
+    }
+    
+    // Handle 500 Internal Server Error
+    if (response.status === 500) {
+      const currentPath = window.location.pathname;
+      const isFormSubmission = options.method && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(options.method.toUpperCase());
+      
+      // For form submissions, don't redirect - let the form handle the error
+      // Only redirect GET requests to the error page
+      if (!isFormSubmission && currentPath !== "/server-error" && !currentPath.includes("/server-error")) {
+        // Store error message in sessionStorage to pass to error page
+        sessionStorage.setItem("serverError", JSON.stringify({
+          message: errorMessage,
+          detail: errorDetail,
+          timestamp: new Date().toISOString()
+        }));
+        // Navigate to server error page
+        window.location.href = "/server-error";
+        // Return early to prevent throwing error during redirect
+        const error = new Error("Internal Server Error");
+        (error as any).status = 500;
+        (error as any).isServerError = true;
+        throw error;
+      }
+      // For form submissions, throw error with detail so form can handle it
+      const error = new Error(errorMessage || "Internal Server Error");
+      (error as any).status = 500;
+      (error as any).isServerError = true;
+      (error as any).detail = errorDetail;
+      throw error;
+    }
+    
+    // For other 5xx errors, show the error message
+    if (response.status >= 500 && response.status !== 500) {
+      alerterror(
+        `Server error: ${errorMessage}. Please try again later or contact support.`,
+        false
+      );
     }
     
     const error = new Error(errorMessage);

@@ -4,6 +4,7 @@ import SignUp from "./pages/AuthPages/SignUp";
 import SSOCallback from "./pages/AuthPages/SSOCallback";
 import SSORedirect from "./pages/AuthPages/SSORedirect";
 import NotFound from "./pages/OtherPage/NotFound";
+import ServerError from "./pages/OtherPage/ServerError";
 import UserProfiles from "./pages/UserProfiles";
 import Settings from "./pages/Settings";
 import Videos from "./pages/UiElements/Videos";
@@ -106,6 +107,7 @@ export default function App() {
         <Route path="/sso/callback" element={<SSOCallback />} />
         <Route path="/sso/client" element={<SSORedirect />} />
         <Route path="/sso/ktech" element={<SSORedirect />} />
+        <Route path="/server-error" element={<ServerError />} />
 
         {/* Protected Routes - Require Authentication */}
         <Route

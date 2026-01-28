@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { api } from "../../../../config/api";
 import PageContainer from "../../../../components/common/PageContainer";
+import { useToast } from "../../../../context/ToastContext";
 
 interface Permission {
   ID: number;
@@ -28,6 +29,7 @@ const AddRole: React.FC = () => {
     Record<number, Record<number, PermissionState>>
   >({});
   const navigate = useNavigate();
+  const { alertsuccess, alerterror } = useToast();
 
   useEffect(() => {
     fetchPermissions();
@@ -44,7 +46,7 @@ const AddRole: React.FC = () => {
       }
     } catch (error: any) {
       console.error("Error fetching permissions:", error);
-      // Add toast notification here
+      alerterror("Failed to load permissions. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -74,18 +76,27 @@ const AddRole: React.FC = () => {
 
   const handleParentCheckAll = (parentId: number, action: keyof PermissionState) => {
     setSelectedPermissions(prev => {
+      // Deep copy to avoid mutating the original state
       const updated = { ...prev };
+      if (!updated[parentId]) {
+        updated[parentId] = {};
+      } else {
+        updated[parentId] = { ...updated[parentId] };
+      }
+      
       const parent = updated[parentId];
       
-      if (!parent) return prev;
+      if (!parent || Object.keys(parent).length === 0) return prev;
       
       // Get current state from first child (all should be same if parent is checked)
       const currentState = Object.values(parent)[0]?.[action] ?? true;
       const newState = !currentState;
       
-      // Update all children
+      // Update all children with deep copy
       Object.keys(parent).forEach(childId => {
-        updated[parentId][parseInt(childId)][action] = newState;
+        const childIdNum = parseInt(childId);
+        updated[parentId][childIdNum] = { ...updated[parentId][childIdNum] };
+        updated[parentId][childIdNum][action] = newState;
       });
       
       return updated;
@@ -98,9 +109,35 @@ const AddRole: React.FC = () => {
     action: keyof PermissionState
   ) => {
     setSelectedPermissions(prev => {
+      // Deep copy to avoid mutating the original state
       const updated = { ...prev };
-      const currentValue = updated[parentId]?.[childId]?.[action] ?? true;
+      
+      // Deep copy parent object
+      if (!updated[parentId]) {
+        updated[parentId] = {};
+      } else {
+        updated[parentId] = { ...updated[parentId] };
+      }
+      
+      // Get current value from previous state before creating new object
+      const currentChildState = prev[parentId]?.[childId];
+      const currentValue = currentChildState?.[action] ?? true;
+      
+      // Deep copy child object
+      if (!updated[parentId][childId]) {
+        updated[parentId][childId] = {
+          view: currentChildState?.view ?? true,
+          add: currentChildState?.add ?? true,
+          update: currentChildState?.update ?? true,
+          delete: currentChildState?.delete ?? true,
+        };
+      } else {
+        updated[parentId][childId] = { ...updated[parentId][childId] };
+      }
+      
+      // Toggle the value
       updated[parentId][childId][action] = !currentValue;
+      
       return updated;
     });
   };
@@ -122,7 +159,7 @@ const AddRole: React.FC = () => {
     e.preventDefault();
     
     if (!formData.role_name.trim()) {
-      // Show validation error
+      alerterror("Please enter a role name");
       return;
     }
 
@@ -131,39 +168,84 @@ const AddRole: React.FC = () => {
       .toLowerCase()
       .replace(/['",;<>&\s]/g, "_");
 
-    // Build permissions list
+    // Build permissions list - backend expects boolean values, not 1/0
     const permissions_list: any[] = [];
     Object.entries(selectedPermissions).forEach(([parentId, children]) => {
       Object.entries(children).forEach(([childId, perms]) => {
-        if (perms.view || perms.add || perms.update || perms.delete) {
+        // Include permission if at least one action is checked
+        // Convert to proper booleans (handle undefined/null as false)
+        const view = Boolean(perms.view);
+        const add = Boolean(perms.add);
+        const update = Boolean(perms.update);
+        const deletePerm = Boolean(perms.delete);
+        
+        if (view || add || update || deletePerm) {
           permissions_list.push({
             permission_id: parseInt(childId),
-            view: perms.view ? 1 : 0,
-            add: perms.add ? 1 : 0,
-            update: perms.update ? 1 : 0,
-            delete: perms.delete ? 1 : 0,
+            view: view,
+            add: add,
+            update: update,
+            delete: deletePerm,
           });
         }
       });
     });
 
+    const requestPayload = {
+      role_name: formData.role_name,
+      role_key: role_key,
+      permissions: permissions_list
+    };
+
+    console.log("Sending role add request:", {
+      role_name: requestPayload.role_name,
+      role_key: requestPayload.role_key,
+      permissions_count: requestPayload.permissions.length,
+      first_permission: requestPayload.permissions[0]
+    });
+
     try {
-      const response = await api.post("/api/roles/add", {
-        role_name: formData.role_name,
-        role_key: role_key,
-        permissions: permissions_list
-      });
+      const response = await api.post("/api/roles/add", requestPayload);
 
       if (response.status === 1) {
-        // Show success toast
+        const successMessage = response.message || "Role added successfully";
+        alertsuccess(successMessage);
         navigate("/college/roles");
       } else {
-        // Show error toast
-        console.error("Add role error:", response.message);
+        const errorMessage = response.message || "Failed to add role";
+        alerterror(errorMessage);
       }
     } catch (error: any) {
       console.error("Error adding role:", error);
-      // Show error toast
+      console.error("Error details:", {
+        message: error.message,
+        detail: (error as any).detail,
+        response: error.response?.data,
+        status: error.status,
+        isDbError: (error as any).isDbError,
+        isNetworkError: (error as any).isNetworkError,
+        isServerError: (error as any).isServerError
+      });
+      
+      // Get the actual error message
+      let errorMessage = "Failed to add role.";
+      
+      if ((error as any).isDbError) {
+        errorMessage = "Database connection error. Please check if the database server is running and accessible.";
+      } else if ((error as any).isNetworkError) {
+        errorMessage = "Unable to connect to the server. Please check if the backend server is running.";
+      } else if ((error as any).detail) {
+        // Use detail from the error object (set by API handler)
+        errorMessage = (error as any).detail;
+      } else if (error.response?.data?.detail) {
+        errorMessage = error.response.data.detail;
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      alerterror(errorMessage);
     }
   };
 

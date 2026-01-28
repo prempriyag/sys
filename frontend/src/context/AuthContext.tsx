@@ -1,6 +1,7 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
 import { useNavigate } from "react-router";
 import { api, API_ENDPOINTS, setAuthToken, removeAuthToken, getAuthToken } from "../config/api";
+import { alerterror } from "../utils/toast";
 
 interface UserPermissions {
   [permissionKey: string]: {
@@ -51,38 +52,59 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  // Check if user is already logged in
+  // Check if user is already logged in and verify session
   useEffect(() => {
-    const token = getAuthToken();
-    const storedUser = localStorage.getItem("user");
-    const storedPermissions = localStorage.getItem("user_permissions");
-    
-    if (token && storedUser) {
-      try {
-        const parsedUser = JSON.parse(storedUser);
-        
-        // Load permissions from localStorage
-        if (storedPermissions) {
-          try {
-            const parsedPermissions = JSON.parse(storedPermissions);
-            // Attach permissions to user object if not already present
-            if (!parsedUser.permissions) {
-              parsedUser.permissions = parsedPermissions;
+    const verifySession = async () => {
+      const token = getAuthToken();
+      const storedUser = localStorage.getItem("user");
+      const storedPermissions = localStorage.getItem("user_permissions");
+      
+      if (token && storedUser) {
+        try {
+          const parsedUser = JSON.parse(storedUser);
+          
+          // Load permissions from localStorage
+          if (storedPermissions) {
+            try {
+              const parsedPermissions = JSON.parse(storedPermissions);
+              // Attach permissions to user object if not already present
+              if (!parsedUser.permissions) {
+                parsedUser.permissions = parsedPermissions;
+              }
+              setPermissions(parsedPermissions);
+            } catch (error) {
+              console.error("Error parsing stored permissions:", error);
             }
-            setPermissions(parsedPermissions);
-          } catch (error) {
-            console.error("Error parsing stored permissions:", error);
           }
+          
+          // Verify token is still valid by making a request to /api/me
+          try {
+            await api.get(API_ENDPOINTS.ME);
+            setUser(parsedUser);
+          } catch (error: unknown) {
+            // If verification fails (401 or network error), clear session
+            console.error("Session verification failed:", error);
+            removeAuthToken();
+            localStorage.removeItem("user_permissions");
+            setUser(null);
+            setPermissions(null);
+            // Only redirect if not already on login page
+            const currentPath = window.location.pathname;
+            if (currentPath !== "/login" && !currentPath.includes("/login")) {
+              navigate("/login");
+            }
+          }
+        } catch (error) {
+          console.error("Error parsing stored user:", error);
+          removeAuthToken();
+          localStorage.removeItem("user_permissions");
         }
-        
-        setUser(parsedUser);
-      } catch (error) {
-        console.error("Error parsing stored user:", error);
-        removeAuthToken();
       }
-    }
-    setLoading(false);
-  }, []);
+      setLoading(false);
+    };
+
+    verifySession();
+  }, [navigate]);
 
   const login = async (email: string, password: string) => {
     try {
@@ -129,13 +151,133 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const logout = () => {
+  const logout = useCallback(() => {
     removeAuthToken();
     localStorage.removeItem("user_permissions");
     setUser(null);
     setPermissions(null);
     navigate("/login");
-  };
+  }, [navigate]);
+
+  // Idle timeout: logout after 30 minutes of inactivity
+  useEffect(() => {
+    if (!user) return;
+
+    let idleTimeout: ReturnType<typeof setTimeout> | null = null;
+    const IDLE_TIMEOUT = 30 * 60 * 1000; // 30 minutes in milliseconds
+
+    const resetIdleTimer = () => {
+      // Clear existing timeout
+      if (idleTimeout) {
+        clearTimeout(idleTimeout);
+      }
+
+      // Set new timeout for logout after inactivity
+      idleTimeout = setTimeout(() => {
+        // User has been idle for 30 minutes
+        console.log("User idle for 30 minutes, logging out...");
+        removeAuthToken();
+        localStorage.removeItem("user_permissions");
+        setUser(null);
+        setPermissions(null);
+        alerterror("You have been inactive for 30 minutes. Please login again.", false);
+        setTimeout(() => {
+          navigate("/login");
+        }, 1000);
+      }, IDLE_TIMEOUT);
+    };
+
+    // Activity events that reset the idle timer
+    const activityEvents = [
+      "mousedown",
+      "mousemove",
+      "keypress",
+      "scroll",
+      "touchstart",
+      "click",
+      "keydown",
+    ];
+
+    // Set up activity listeners
+    const handleActivity = () => {
+      // Only reset timer if page is visible (not in background tab)
+      if (!document.hidden) {
+        resetIdleTimer();
+      }
+    };
+
+    // Handle visibility change (tab switch)
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        // Tab is hidden - pause the timer (don't clear, just pause)
+        if (idleTimeout) {
+          clearTimeout(idleTimeout);
+          idleTimeout = null;
+        }
+      } else {
+        // Tab is visible again - resume the timer
+        resetIdleTimer();
+      }
+    };
+
+    // Add event listeners
+    activityEvents.forEach((event) => {
+      window.addEventListener(event, handleActivity, true);
+    });
+
+    // Listen for visibility changes
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    // Initialize the timer
+    resetIdleTimer();
+
+    // Cleanup
+    return () => {
+      if (idleTimeout) {
+        clearTimeout(idleTimeout);
+      }
+      activityEvents.forEach((event) => {
+        window.removeEventListener(event, handleActivity, true);
+      });
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [user, navigate]);
+
+  // Periodic session verification (every 10 minutes) - only when user is active
+  // This checks if the session is still valid on the server side
+  useEffect(() => {
+    if (!user) return;
+
+    const verifyInterval = setInterval(async () => {
+      const token = getAuthToken();
+      if (!token) {
+        logout();
+        return;
+      }
+
+      try {
+        await api.get(API_ENDPOINTS.ME);
+      } catch (error: unknown) {
+        // Session expired or network error
+        const err = error as { status?: number; isNetworkError?: boolean };
+        if (err.status === 401 || err.isSessionExpired) {
+          // Session expired on server side
+          removeAuthToken();
+          localStorage.removeItem("user_permissions");
+          setUser(null);
+          setPermissions(null);
+          alerterror("Your session has expired. Please login again.", false);
+          setTimeout(() => {
+            navigate("/login");
+          }, 1000);
+        }
+        // For network errors, don't logout - just log the error
+        // The apiRequest will show the appropriate error message
+      }
+    }, 10 * 60 * 1000); // Check every 10 minutes (only when user is active)
+
+    return () => clearInterval(verifyInterval);
+  }, [user, navigate, logout]);
 
   // Check if user has a specific permission (similar to checkpermission in PHP)
   // API returns permissions as strings ("0", "1"), so we check both number and string

@@ -263,12 +263,13 @@ export default function ArticulationReports(props?: ArticulationReportsProps) {
         <DataTable
           refreshTrigger={refreshTrigger}
           columns={[
-            { data: "INSTITUTION_NAME", name: "College Name", searchable: true, orderable: true },
+            { data: "INSTITUTION_NAME", name: "College Name", searchable: true, orderable: true, width: "200px" },
             { 
               data: "INSTITUTION_ID", 
               name: "Institution ID", 
               searchable: true, 
               orderable: true,
+              width: "120px",
               render: (data: any) => {
                 if (!data) return "-";
                 return (
@@ -287,6 +288,7 @@ export default function ArticulationReports(props?: ArticulationReportsProps) {
               name: "Student ID", 
               searchable: true, 
               orderable: true,
+              width: "150px",
               render: (data: any) => {
                 if (!data) return "-";
                 if (hasUpdatePermission) {
@@ -303,12 +305,13 @@ export default function ArticulationReports(props?: ArticulationReportsProps) {
                 return <span>{data}</span>;
               }
             },
-            { data: "STUDENT_FULL_NAME", name: "Student Name", searchable: true, orderable: true },
+            { data: "STUDENT_FULL_NAME", name: "Student Name", searchable: true, orderable: true, width: "220px" },
             { 
               data: "BATCH_ID", 
               name: "Batch ID", 
               searchable: true, 
               orderable: true,
+              width: "120px",
               render: (data: any) => {
                 if (!data) return "-";
                 return (
@@ -330,15 +333,16 @@ export default function ArticulationReports(props?: ArticulationReportsProps) {
                 );
               }
             },
-            { data: "STATUS_BANNER_ARTICULATION", name: "Status Banner Articulation", searchable: false, orderable: false },
-            { data: "SUBJECT", name: "Subject", searchable: false, orderable: false },
-            { data: "COURSE_ID", name: "Course ID", searchable: false, orderable: false },
-            { data: "COURSE_TITLE", name: "Course Title", searchable: false, orderable: false },
+            { data: "STATUS_BANNER_ARTICULATION", name: "Status Banner Articulation", searchable: false, orderable: false, width: "220px" },
+            { data: "SUBJECT", name: "Subject", searchable: false, orderable: false, width: "100px" },
+            { data: "COURSE_ID", name: "Course ID", searchable: false, orderable: false, width: "120px" },
+            { data: "COURSE_TITLE", name: "Course Title", searchable: false, orderable: false, width: "200px" },
             { 
               data: "ARTICULATION_INDICATOR", 
               name: "Articulation Indicator", 
               searchable: false, 
               orderable: false,
+              width: "160px",
               render: (data: any, row: any) => {
                 const searchField = row._search_field || "";
                 if ((searchField === "Failed" || searchField === "Phase_2") && hasUpdatePermission) {
@@ -361,6 +365,7 @@ export default function ArticulationReports(props?: ArticulationReportsProps) {
               name: "Transfer Duplicate", 
               searchable: false, 
               orderable: false,
+              width: "140px",
               render: (data: any, row: any) => {
                 const searchField = row._search_field || "";
                 if ((searchField === "Failed" || searchField === "Phase_2") && hasUpdatePermission) {
@@ -390,6 +395,7 @@ export default function ArticulationReports(props?: ArticulationReportsProps) {
               name: "Equivalent Subject", 
               searchable: false, 
               orderable: false,
+              width: "140px",
               render: (data: any, row: any) => {
                 const searchField = row._search_field || "";
                 if ((searchField === "Failed" || searchField === "Phase_2") && hasUpdatePermission) {
@@ -414,6 +420,7 @@ export default function ArticulationReports(props?: ArticulationReportsProps) {
               name: "Equivalent Course ID", 
               searchable: false, 
               orderable: false,
+              width: "150px",
               render: (data: any, row: any) => {
                 const searchField = row._search_field || "";
                 if ((searchField === "Failed" || searchField === "Phase_2") && hasUpdatePermission) {
@@ -439,6 +446,7 @@ export default function ArticulationReports(props?: ArticulationReportsProps) {
               name: "Equivalent Credits", 
               searchable: false, 
               orderable: false,
+              width: "140px",
               render: (data: any, row: any) => {
                 const searchField = row._search_field || "";
                 if ((searchField === "Failed" || searchField === "Phase_2") && hasUpdatePermission) {
@@ -463,6 +471,7 @@ export default function ArticulationReports(props?: ArticulationReportsProps) {
               name: "Equivalent Grade", 
               searchable: false, 
               orderable: false,
+              width: "130px",
               render: (data: any, row: any) => {
                 const searchField = row._search_field || "";
                 if ((searchField === "Failed" || searchField === "Phase_2") && hasUpdatePermission) {
@@ -487,6 +496,7 @@ export default function ArticulationReports(props?: ArticulationReportsProps) {
               name: "Include/Exclude", 
               searchable: false, 
               orderable: false,
+              width: "120px",
               render: (data: any, row: any) => {
                 const searchField = row._search_field || "";
                 if ((searchField === "Failed" || searchField === "Phase_2") && hasUpdatePermission) {
@@ -513,6 +523,7 @@ export default function ArticulationReports(props?: ArticulationReportsProps) {
               name: "Equivalent Repeat System", 
               searchable: false, 
               orderable: false,
+              width: "180px",
               render: (data: any, row: any) => {
                 const searchField = row._search_field || "";
                 if ((searchField === "Failed" || searchField === "Phase_2") && hasUpdatePermission) {
@@ -539,6 +550,7 @@ export default function ArticulationReports(props?: ArticulationReportsProps) {
               name: "Equivalent Count In GPA", 
               searchable: false, 
               orderable: false,
+              width: "160px",
               render: (data: any, row: any) => {
                 const searchField = row._search_field || "";
                 if ((searchField === "Failed" || searchField === "Phase_2") && hasUpdatePermission) {
@@ -568,6 +580,7 @@ export default function ArticulationReports(props?: ArticulationReportsProps) {
               name: "Course Attribute", 
               searchable: false, 
               orderable: false,
+              width: "130px",
               render: (data: any, row: any) => {
                 const searchField = row._search_field || "";
                 if ((searchField === "Failed" || searchField === "Phase_2") && hasUpdatePermission) {
@@ -584,15 +597,16 @@ export default function ArticulationReports(props?: ArticulationReportsProps) {
                 return <span>{data || "-"}</span>;
               }
             },
-            { data: "LEVEL", name: "Level", searchable: false, orderable: false },
-            { data: "ATTENDANCE_PERIOD", name: "Attendance Period", searchable: false, orderable: false },
-            { data: "TERM", name: "Term", searchable: false, orderable: false },
+            { data: "LEVEL", name: "Level", searchable: false, orderable: false, width: "80px" },
+            { data: "ATTENDANCE_PERIOD", name: "Attendance Period", searchable: false, orderable: false, width: "140px" },
+            { data: "TERM", name: "Term", searchable: false, orderable: false, width: "100px" },
             ...(type !== "Processed" ? [
               { 
                 data: "ERROR_REASON", 
                 name: "Error Reason / Action", 
                 searchable: false, 
                 orderable: false,
+                width: "400px",
                 render: (data: any) => {
                   if (!data) return "-";
                   // Split on numbering pattern and render with <br>
@@ -605,6 +619,7 @@ export default function ArticulationReports(props?: ArticulationReportsProps) {
                 name: "Error Screenshot", 
                 searchable: false, 
                 orderable: false,
+                width: "120px",
                 render: (data: any, row: any) => {
                   // Show link if ERROR_SCREENSHOT exists (matches CI3 line 237-239)
                   if (!data || data === "" || data === null || data === undefined) return "-";
@@ -630,6 +645,7 @@ export default function ArticulationReports(props?: ArticulationReportsProps) {
                 name: "Transcript", 
                 searchable: false, 
                 orderable: false,
+                width: "100px",
                 render: (data: any) => {
                   if (!data || data === "" || data === null || data === undefined) return "-";
                   // Backend already returns encrypted URL like: /api/viewfile/transcript_file?pdf={encrypted}
@@ -650,6 +666,7 @@ export default function ArticulationReports(props?: ArticulationReportsProps) {
               name: type === "Failed" || type === "Phase_2" ? "Reprocess Articulation?" : "Articulation Status", 
               searchable: false, 
               orderable: false,
+              width: "240px",
               render: (_data: any, row: any) => {
                 const searchField = row._search_field || "";
                 if ((searchField === "Failed" || searchField === "Phase_2") && hasUpdatePermission) {
@@ -677,6 +694,7 @@ export default function ArticulationReports(props?: ArticulationReportsProps) {
               name: "Comments", 
               searchable: false, 
               orderable: false,
+              width: "350px",
               render: (data: any, row: any) => {
                 const searchField = row._search_field || "";
                 const isCommentEdited = row._is_comment_edited || false;
@@ -716,10 +734,10 @@ export default function ArticulationReports(props?: ArticulationReportsProps) {
                 return <span>{data || "-"}</span>;
               }
             },
-            { data: "CREDIT_HOURS_EARNED", name: "Credits", searchable: false, orderable: false },
-            { data: "GRADE", name: "Grade", searchable: false, orderable: false },
-            { data: "LAST_UPDATED_DATETIME", name: "Updated On", searchable: false, orderable: true },
-            { data: "UPDATED_BY", name: "Updated By", searchable: true, orderable: true },
+            { data: "CREDIT_HOURS_EARNED", name: "Credits", searchable: false, orderable: false, width: "100px" },
+            { data: "GRADE", name: "Grade", searchable: false, orderable: false, width: "80px" },
+            { data: "LAST_UPDATED_DATETIME", name: "Updated On", searchable: false, orderable: true, width: "200px" },
+            { data: "UPDATED_BY", name: "Updated By", searchable: true, orderable: true, width: "120px" },
           ]}
           ajaxUrl={`${API_BASE_URL}${API_ENDPOINTS.ARTICULATION_REPORTS_LIST}`}
           ajaxMethod="POST"

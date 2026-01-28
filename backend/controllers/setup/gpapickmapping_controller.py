@@ -71,11 +71,11 @@ async def insert(request: GpaPickRequest, db: Session = Depends(get_db)):
 @router.post("/get", response_model=dict)
 async def get_gpa_pick(request: DeleteRequest, db: Session = Depends(get_db)):
     try:
-        query = text(f"SELECT Id, GPA_PICK FROM {TBL_GPA_PICK_MAPPING} WHERE Id = :id")
+        query = text(f"SELECT ID, GPA_PICK FROM {TBL_GPA_PICK_MAPPING} WHERE ID = :id")
         result = db.execute(query, {"id": request.id}).fetchone()
         if not result:
             raise HTTPException(status_code=404, detail="GPA Pick not found")
-        return {"Id": result.Id, "GPA_PICK": result.GPA_PICK}
+        return {"Id": result.ID if hasattr(result, 'ID') else result[0], "GPA_PICK": result.GPA_PICK if hasattr(result, 'GPA_PICK') else result[1]}
     except HTTPException:
         raise
     except Exception as e:
@@ -91,7 +91,7 @@ async def update(request: GpaPickUpdateRequest, db: Session = Depends(get_db)):
             UPDATE {TBL_GPA_PICK_MAPPING}
             SET GPA_PICK = :gpa_pick,
                 UPDATED_BY = :updated_by, LAST_UPDATED_DATETIME = :last_updated_datetime
-            WHERE Id = :id
+            WHERE ID = :id
         """)
         result = db.execute(update_query, {
             "id": request.Id,

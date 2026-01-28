@@ -21,6 +21,7 @@ import {
   ArrowRightIcon,
   FolderIcon,
   BoxCubeIcon,
+  AlertIcon,
 } from "../icons";
 
 // Map icon string names to icon components
@@ -47,6 +48,7 @@ export const iconMap: Record<string, React.ComponentType<any>> = {
   "arrow-right": ArrowRightIcon,
   folder: FolderIcon,
   "box-cube": BoxCubeIcon,
+  alert: AlertIcon,
 };
 
 export const getIcon = (iconName?: string | React.ReactNode): React.ReactNode => {

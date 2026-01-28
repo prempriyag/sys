@@ -100,7 +100,7 @@ class GpaScaleMappingModel:
             
             count_query = text(f"""
                 SELECT count(*) as allcount
-                FROM {TBL_GPA_SCALE_MAPPING}
+                FROM {TBL_GPA_SCALE_MAPPING} WITH(NOLOCK)
                 WHERE {where_clause}
             """)
 
@@ -120,8 +120,8 @@ class GpaScaleMappingModel:
 
             # Build data query
             data_query_sql = f"""
-                SELECT Id, GPA_SCALE, UPDATED_BY, LAST_UPDATED_DATETIME
-                FROM {TBL_GPA_SCALE_MAPPING}
+                SELECT ID, GPA_SCALE, UPDATED_BY, LAST_UPDATED_DATETIME
+                FROM {TBL_GPA_SCALE_MAPPING} WITH(NOLOCK)
                 WHERE {where_clause}
                 ORDER BY {order_by_clause}
                 OFFSET {start} ROWS

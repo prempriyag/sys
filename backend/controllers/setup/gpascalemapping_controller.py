@@ -71,11 +71,11 @@ async def insert(request: GpaScaleRequest, db: Session = Depends(get_db)):
 @router.post("/get", response_model=dict)
 async def get_gpa_scale(request: DeleteRequest, db: Session = Depends(get_db)):
     try:
-        query = text(f"SELECT Id, GPA_SCALE FROM {TBL_GPA_SCALE_MAPPING} WHERE Id = :id")
+        query = text(f"SELECT ID, GPA_SCALE FROM {TBL_GPA_SCALE_MAPPING} WHERE ID = :id")
         result = db.execute(query, {"id": request.id}).fetchone()
         if not result:
             raise HTTPException(status_code=404, detail="GPA Scale not found")
-        return {"Id": result.Id, "GPA_SCALE": result.GPA_SCALE}
+        return {"Id": result.ID if hasattr(result, 'ID') else result[0], "GPA_SCALE": result.GPA_SCALE if hasattr(result, 'GPA_SCALE') else result[1]}
     except HTTPException:
         raise
     except Exception as e:
@@ -91,7 +91,7 @@ async def update(request: GpaScaleUpdateRequest, db: Session = Depends(get_db)):
             UPDATE {TBL_GPA_SCALE_MAPPING}
             SET GPA_SCALE = :gpa_scale,
                 UPDATED_BY = :updated_by, LAST_UPDATED_DATETIME = :last_updated_datetime
-            WHERE Id = :id
+            WHERE ID = :id
         """)
         result = db.execute(update_query, {
             "id": request.Id,

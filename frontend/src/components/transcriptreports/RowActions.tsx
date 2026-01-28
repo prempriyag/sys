@@ -115,9 +115,9 @@ export default function RowActions({
   const showActions = type !== "Processed" && type !== "equivalenthours" && type !== "";
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-2" style={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>
       {showActions && hasUpdatePermission && (
-        <div className="flex gap-2">
+        <div className="flex gap-2" style={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>
           {searchField === "Articulation-Kickouts" || searchField === "ArticulationKickouts" ? (
             // For Articulation-Kickouts, show articulation dropdown only if not Processed
             articulationStatus !== "Processed" && (
@@ -149,6 +149,11 @@ export default function RowActions({
           className="form-select SCENARIO rounded border border-gray-300 bg-white px-2 py-1 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white"
           value={scenario}
           onChange={handleScenarioChange}
+          style={{
+            width: '100%',
+            maxWidth: '100%',
+            boxSizing: 'border-box',
+          }}
         >
           <option value="0">Select Option</option>
           <option value="Applicant">Applicant</option>

@@ -242,6 +242,132 @@ class CollegeVerifierModel:
             logger.error(f"get_verifiers_list: {e}")
             raise
 
+    @staticmethod
+    def get_all_verifier_batch_data(
+        db: Session, request_data: Dict[str, Any], project_id: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """
+        College or School OCR assigned batches list for DataTables.
+        CI: ajaxverifierbatchelist / getallverifierbatchdata.
+        project_id: COLLEGE_PROJECT_ID (default) or SCHOOL_PROJECT_ID for school.
+        Returns { draw, recordsTotal, recordsFiltered, data }.
+        """
+        pid = project_id if project_id is not None else COLLEGE_PROJECT_ID
+        draw = int(request_data.get("draw", 1))
+        start = int(request_data.get("start", 0))
+        length = int(request_data.get("length", 10))
+        if length <= 0:
+            length = 10
+        order_list = request_data.get("order") or []
+        columns_list = request_data.get("columns") or []
+        field_type = (request_data.get("fieldType") or "").strip()
+        username_filter = (request_data.get("username") or "").strip()
+        institution_name = (request_data.get("institution_name") or "").strip()
+        fromdate = (request_data.get("fromdate") or "").strip()
+        todate = (request_data.get("todate") or "").strip()
+        search_val = (request_data.get("search") or {}).get("value") or ""
+        if isinstance(search_val, str):
+            search_val = search_val.strip()
+
+        # Order by: map column index to SQL column (frontend: BATCH_ID, VERIFIER_NAME, USERNAME, STATUS_FLAG, INSTITUTION_TYPE, OCR_EXTRACTED_DATE)
+        order_col_map = {
+            "BATCH_ID": "t.BATCH_ID",
+            "VERIFIER_NAME": "t.PORTAL_VERIFIER_NAME",
+            "USERNAME": "t.PORTAL_VERIFIER_NAME",
+            "STATUS_FLAG": "t.STATUS_FLAG",
+            "INSTITUTION_TYPE": "t.EXTERNAL_INSTITUTION_NAME",
+            "OCR_EXTRACTED_DATE": "COALESCE(t.OCR_EXTRACTED_DATE, t.OCR_UPLOADED_DATE)",
+        }
+        order_col = "t.BATCH_ID"
+        order_dir = "DESC"
+        if order_list and columns_list:
+            col_idx = int(order_list[0].get("column", 0))
+            order_dir = (order_list[0].get("dir") or "desc").upper()
+            if order_dir not in ("ASC", "DESC"):
+                order_dir = "DESC"
+            if 0 <= col_idx < len(columns_list):
+                data_key = columns_list[col_idx].get("data")
+                if data_key and data_key in order_col_map:
+                    order_col = order_col_map[data_key]
+
+        # Build WHERE: PROJECT_ID + filters
+        where_parts = [f"t.PROJECT_ID = :pid"]
+        params: Dict[str, Any] = {"pid": pid}
+
+        if field_type:
+            where_parts.append("t.STATUS_FLAG = :field_type")
+            params["field_type"] = field_type
+        if username_filter:
+            where_parts.append("t.PORTAL_VERIFIER_NAME LIKE :username_filter")
+            params["username_filter"] = f"%{username_filter}%"
+        if institution_name:
+            where_parts.append("t.EXTERNAL_INSTITUTION_NAME LIKE :institution_name")
+            params["institution_name"] = f"%{institution_name}%"
+        if fromdate:
+            where_parts.append("CAST(COALESCE(t.OCR_EXTRACTED_DATE, t.OCR_UPLOADED_DATE) AS DATE) >= CAST(:fromdate AS DATE)")
+            params["fromdate"] = fromdate
+        if todate:
+            where_parts.append("CAST(COALESCE(t.OCR_EXTRACTED_DATE, t.OCR_UPLOADED_DATE) AS DATE) <= CAST(:todate AS DATE)")
+            params["todate"] = todate
+        if search_val:
+            where_parts.append(
+                "(t.BATCH_ID LIKE :search_val OR t.PORTAL_VERIFIER_NAME LIKE :search_val2 "
+                "OR t.EXTERNAL_INSTITUTION_NAME LIKE :search_val2 OR t.STATUS_FLAG LIKE :search_val2)"
+            )
+            params["search_val"] = f"%{search_val}%"
+            params["search_val2"] = f"%{search_val}%"
+
+        where_sql = " AND ".join(where_parts)
+
+        # Count total (no filters except PROJECT_ID)
+        count_total_sql = f"""
+            SELECT COUNT(*) AS c FROM {TBL_TRANSCRIPTHDROCR} AS t WITH(NOLOCK)
+            WHERE t.PROJECT_ID = :pid
+        """
+        total_result = db.execute(text(count_total_sql), {"pid": pid}).fetchone()
+        records_total = total_result[0] if total_result else 0
+
+        # Count filtered
+        count_filtered_sql = f"""
+            SELECT COUNT(*) AS c FROM {TBL_TRANSCRIPTHDROCR} AS t WITH(NOLOCK)
+            WHERE {where_sql}
+        """
+        filtered_result = db.execute(text(count_filtered_sql), params).fetchone()
+        records_filtered = filtered_result[0] if filtered_result else 0
+
+        # Data query: select columns needed for table (COALESCE supports either date column)
+        data_sql = f"""
+            SELECT t.BATCH_ID, t.PORTAL_VERIFIER_NAME, t.STATUS_FLAG, t.EXTERNAL_INSTITUTION_NAME,
+                   COALESCE(t.OCR_EXTRACTED_DATE, t.OCR_UPLOADED_DATE) AS OCR_EXTRACTED_DATE
+            FROM {TBL_TRANSCRIPTHDROCR} AS t WITH(NOLOCK)
+            WHERE {where_sql}
+            ORDER BY {order_col} {order_dir}
+            OFFSET :start ROWS FETCH NEXT :length ROWS ONLY
+        """
+        params["start"] = start
+        params["length"] = length
+        rows = db.execute(text(data_sql), params).fetchall()
+
+        data = []
+        for r in rows:
+            row = r._mapping
+            verifier = row.get("PORTAL_VERIFIER_NAME") or ""
+            data.append({
+                "BATCH_ID": row.get("BATCH_ID") or "",
+                "VERIFIER_NAME": verifier,
+                "USERNAME": verifier,
+                "STATUS_FLAG": row.get("STATUS_FLAG") or "",
+                "INSTITUTION_TYPE": row.get("EXTERNAL_INSTITUTION_NAME") or "",
+                "OCR_EXTRACTED_DATE": str(row.get("OCR_EXTRACTED_DATE") or ""),
+            })
+
+        return {
+            "draw": draw,
+            "recordsTotal": records_total,
+            "recordsFiltered": records_filtered,
+            "data": data,
+        }
+
     # ---------- School OCR (TBL_TRANSCRIPT_TEST_SCORE_OCR) ----------
 
     @staticmethod

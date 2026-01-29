@@ -12,6 +12,8 @@ from pydantic import BaseModel
 
 from database.connection import get_db
 from models.college_verifier_model import CollegeVerifierModel
+from config.constants import SCHOOL_PROJECT_ID
+
 router = APIRouter(prefix="/api/ocrverify", tags=["ocr-school"])
 
 
@@ -97,13 +99,8 @@ async def schoolocr_ajaxverifierbatchelist(
 ):
     """School OCR verifier batch list. CI: schoolocr/ajaxverifierbatchelist."""
     try:
-        # Stub: return DataTables shape; replace with real query on TBL_TRANSCRIPTHDROCR + PROJECT_ID=SCHOOL_PROJECT_ID
-        return {
-            "draw": request.draw,
-            "recordsTotal": 0,
-            "recordsFiltered": 0,
-            "data": [],
-        }
+        request_data = request.model_dump() if hasattr(request, "model_dump") else request.dict()
+        return CollegeVerifierModel.get_all_verifier_batch_data(db, request_data, SCHOOL_PROJECT_ID)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

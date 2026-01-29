@@ -159,13 +159,8 @@ async def collegeocr_ajaxverifierbatchelist(
 ):
     """College OCR verifier batch list. CI: ajaxverifierbatchelist. Returns DataTables payload (recordsTotal, recordsFiltered, data)."""
     try:
-        # Stub: return empty DataTables response; full implementation would use getallverifierbatchdata
-        return {
-            "draw": request.draw,
-            "recordsTotal": 0,
-            "recordsFiltered": 0,
-            "data": [],
-        }
+        request_data = request.model_dump() if hasattr(request, "model_dump") else request.dict()
+        return CollegeVerifierModel.get_all_verifier_batch_data(db, request_data)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

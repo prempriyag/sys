@@ -404,6 +404,42 @@ if batchdetails_controller is not None:
 else:
     print("[MAIN] WARNING: batchdetails_controller router NOT registered due to import error")
 
+# Import OCR (ocrverify) module controllers
+try:
+    from controllers.ocr import (
+        dashboard_controller as ocr_dashboard_controller,
+        verifier_controller,
+        college_ocr_controller,
+        college_hdr_controller,
+        school_ocr_controller,
+        school_hdr_controller,
+    )
+    print("[MAIN] Successfully imported OCR (ocrverify) controllers")
+except Exception as e:
+    print(f"[MAIN] ERROR importing OCR controllers: {e}")
+    import traceback
+    traceback.print_exc()
+    ocr_dashboard_controller = None
+    verifier_controller = None
+    college_ocr_controller = None
+    college_hdr_controller = None
+    school_ocr_controller = None
+    school_hdr_controller = None
+
+# Include OCR routers if imported successfully
+ocr_controllers = [
+    (ocr_dashboard_controller, "ocr_dashboard_controller"),
+    (verifier_controller, "ocr_verifier_controller"),
+    (college_ocr_controller, "ocr_college_ocr_controller"),
+    (college_hdr_controller, "ocr_college_hdr_controller"),
+    (school_ocr_controller, "ocr_school_ocr_controller"),
+    (school_hdr_controller, "ocr_school_hdr_controller"),
+]
+for ctrl, name in ocr_controllers:
+    if ctrl is not None:
+        app.include_router(ctrl.router)
+        print(f"[MAIN] Successfully registered {name} router")
+
 # Import error log controller
 try:
     from controllers.college import errorlog_controller
@@ -497,6 +533,20 @@ except Exception as e:
 if studentview_controller is not None:
     app.include_router(studentview_controller.router)
     print("[MAIN] Successfully registered studentview_controller router")
+
+# Import school studentview controller (HS)
+try:
+    from controllers.school import studentview_controller as school_studentview_controller
+    print("[MAIN] Successfully imported school studentview_controller")
+except Exception as e:
+    print(f"[MAIN] ERROR importing school studentview_controller: {e}")
+    import traceback
+    traceback.print_exc()
+    school_studentview_controller = None
+
+if school_studentview_controller is not None:
+    app.include_router(school_studentview_controller.router)
+    print("[MAIN] Successfully registered school studentview_controller router")
 
 
 @app.get("/")

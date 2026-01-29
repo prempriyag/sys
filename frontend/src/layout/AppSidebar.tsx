@@ -83,14 +83,24 @@ const AppSidebar: React.FC = () => {
   );
 
   const isActive = useCallback(
-    (path?: string) => {
-      if (!path) return false;
-      // Handle query params in path
-      const pathWithoutQuery = path.split("?")[0];
-      return (
-        location.pathname === pathWithoutQuery ||
-        location.pathname.startsWith(pathWithoutQuery + "/")
-      );
+    (path?: string, activePaths?: string[]) => {
+      const current = location.pathname.split("?")[0];
+      if (path) {
+        const pathWithoutQuery = path.split("?")[0];
+        if (
+          current === pathWithoutQuery ||
+          current.startsWith(pathWithoutQuery + "/")
+        ) {
+          return true;
+        }
+      }
+      if (activePaths?.length) {
+        return activePaths.some((p) => {
+          const pClean = p.split("?")[0];
+          return current === pClean || current.startsWith(pClean + "/");
+        });
+      }
+      return false;
     },
     [location.pathname]
   );
@@ -119,7 +129,7 @@ const AppSidebar: React.FC = () => {
               }
               return hasNestedActive;
             }
-            return isActive(subItem.path);
+            return isActive(subItem.path, subItem.activePaths);
           });
 
           if (hasActiveSubItem) {
@@ -145,11 +155,11 @@ const AppSidebar: React.FC = () => {
             }
             return isNestedActive;
           }
-          return isActive(subItem.path);
+          return isActive(subItem.path, subItem.activePaths);
         });
         return hasActive;
       }
-      return isActive(item.path);
+      return isActive(item.path, item.activePaths);
     };
 
     checkActiveMenu(filteredMenuConfigItems);
@@ -242,7 +252,7 @@ const AppSidebar: React.FC = () => {
 
     const key = parentKey ? `${parentKey}-${index}` : `${index}`;
     const hasSubItems = item.subItems && item.subItems.length > 0;
-    const isItemActive = isActive(item.path);
+    const isItemActive = isActive(item.path, item.activePaths);
     const isSubmenuOpen = openSubmenu[key] || false;
 
     if (hasSubItems) {
@@ -310,7 +320,7 @@ const AppSidebar: React.FC = () => {
                       >
                         {subItem.icon && (
                           <span className={`menu-item-icon-size ${
-                            isActive(subItem.path)
+                            isActive(subItem.path, subItem.activePaths)
                               ? "menu-item-icon-active"
                               : "menu-item-icon-inactive"
                           }`}>

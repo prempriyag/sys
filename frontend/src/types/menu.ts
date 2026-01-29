@@ -5,6 +5,8 @@ export type MenuItem = {
   permission?: string; // Single permission check (checkpermission)
   permissions?: string[]; // Multiple permissions check (checkallpermission - show if user has ANY)
   subItems?: MenuItem[];
+  /** Paths that also mark this item as active (e.g. batch view under same section) */
+  activePaths?: string[];
   badge?: {
     label: string;
     variant?: "new" | "pro" | "default";

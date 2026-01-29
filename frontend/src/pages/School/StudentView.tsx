@@ -45,8 +45,10 @@ interface StudentViewData {
 }
 
 /**
- * Student View page - Student to Transcripts Action Center
- * Based on CI3 Studentview controller and student_page view
+ * Student View page (HS) - Student to Transcripts Action Center
+ * Matches: CI3 school/Studentview (application/controllers/school/Studentview.php)
+ *          CI3 view (application/views/school/studentview/student_page.php)
+ * HS shows only: Failed, Processed, Rerun (no Articulation-Kickouts or articulation_* rows).
  */
 export default function StudentView() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -110,7 +112,7 @@ export default function StudentView() {
     const fetchStudents = async () => {
       try {
         // Fetch all students (no query parameter = get all students)
-        const response = await api.get(API_ENDPOINTS.STUDENTVIEW_GET_STUDENTS);
+        const response = await api.get(API_ENDPOINTS.SCHOOL_STUDENTVIEW_GET_STUDENTS);
         console.log("[StudentView] Fetched students list:", response?.length || 0, "students");
         if (response && Array.isArray(response)) {
           // Ensure we have proper student objects
@@ -145,7 +147,7 @@ export default function StudentView() {
       try {
         // Build query string manually since api.get doesn't handle params
         const queryParams = new URLSearchParams({ student_id: studentId });
-        const url = `${API_ENDPOINTS.STUDENTVIEW}?${queryParams.toString()}`;
+        const url = `${API_ENDPOINTS.SCHOOL_STUDENTVIEW}?${queryParams.toString()}`;
         console.log("[StudentView] Fetching student data from:", url);
         const response = await api.get(url);
         console.log("[StudentView] Student data response:", response);
@@ -201,12 +203,9 @@ export default function StudentView() {
       Object.entries(studentData.batch_details).forEach(([instId, batches]) => {
         batches.forEach((batch) => {
           const menuWithBatch = studentData.menu_list[instId]?.[batch] || {};
+          // HS view: expand when Failed or Rerun (no Articulation-Kickouts/articulation_* in PHP)
           const hasKickouts =
-            (menuWithBatch["Failed"] > 0 ||
-              menuWithBatch["Articulation-Kickouts"] > 0 ||
-              menuWithBatch["Rerun"] > 0 ||
-              menuWithBatch["articulation_Failed"] > 0 ||
-              menuWithBatch["articulation_Rerun"] > 0) ||
+            (menuWithBatch["Failed"] > 0 || menuWithBatch["Rerun"] > 0) ||
             (batch === selectedBatch && instId === selectedInstitution);
 
           if (hasKickouts) {
@@ -480,13 +479,9 @@ export default function StudentView() {
                                 ? `${institution.INSTITUTION_NAME} - ${institution.INSTITUTION_ID} - ${batchId} - ${ocrDate}`
                                 : `${institution.INSTITUTION_NAME} - ${institution.INSTITUTION_ID} - ${batchId}`;
 
-                              // Check if should be expanded (matching CI3 line 78-80)
+                              // HS: expand when Failed or Rerun (CI3 school view line 66)
                               const shouldExpand = 
-                                (menuWithBatch["Failed"] > 0 || 
-                                 menuWithBatch["Articulation-Kickouts"] > 0 || 
-                                 menuWithBatch["Rerun"] > 0 || 
-                                 menuWithBatch["articulation_Failed"] > 0 || 
-                                 menuWithBatch["articulation_Rerun"] > 0) ||
+                                (menuWithBatch["Failed"] > 0 || menuWithBatch["Rerun"] > 0) ||
                                 (batchId === selectedBatch && institution.INSTITUTION_ID === selectedInstitution);
                               const isExpandedNow = isExpanded || shouldExpand;
 
@@ -564,44 +559,10 @@ export default function StudentView() {
                                             </li>
                                           )}
 
-                                          {/* Articulation-Kickouts - matching CI3 lines 91-99 */}
-                                          {menuWithBatch["Articulation-Kickouts"] > 0 &&
-                                            !menuWithBatch["articulation_Failed"] && (
-                                              <li className="tree-item view">
-                                                <button
-                                                  className={`w-full text-left px-3 py-1.5 rounded text-sm flex items-center justify-between ${
-                                                    isActive("Articulation-Kickouts", institution.INSTITUTION_ID, batchId, "transcript") 
-                                                      ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300" 
-                                                      : "hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
-                                                  }`}
-                                                  onClick={(e) => {
-                                                    e.preventDefault();
-                                                    handleViewPageLoad(
-                                                      studentId,
-                                                      "Articulation-Kickouts",
-                                                      institution.INSTITUTION_ID,
-                                                      batchId,
-                                                      "transcript"
-                                                    );
-                                                  }}
-                                                >
-                                                  <span className="flex items-center gap-2">
-                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                                    </svg>
-                                                    Articulation-Kickouts
-                                                  </span>
-                                                  {menuWithBatch["Articulation-Kickouts"] > 1 && (
-                                                    <span className="inline-flex items-center justify-center rounded-full bg-red-500 h-5 w-5 text-xs font-medium text-white">
-                                                      {menuWithBatch["Articulation-Kickouts"]}
-                                                    </span>
-                                                  )}
-                                                </button>
-                                              </li>
-                                            )}
+                                          {/* HS: no Articulation-Kickouts row (commented out in PHP school view) */}
 
-                                          {/* Transcript Processed - matching CI3 lines 100-112 */}
-                                          {menuWithBatch["Articulation-Kickouts"] === 0 && menuWithBatch["Processed"] > 0 && (
+                                          {/* Transcript Processed - CI3 school view line 78-82 */}
+                                          {menuWithBatch["Processed"] > 0 && (
                                             <li className="tree-item view">
                                               <button
                                                 className={`w-full text-left px-3 py-1.5 rounded text-sm flex items-center justify-between ${
@@ -675,103 +636,7 @@ export default function StudentView() {
                                               </button>
                                             </li>
                                           )}
-
-                                          {/* Articulation Status Items - matching CI3 lines 124-150 */}
-                                          {menuWithBatch["articulation_Failed"] > 0 && (
-                                            <li className="tree-item view">
-                                              <button
-                                                className={`w-full text-left px-3 py-1.5 rounded text-sm flex items-center justify-between ${
-                                                  isActive("Failed", institution.INSTITUTION_ID, batchId, "articulation") 
-                                                    ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300" 
-                                                    : "hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
-                                                }`}
-                                                onClick={(e) => {
-                                                  e.preventDefault();
-                                                  handleViewPageLoad(
-                                                    studentId,
-                                                    "Failed",
-                                                    institution.INSTITUTION_ID,
-                                                    batchId,
-                                                    "articulation"
-                                                  );
-                                                }}
-                                              >
-                                                <span className="flex items-center gap-2">
-                                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                                  </svg>
-                                                  Articulation Course Kickouts
-                                                </span>
-                                                <span className="inline-flex items-center justify-center rounded-full bg-red-500 h-5 w-5 text-xs font-medium text-white">
-                                                  {menuWithBatch["articulation_Failed"]}
-                                                </span>
-                                              </button>
-                                            </li>
-                                          )}
-
-                                          {menuWithBatch["articulation_Processed"] > 0 && (
-                                            <li className="tree-item view">
-                                              <button
-                                                className={`w-full text-left px-3 py-1.5 rounded text-sm flex items-center justify-between ${
-                                                  isActive("Processed", institution.INSTITUTION_ID, batchId, "articulation") 
-                                                    ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300" 
-                                                    : "hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
-                                                }`}
-                                                onClick={(e) => {
-                                                  e.preventDefault();
-                                                  handleViewPageLoad(
-                                                    studentId,
-                                                    "Processed",
-                                                    institution.INSTITUTION_ID,
-                                                    batchId,
-                                                    "articulation"
-                                                  );
-                                                }}
-                                              >
-                                                <span className="flex items-center gap-2">
-                                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                                  </svg>
-                                                  Articulation Course Processed
-                                                </span>
-                                                <span className="inline-flex items-center justify-center rounded-full bg-red-500 h-5 w-5 text-xs font-medium text-white">
-                                                  {menuWithBatch["articulation_Processed"]}
-                                                </span>
-                                              </button>
-                                            </li>
-                                          )}
-
-                                          {menuWithBatch["articulation_Rerun"] > 0 && (
-                                            <li className="tree-item view">
-                                              <button
-                                                className={`w-full text-left px-3 py-1.5 rounded text-sm flex items-center justify-between ${
-                                                  isActive("Rerun", institution.INSTITUTION_ID, batchId, "articulation") 
-                                                    ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300" 
-                                                    : "hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
-                                                }`}
-                                                onClick={(e) => {
-                                                  e.preventDefault();
-                                                  handleViewPageLoad(
-                                                    studentId,
-                                                    "Rerun",
-                                                    institution.INSTITUTION_ID,
-                                                    batchId,
-                                                    "articulation"
-                                                  );
-                                                }}
-                                              >
-                                                <span className="flex items-center gap-2">
-                                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                                  </svg>
-                                                  Articulation Course Rerun
-                                                </span>
-                                                <span className="inline-flex items-center justify-center rounded-full bg-red-500 h-5 w-5 text-xs font-medium text-white">
-                                                  {menuWithBatch["articulation_Rerun"]}
-                                                </span>
-                                              </button>
-                                            </li>
-                                          )}
+                                          {/* HS: no articulation_* rows (commented out in PHP school view) */}
                                         </>
                                       )}
                                     </ul>
@@ -808,64 +673,33 @@ export default function StudentView() {
           <div className="row mx-0 align-items-center mt-6" id="transcript_view">
             <div className="col-md-12">
               {/* Check if type is selected (matching CI3 line 166: if ($type)) */}
+              {/* HS: only transcript view (CI3 school view loads school/hdrreports/list only) */}
               {selectedType && studentData && studentId ? (
                 <>
-                  {/* Check page type (matching CI3 line 167: if ($page_type == 'articulation')) */}
-                  {selectedPageType === "articulation" ? (
-                    <>
-                      {/* Determine page title based on type (matching CI3 lines 168-176) */}
-                      <div className="mb-4">
-                        <h4 className="text-lg font-bold text-gray-800 dark:text-white">
-                          {selectedType === "Failed"
-                            ? "Articulation Kickouts"
-                            : selectedType === "Processed"
-                            ? "Articulation Processed"
-                            : selectedType === "Rerun"
-                            ? "Articulation Rerun"
-                            : "Articulation Reports"}
-                        </h4>
-                        {studentData.student_info && (
-                          <p className="text-sm text-gray-500 dark:text-gray-400">
-                            Student: {studentData.student_info.STUDENT_FULL_NAME}
-                            {studentData.student_info.STUDENT_ID && ` - ${studentData.student_info.STUDENT_ID}`}
-                          </p>
-                        )}
-                      </div>
-
-                    </>
-                  ) : (
-                    <>
-                      {/* Transcript Reports (matching CI3 lines 184-200) */}
-                      <div className="mb-4">
-                        <h4 className="text-lg font-bold text-gray-800 dark:text-white">
-                          {selectedType === "Failed"
-                            ? "Transcript Kickouts"
-                            : selectedType === "Articulation-Kickouts"
-                            ? "Articulation Kickouts"
-                            : selectedType === "Processed"
-                            ? "Transcript Processed"
-                            : selectedType === "Rerun"
-                            ? "Transcript Rerun"
-                            : "Transcript Reports"}
-                        </h4>
-                        {studentData.student_info && (
-                          <p className="text-sm text-gray-500 dark:text-gray-400">
-                            Student: {studentData.student_info.STUDENT_FULL_NAME}
-                            {studentData.student_info.STUDENT_ID && ` - ${studentData.student_info.STUDENT_ID}`}
-                          </p>
-                        )}
-                      </div>
-                      
-                      {/* Load Transcript Reports (matching CI3 line 201: $this->load->view('admin/transcriptreports/list', $data)) */}
-                      <SchoolTranscriptReports
-                        key={`transcript-${studentId}-${selectedBatch}-${selectedInstitution}-${selectedType}`}
-                        studentId={studentId}
-                        batchId={selectedBatch}
-                        institutionId={selectedInstitution}
-                        type={selectedType}
-                      />
-                    </>
-                  )}
+                  <div className="mb-4">
+                    <h4 className="text-lg font-bold text-gray-800 dark:text-white">
+                      {selectedType === "Failed"
+                        ? "Transcript Kickouts"
+                        : selectedType === "Processed"
+                        ? "Transcript Processed"
+                        : selectedType === "Rerun"
+                        ? "Transcript Rerun"
+                        : "Transcript Reports"}
+                    </h4>
+                    {studentData.student_info && (
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        Student: {studentData.student_info.STUDENT_FULL_NAME}
+                        {studentData.student_info.STUDENT_ID && ` - ${studentData.student_info.STUDENT_ID}`}
+                      </p>
+                    )}
+                  </div>
+                  <SchoolTranscriptReports
+                    key={`transcript-${studentId}-${selectedBatch}-${selectedInstitution}-${selectedType}`}
+                    studentId={studentId}
+                    batchId={selectedBatch}
+                    institutionId={selectedInstitution}
+                    type={selectedType}
+                  />
                 </>
               ) : loading ? (
                 // Loading state

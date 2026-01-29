@@ -47,7 +47,8 @@ interface StudentViewData {
 
 /**
  * Student View page - Student to Transcripts Action Center
- * Based on CI3 Studentview controller and student_page view
+ * Matches: CI3 Studentview controller (application/controllers/Studentview.php)
+ *          CI3 view (application/views/admin/studentview/student_page.php)
  */
 export default function StudentView() {
   const [searchParams, setSearchParams] = useSearchParams();

@@ -122,12 +122,19 @@ class SchoolTranscriptReportsModel:
                 "OR UPPER(k.ARTICULATION_STATUS_FLAG) = 'PARTIALLY PROCESSED'))"
             )
 
+        # BATCH_ID exact filter (e.g. from Student View; CI3 School->gethdrdatareports passes BATCH_ID)
+        if request_data.get("BATCH_ID"):
+            search_conditions.append(f"k.BATCH_ID = '{check_special_name(str(request_data['BATCH_ID']))}'")
+
         # Field type filters (matches CI3 lines 431-588)
         field_type = request_data.get("fieldType")
         field_name = request_data.get("fieldName")
 
         if field_type and field_name:
             if field_type == "COLLEGE_ID":
+                search_conditions.append(f"k.INSTITUTION_ID = '{check_special_name(field_name)}'")
+            elif field_type == "SCHOOL_ID":
+                # CI3 school/Studentview uses fieldType = 'SCHOOL_ID', fieldName = INSTITUTION_ID
                 search_conditions.append(f"k.INSTITUTION_ID = '{check_special_name(field_name)}'")
             elif field_type == "SOURCE_TYPE":
                 search_conditions.append(f"d.SOURCE_TYPE = '{check_special_name(field_name)}'")

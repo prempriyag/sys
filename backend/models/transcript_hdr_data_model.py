@@ -13,6 +13,7 @@ from config.constants import (
     TBL_TRANSCRIPTHDRDATA,
     TBL_INSTITUTION_MAPPING,
     COLLEGE_PROJECT_ID,
+    SCHOOL_PROJECT_ID,
 )
 from helpers.common_helper import check_special_name
 
@@ -136,11 +137,14 @@ class TranscriptHdrDataModel:
         db: Session,
         request_data: Dict[str, Any],
         has_update_permission: bool = False,
+        project_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         """
         Get Transcript Header DATA for DataTables
         Matches CI3 Transcripts_model::gettranscripthdrdata() method (lines 1958-2157)
+        project_id: COLLEGE_PROJECT_ID or SCHOOL_PROJECT_ID; default COLLEGE_PROJECT_ID.
         """
+        pid = project_id if project_id is not None else COLLEGE_PROJECT_ID
         try:
             # Extract request parameters
             draw = int(request_data.get("draw", 1))
@@ -172,7 +176,7 @@ class TranscriptHdrDataModel:
             where_clauses = []
             if search_query:
                 where_clauses.append(search_query)
-            where_clauses.append(f"t.PROJECT_ID = {COLLEGE_PROJECT_ID}")
+            where_clauses.append(f"t.PROJECT_ID = {pid}")
             
             where_clause = " AND ".join(where_clauses)
             

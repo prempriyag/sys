@@ -112,7 +112,7 @@ export default function ArticulationReports(props?: ArticulationReportsProps) {
     if (type === "Failed") {
       return "Articulation Kickouts";
     } else if (type === "Phase_2") {
-      return "Articulation Phase-2 Kickouts";
+      return "To be Processed Manually";
     } else if (type === "Processed") {
       return "Articulation Processed";
     } else if (type === "Rerun") {

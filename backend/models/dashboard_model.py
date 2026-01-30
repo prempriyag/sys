@@ -176,7 +176,7 @@ class DashboardModel:
     ) -> List[Dict[str, Any]]:
         """Get transcripts downloaded from sources (Parchment, NSC, Scanned, ScannedUnofficial)"""
         try:
-            source_types = ['Parchment', 'NSC', 'Scanned', 'ScannedUnofficial']
+            source_types = ['Parchment', 'NSC', 'Scanned', 'ScannedUnofficial', 'Element451']
             college_filter = f" AND d.INSTITUTION_ID = '{college_name}'" if college_name else ""
 
             datasets = []
@@ -323,7 +323,7 @@ class DashboardModel:
         Queries DIGISCRIPT_LOG (TBL_KICKOUT) for STATUS_SOAPCOL, STATUS_SHATAEQ, STATUS_BDMS
         """
         try:
-            status_flags = ['SOAPCOL', 'SHATAEQ', 'BDMS']
+            status_flags = ['SOAPCOL', 'SHATAEQ', 'BDMS', 'SHATRNS']
             college_filter = f" AND (t.INSTITUTION_ID = '{college_name}')" if college_name else ""
             
             first_start_date = fromdate.split()[0]

@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     DB_NAME: str
     DB_USER: str
     DB_PASSWORD: str
-    DB_DRIVER: str = "ODBC Driver 17 for SQL Server"
+    DB_DRIVER: str = "ODBC Driver 18 for SQL Server"
     
     # JWT Configuration
     SECRET_KEY: str
@@ -24,8 +24,8 @@ class Settings(BaseSettings):
     # Application Configuration
     ENVIRONMENT: str = "DEV"
     DEBUG: bool = True
-    BASE_URL: str = "http://localhost:8000"  # Base URL for SSO redirects
-    FRONTEND_URL: str = "http://localhost:5173"  # Frontend URL for SSO callbacks
+    BASE_URL: str = "https://digiscript-csc-uat.ktechproducts.com/api"  # Base URL for SSO redirects
+    FRONTEND_URL: str = "https://digiscript-csc-uat.ktechproducts.com"  # Frontend URL for SSO callbacks
     
     class Config:
         env_file = ".env"

@@ -101,6 +101,7 @@ app.add_middleware(
         "http://127.0.0.1:5173",  # React frontend (127.0.0.1)
         "http://127.0.0.1:5174",  # React frontend (127.0.0.1)
         "http://127.0.0.1:3000",  # Alternative React port (127.0.0.1)
+	"https://digiscript-csc-api-uat.ktechproducts.com/api/"
     ],
     allow_credentials=True,
     allow_methods=["*"],

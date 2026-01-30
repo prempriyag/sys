@@ -46,8 +46,8 @@ export default function EditDegreeModal({
           
           // The API returns { Id, DEGREE_CD, DEGREE_NAME } directly
           // Handle both Id and id (case variations)
-          const degreeId = response.Id || response.id || response.ID;
-          if (response && degreeId) {
+          const fetchedId = response.Id || response.id || response.ID;
+          if (response && fetchedId) {
             setFormData({
               DEGREE_CD: response.DEGREE_CD || response.degree_cd || "",
               DEGREE_NAME: response.DEGREE_NAME || response.degree_name || "",

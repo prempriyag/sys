@@ -20,6 +20,8 @@ interface DataTableProps {
   columns: Column[];
   ajaxUrl: string;
   ajaxMethod?: "GET" | "POST";
+  /** @deprecated Use ajaxMethod instead */
+  method?: "GET" | "POST";
   ajaxData?: Record<string, any>; // Additional data to send with AJAX request
   onRowClick?: (row: any) => void;
   pageLength?: number;
@@ -55,8 +57,8 @@ const DataTableComponent = (props: DataTableProps, ref: React.ForwardedRef<DataT
   const showColumnVisibility = props.showColumnVisibility !== false;
   const exportFileName = props.exportFileName || "export";
   
-  // Apply default values
-  const method = ajaxMethod || "POST";
+  // Apply default values (support both ajaxMethod and deprecated method prop)
+  const method = ajaxMethod ?? props.method ?? "POST";
   const pageLen = pageLength || 10;
   const menu = lengthMenu || [10, 25, 50, 100];
   

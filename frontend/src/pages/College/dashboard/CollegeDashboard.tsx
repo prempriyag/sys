@@ -8,6 +8,36 @@ import Chart from "react-apexcharts";
 import { RefreshIcon } from "../../../icons";
 import { ApexOptions } from "apexcharts";
 
+type ChartDataset = { name: string; data: number[] };
+type ChartData = { labels: string[]; datasets: ChartDataset[] };
+type DonutData = { series: number[]; labels: string[] };
+
+type DashboardData = {
+  transcriptSources: ChartData;
+  transcriptStatus: ChartData;
+  transcriptProcessed: ChartData;
+  initialKickouts: ChartData;
+  transcriptKickouts: ChartData;
+  articulationKickouts: ChartData;
+  articulationCoursesKickouts: ChartData;
+  transcriptStatusDonut: DonutData;
+  articulationStatusDonut: DonutData;
+  articulationCoursesStatusDonut: DonutData;
+};
+
+const initialDashboardData: DashboardData = {
+  transcriptSources: { labels: [], datasets: [] },
+  transcriptStatus: { labels: [], datasets: [] },
+  transcriptProcessed: { labels: [], datasets: [] },
+  initialKickouts: { labels: [], datasets: [] },
+  transcriptKickouts: { labels: [], datasets: [] },
+  articulationKickouts: { labels: [], datasets: [] },
+  articulationCoursesKickouts: { labels: [], datasets: [] },
+  transcriptStatusDonut: { series: [], labels: [] },
+  articulationStatusDonut: { series: [], labels: [] },
+  articulationCoursesStatusDonut: { series: [], labels: [] },
+};
+
 export default function CollegeDashboard() {
   const [loading, setLoading] = useState(false);
   const [filters, setFilters] = useState({
@@ -16,18 +46,7 @@ export default function CollegeDashboard() {
     todate: new Date().toISOString().split("T")[0],
   });
 
-  const [dashboardData, setDashboardData] = useState({
-    transcriptSources: { labels: [], datasets: [] },
-    transcriptStatus: { labels: [], datasets: [] },
-    transcriptProcessed: { labels: [], datasets: [] },
-    initialKickouts: { labels: [], datasets: [] },
-    transcriptKickouts: { labels: [], datasets: [] },
-    articulationKickouts: { labels: [], datasets: [] },
-    articulationCoursesKickouts: { labels: [], datasets: [] },
-    transcriptStatusDonut: { series: [], labels: [] },
-    articulationStatusDonut: { series: [], labels: [] },
-    articulationCoursesStatusDonut: { series: [], labels: [] },
-  });
+  const [dashboardData, setDashboardData] = useState<DashboardData>(initialDashboardData);
 
   const handleFilterChange = (field: string, value: string) => {
     setFilters((prev) => ({ ...prev, [field]: value }));

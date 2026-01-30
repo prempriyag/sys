@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { API_BASE_URL, api } from "../config/api";
+import { api } from "../config/api";
 
 interface SettingsContextType {
   systemName: string;

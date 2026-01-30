@@ -669,7 +669,9 @@ export default function AdvancedDashboard() {
       categories: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
     },
     yaxis: {
-      categories: ["6 AM", "9 AM", "12 PM", "3 PM", "6 PM", "9 PM", "12 AM"],
+      labels: {
+        style: { colors: "#64748B", fontSize: "12px" },
+      },
     },
     plotOptions: {
       heatmap: {
@@ -740,10 +742,10 @@ export default function AdvancedDashboard() {
     </div>
   );
 
-  const MetricCard = ({ title, value, target, unit, status }: PerformanceMetric) => (
+  const MetricCard = ({ name, value, target, unit, status }: PerformanceMetric) => (
     <div className="rounded-lg border border-stroke bg-white p-4 dark:border-strokedark dark:bg-boxdark">
       <div className="flex items-center justify-between">
-        <span className="text-sm font-medium text-gray-500 dark:text-gray-400">{title}</span>
+        <span className="text-sm font-medium text-gray-500 dark:text-gray-400">{name}</span>
         <div className={`w-2 h-2 rounded-full ${
           status === 'excellent' ? 'bg-green-500' :
           status === 'good' ? 'bg-blue-500' :
@@ -1349,7 +1351,7 @@ export default function AdvancedDashboard() {
               </div>
               <div className="space-y-3">
                 {staticData.alerts.map((alert) => (
-                  <AlertCard key={alert.id} alert={alert} />
+                  <AlertCard key={alert.id} alert={alert as Alert} />
                 ))}
               </div>
               <div className="mt-6">
@@ -1498,18 +1500,13 @@ export default function AdvancedDashboard() {
                 <Chart
                   options={heatmapOptions}
                   series={[
-                    {
-                      name: "Processing Volume",
-                      data: [
-                        { x: "Mon", y: "6 AM", value: 65 },
-                        { x: "Mon", y: "9 AM", value: 128 },
-                        { x: "Mon", y: "12 PM", value: 245 },
-                        { x: "Mon", y: "3 PM", value: 198 },
-                        { x: "Mon", y: "6 PM", value: 156 },
-                        { x: "Mon", y: "9 PM", value: 89 },
-                        { x: "Mon", y: "12 AM", value: 42 },
-                      ]
-                    }
+                    { name: "6 AM", data: [{ x: "Mon", y: 65 }] },
+                    { name: "9 AM", data: [{ x: "Mon", y: 128 }] },
+                    { name: "12 PM", data: [{ x: "Mon", y: 245 }] },
+                    { name: "3 PM", data: [{ x: "Mon", y: 198 }] },
+                    { name: "6 PM", data: [{ x: "Mon", y: 156 }] },
+                    { name: "9 PM", data: [{ x: "Mon", y: 89 }] },
+                    { name: "12 AM", data: [{ x: "Mon", y: 42 }] },
                   ]}
                   type="heatmap"
                   height="100%"

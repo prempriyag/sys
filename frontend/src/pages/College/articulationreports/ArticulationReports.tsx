@@ -18,6 +18,7 @@ interface ArticulationReportsProps {
 }
 
 export default function ArticulationReports(props?: ArticulationReportsProps) {
+  const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
   

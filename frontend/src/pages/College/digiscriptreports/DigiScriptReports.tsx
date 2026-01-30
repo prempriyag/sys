@@ -240,16 +240,34 @@ export default function DigiScriptReports() {
                 );
               }
             },
+            // REMOVED: Slate Status column (commented per requirement)
+            // { 
+            //   data: "FOUND_IN_SLATE_YN", 
+            //   name: "Slate Status", 
+            //   searchable: false, 
+            //   orderable: false,
+            //   render: (data: any) => {
+            //     if (!data) return "-";
+            //     return <StatusBadge status={data} size="sm" />;
+            //   }
+            // },
             { 
-              data: "FOUND_IN_SLATE_YN", 
-              name: "Slate Status", 
+              data: "TRANSFER_LETTER_FILE_LINK", 
+              name: "Transfer Letter File Link", 
               searchable: false, 
               orderable: false,
               render: (data: any) => {
                 if (!data) return "-";
-                return <StatusBadge status={data} size="sm" />;
+                const pdfUrl = data && getPdfUrl(data);
+                if (!pdfUrl) return "-";
+                return (
+                  <a href={pdfUrl} target="_blank" rel="noopener noreferrer" className="text-brand-500 hover:underline">
+                    <i className="fa fa-link me-1"></i> Link
+                  </a>
+                );
               }
             },
+            { data: "LETTER_SENT_DATE", name: "Letter Sent Date", searchable: false, orderable: false, render: (data: any) => data || "-" },
             { 
               data: "FOUND_IN_BANNER_YN", 
               name: "Banner Status", 

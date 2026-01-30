@@ -171,38 +171,31 @@ export const createTranscriptReportColumns = (
       },
     },
     
-    // Column 4: SLATE_REF_NUMBER (text-center) - with inline editing support
-    // Matching CI3: Shows edit icon for Failed/Rerun types
-    {
-      data: "SLATE_REF_NUMBER",
-      name: "Slate ID",
-      searchable: true,
-      orderable: true,
-      textCenter: true,
-      render: (data: any, row: any) => {
-        const batchId = row.BATCH_ID || "";
-        const studentName = row.STUDENT_FULL_NAME || "";
-        const searchField = row._search_field || "";
-        const refreshTable = helpers?.refreshTable;
-        
-        if (!data) {
-          return <span>-</span>;
-        }
-        
-        return (
-          <EditableSlateId
-            value={data}
-            batchId={batchId}
-            studentName={studentName}
-            searchField={searchField}
-            hasUpdatePermission={hasUpdatePermission}
-            onSuccess={() => {
-              if (refreshTable) refreshTable();
-            }}
-          />
-        );
-      },
-    },
+    // Column 4: SLATE_REF_NUMBER (text-center) - REMOVED: Slate ID column (commented per requirement)
+    // {
+    //   data: "SLATE_REF_NUMBER",
+    //   name: "Slate ID",
+    //   searchable: true,
+    //   orderable: true,
+    //   textCenter: true,
+    //   render: (data: any, row: any) => {
+    //     const batchId = row.BATCH_ID || "";
+    //     const studentName = row.STUDENT_FULL_NAME || "";
+    //     const searchField = row._search_field || "";
+    //     const refreshTable = helpers?.refreshTable;
+    //     if (!data) return <span>-</span>;
+    //     return (
+    //       <EditableSlateId
+    //         value={data}
+    //         batchId={batchId}
+    //         studentName={studentName}
+    //         searchField={searchField}
+    //         hasUpdatePermission={hasUpdatePermission}
+    //         onSuccess={() => { if (refreshTable) refreshTable(); }}
+    //       />
+    //     );
+    //   },
+    // },
     
     // Column 5: STUDENT_FULL_NAME (text-center)
     {
@@ -348,31 +341,31 @@ export const createTranscriptReportColumns = (
       visible: false, // notvisible
     },
     
-    // Column 18: STATUS_SLATE
-    {
-      data: "STATUS_SLATE",
-      name: "Slate Status",
-      searchable: false,
-      orderable: false,
-      width: "140px",
-      render: (data: any) => {
-        if (!data) return "-";
-        return <StatusBadge status={data} size="sm" />;
-      },
-    },
-    
-    // Column 19: STATUS_SLATE_UPLOAD
-    {
-      data: "STATUS_SLATE_UPLOAD",
-      name: "Transcript uploaded to Slate",
-      searchable: false,
-      orderable: false,
-      width: "220px",
-      render: (data: any) => {
-        if (!data) return "-";
-        return <StatusBadge status={data} size="sm" />;
-      },
-    },
+    // Column 18: STATUS_SLATE - REMOVED: Slate Status column (commented per requirement)
+    // {
+    //   data: "STATUS_SLATE",
+    //   name: "Slate Status",
+    //   searchable: false,
+    //   orderable: false,
+    //   width: "140px",
+    //   render: (data: any) => {
+    //     if (!data) return "-";
+    //     return <StatusBadge status={data} size="sm" />;
+    //   },
+    // },
+    //
+    // Column 19: STATUS_SLATE_UPLOAD - REMOVED: Transcript uploaded to Slate column (commented per requirement)
+    // {
+    //   data: "STATUS_SLATE_UPLOAD",
+    //   name: "Transcript uploaded to Slate",
+    //   searchable: false,
+    //   orderable: false,
+    //   width: "220px",
+    //   render: (data: any) => {
+    //     if (!data) return "-";
+    //     return <StatusBadge status={data} size="sm" />;
+    //   },
+    // },
     
     // Column 20: STATUS_BANNER (noorder)
     {

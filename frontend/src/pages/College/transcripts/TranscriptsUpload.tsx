@@ -198,7 +198,8 @@ export default function TranscriptsUpload() {
                 <li>Only PDF documents should be uploaded</li>
                 <li>Upload all the pages of a transcript in one single pdf document</li>
                 <li>Upload a properly scanned file with all the borders of the Transcript visible. For e.g. No borders should be trimmed which have College name printed</li>
-                <li>UNOFFICIAL transcript should not be uploaded. Only upload Official transcripts</li>
+                <li>Only upload unofficial transcripts under the ScannedUnofficial source.</li>
+                <li>DigiScript will only accept files up to 20 pages. Files that exceed this limit will be automatically trimmed to 20 pages.</li>
                 <li>If any file has restricted permissions, please save it using the "Print as pdf" and then upload the file. It will have "PRINTED COPY" printed everywhere on the transcript</li>
                 <li>Transcript scanned should not be skewed. The lines should be horizontally and vertically aligned</li>
                 <li>Ensure that the institution name and other identifying marks are not missed during the scanning process</li>

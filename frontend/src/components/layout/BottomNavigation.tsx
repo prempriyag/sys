@@ -88,11 +88,9 @@ const BottomNavigation: React.FC = () => {
     );
   };
 
-  // Don't render if we don't have items or less than 2 items
-  if (bottomNavItems.length < 2) return null;
-
-  // Order items: Transcripts, Articulation, Dashboard, Reports, Uploads
+  // Order items: Transcripts, Articulation, Dashboard, Reports, Uploads (must run before any return - hooks rule)
   const orderedItems = useMemo(() => {
+    if (bottomNavItems.length < 2) return [];
     const orderMap: Record<string, number> = {
       "Transcripts": 0,
       "Articulation": 1,
@@ -101,13 +99,15 @@ const BottomNavigation: React.FC = () => {
       "Uploads": 4,
       "College Uploads": 4,
     };
-    
     return [...bottomNavItems].sort((a, b) => {
       const orderA = orderMap[a.name] ?? 999;
       const orderB = orderMap[b.name] ?? 999;
       return orderA - orderB;
     });
   }, [bottomNavItems]);
+
+  // Don't render if we don't have items or less than 2 items
+  if (bottomNavItems.length < 2) return null;
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-white/95 dark:bg-gray-900/95 backdrop-blur-lg border-t border-gray-200/50 dark:border-gray-800/50 shadow-2xl">

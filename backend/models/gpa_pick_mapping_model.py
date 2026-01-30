@@ -100,7 +100,7 @@ class GpaPickMappingModel:
             
             count_query = text(f"""
                 SELECT count(*) as allcount
-                FROM {TBL_GPA_PICK_MAPPING}
+                FROM {TBL_GPA_PICK_MAPPING} WITH(NOLOCK)
                 WHERE {where_clause}
             """)
 
@@ -120,8 +120,8 @@ class GpaPickMappingModel:
 
             # Build data query
             data_query_sql = f"""
-                SELECT Id, GPA_PICK, UPDATED_BY, LAST_UPDATED_DATETIME
-                FROM {TBL_GPA_PICK_MAPPING}
+                SELECT ID, GPA_PICK, UPDATED_BY, LAST_UPDATED_DATETIME
+                FROM {TBL_GPA_PICK_MAPPING} WITH(NOLOCK)
                 WHERE {where_clause}
                 ORDER BY {order_by_clause}
                 OFFSET {start} ROWS
@@ -141,7 +141,7 @@ class GpaPickMappingModel:
                 record_dict = dict(record._mapping)
                 
                 data_row = {
-                    "Id": record_dict.get("Id"),
+                    "Id": record_dict.get("ID") or record_dict.get("Id"),
                     "GPA_PICK": record_dict.get("GPA_PICK", ""),
                     "UPDATED_BY": record_dict.get("UPDATED_BY", ""),
                     "LAST_UPDATED_DATETIME": str(record_dict.get("LAST_UPDATED_DATETIME", "")) if record_dict.get("LAST_UPDATED_DATETIME") else "",

@@ -14,6 +14,7 @@ interface Column {
   className?: string; // CSS classes for the column
   defaultOrder?: boolean; // Whether this column should be used for default ordering
   textCenter?: boolean; // Whether text should be center-aligned
+  width?: string; // Column width (e.g., "200px") - if provided, enables fixed table layout
 }
 
 interface DataTableProps {
@@ -77,9 +78,23 @@ const DataTableComponent = (props: DataTableProps, ref: React.ForwardedRef<DataT
   });
   const [showColumnMenu, setShowColumnMenu] = useState(false);
   const columnMenuRef = useRef<HTMLDivElement>(null);
+  const tableContainerRef = useRef<HTMLDivElement>(null);
   
   // Calculate visible columns array - must be early so it's available everywhere
   const visibleColumnsArray = columns.filter((_, idx) => visibleColumns.has(idx));
+  
+  // Check if any columns have explicit widths (for conditional fixed layout)
+  const hasExplicitWidths = visibleColumnsArray.some(col => col.width);
+  
+  // Calculate total table width from column widths (only if widths are defined)
+  const totalTableWidth = hasExplicitWidths ? visibleColumnsArray.reduce((sum, col) => {
+    if (col.width) {
+      const widthValue = parseInt(col.width);
+      return sum + (isNaN(widthValue) ? 0 : widthValue);
+    }
+    return sum + 150; // Default width for columns without specified width
+  }, 0) : 0;
+
 
   // Close column menu when clicking outside
   useEffect(() => {
@@ -103,6 +118,7 @@ const DataTableComponent = (props: DataTableProps, ref: React.ForwardedRef<DataT
   const [length, setLength] = useState(pageLen);
   const [recordsTotal, setRecordsTotal] = useState(0);
   const [recordsFiltered, setRecordsFiltered] = useState(0);
+
   // Find default order column (defaultOrderby) or use first column
   const defaultOrderColumn = columns.findIndex(col => col.defaultOrder === true);
   const initialOrderColumn = defaultOrderColumn >= 0 ? defaultOrderColumn : 0;
@@ -213,6 +229,7 @@ const DataTableComponent = (props: DataTableProps, ref: React.ForwardedRef<DataT
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
       // AJAX call failed
+      console.error(`[DataTable] Error fetching data from ${ajaxUrl}:`, error);
       
       // If it's an authentication error, the redirect should have already happened
       // But we still need to clear the data
@@ -579,6 +596,7 @@ const DataTableComponent = (props: DataTableProps, ref: React.ForwardedRef<DataT
 
       {/* Table */}
       <div 
+        ref={tableContainerRef}
         className="border border-gray-200 rounded-lg dark:border-gray-700" 
         style={{ 
           overflowX: 'auto', 
@@ -586,23 +604,45 @@ const DataTableComponent = (props: DataTableProps, ref: React.ForwardedRef<DataT
           width: '100%',
           maxWidth: '100%',
           display: 'block',
-          position: 'relative'
+          position: 'relative',
+          scrollBehavior: 'smooth'
         }}
       >
-        {/* <div style={{ minWidth: 'max-content', display: 'inline-block' }}> */}
-        <div>
-          <Table className="border-collapse">
+        <div style={{ width: '100%' }}>
+          <Table className="border-collapse" style={hasExplicitWidths ? { tableLayout: 'fixed', width: totalTableWidth > 0 ? `${totalTableWidth}px` : '100%' } : { width: '100%' }}>
+          {hasExplicitWidths && (
+            <colgroup>
+              {visibleColumnsArray.map((column) => {
+                return (
+                  <col key={column.data} style={{ width: column.width || '150px' }} />
+                );
+              })}
+            </colgroup>
+          )}
           <TableHeader className="bg-gray-100 dark:bg-gray-800" style={{ position: 'sticky', top: 0, zIndex: 10 }}>
             <TableRow>
               {visibleColumnsArray.map((column) => {
                 const originalIndex = columns.indexOf(column);
+                const isActionColumn = column.data === "ACTION";
+                const headerStyle: React.CSSProperties = hasExplicitWidths ? (isActionColumn ? {
+                  overflow: 'hidden',
+                  maxWidth: column.width || '160px',
+                  width: column.width || '160px',
+                  minWidth: column.width || '160px',
+                } : {
+                  overflow: 'visible',
+                  wordWrap: 'break-word',
+                  whiteSpace: 'normal',
+                  maxWidth: column.width || '150px',
+                }) : {};
                 return (
                 <TableCell
                   key={originalIndex}
                   isHeader
                   className="px-4 py-3 text-left text-sm font-semibold text-gray-700 dark:text-gray-300"
+                  style={headerStyle}
                 >
-                  <div className="flex flex-col gap-2">
+                  <div className="flex flex-col gap-2" style={{ minWidth: 0, width: '100%', maxWidth: '100%' }}>
                     <div 
                       className={`flex items-center justify-between ${
                         column.orderable !== false ? "cursor-pointer" : ""
@@ -695,21 +735,46 @@ const DataTableComponent = (props: DataTableProps, ref: React.ForwardedRef<DataT
                     const originalIndex = columns.indexOf(column);
                     // Apply text-center class if textCenter is true
                     const cellClassName = `px-4 py-3 text-sm text-gray-800 dark:text-gray-200 ${column.textCenter ? 'text-center' : ''}`;
+                    // For wide columns (Error Reason, Comments), allow text wrapping
+                    const isWideColumn = column.width && (parseInt(column.width) > 250);
+                    const isActionColumn = column.data === "ACTION";
+                    const cellStyle: React.CSSProperties = hasExplicitWidths ? (isWideColumn ? {
+                      wordWrap: 'break-word',
+                      whiteSpace: 'normal',
+                      overflow: 'visible',
+                      maxWidth: column.width || '150px',
+                      width: column.width || '150px',
+                    } : isActionColumn ? {
+                      // Action column needs strict width control to prevent overflow
+                      overflow: 'hidden',
+                      maxWidth: column.width || '160px',
+                      width: column.width || '160px',
+                      minWidth: column.width || '160px',
+                    } : {
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      maxWidth: column.width || '150px',
+                      width: column.width || '150px',
+                    }) : {};
                     return (
                       <TableCell
                         key={originalIndex}
                         className={cellClassName}
+                        style={cellStyle}
                       >
-                        {column.render
-                          ? column.render(row[column.data], row)
-                          : (() => {
-                              const value = row[column.data];
-                              // Check if value contains HTML tags
-                              if (value && typeof value === 'string' && /<[^>]+>/.test(value)) {
-                                return <span dangerouslySetInnerHTML={{ __html: value }} />;
-                              }
-                              return String(value || "-");
-                            })()}
+                        <div style={hasExplicitWidths ? { width: '100%', maxWidth: '100%', minWidth: 0, overflow: 'hidden' } : {}}>
+                          {column.render
+                            ? column.render(row[column.data], row)
+                            : (() => {
+                                const value = row[column.data];
+                                // Check if value contains HTML tags
+                                if (value && typeof value === 'string' && /<[^>]+>/.test(value)) {
+                                  return <span dangerouslySetInnerHTML={{ __html: value }} />;
+                                }
+                                return String(value || "-");
+                              })()}
+                        </div>
                       </TableCell>
                     );
                   })}

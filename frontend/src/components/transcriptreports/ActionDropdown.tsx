@@ -74,6 +74,11 @@ export default function ActionDropdown({
       onChange={handleChange}
       disabled={disabled}
       data-batch-id={batchId}
+      style={{
+        width: '100%',
+        maxWidth: '100%',
+        boxSizing: 'border-box',
+      }}
     >
       {options.map((option, idx) => (
         <option

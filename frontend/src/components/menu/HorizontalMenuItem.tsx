@@ -41,13 +41,24 @@ export default function HorizontalMenuItem({
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevLocationRef = useRef<string>(location.pathname);
 
-  const isActive = (path?: string) => {
-    if (!path) return false;
-    const pathWithoutQuery = path.split("?")[0];
-    return location.pathname === pathWithoutQuery || location.pathname.startsWith(pathWithoutQuery + "/");
+  const isActive = (path?: string, activePaths?: string[]) => {
+    const current = location.pathname.split("?")[0];
+    if (path) {
+      const pathWithoutQuery = path.split("?")[0];
+      if (current === pathWithoutQuery || current.startsWith(pathWithoutQuery + "/")) {
+        return true;
+      }
+    }
+    if (activePaths?.length) {
+      return activePaths.some((p) => {
+        const pClean = p.split("?")[0];
+        return current === pClean || current.startsWith(pClean + "/");
+      });
+    }
+    return false;
   };
 
-  const isItemActive = isActive(item.path);
+  const isItemActive = isActive(item.path, item.activePaths);
 
   // Close submenu when location changes (after navigation)
   useEffect(() => {
@@ -333,7 +344,7 @@ export default function HorizontalMenuItem({
           >
             {item.subItems?.map((subItem, subIndex) => {
               const subKey = `${key}-${subIndex}`;
-              const isSubItemActive = isActive(subItem.path);
+              const isSubItemActive = isActive(subItem.path, subItem.activePaths);
               const hasNestedSubItems = subItem.subItems && subItem.subItems.length > 0;
 
               if (hasNestedSubItems) {

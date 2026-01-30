@@ -14,7 +14,13 @@ from helpers.common_helper import check_special_name
 from models.user import User
 from models.transcript_reports_model import TranscriptReportsModel
 from models.articulation_reports_model import ArticulationReportsModel
-from config.constants import COLLEGE_PROJECT_ID, TBL_TRANSCRIPTHDRDATA, TBL_INSTITUTION_MAPPING, TBL_KICKOUT
+from config.constants import (
+    COLLEGE_PROJECT_ID,
+    TBL_TRANSCRIPTHDRDATA,
+    TBL_INSTITUTION_MAPPING,
+    TBL_KICKOUT,
+    TBL_BANNER_APPLICANT_DATA,
+)
 
 router = APIRouter(prefix="/api/studentview", tags=["studentview"])
 
@@ -37,13 +43,14 @@ async def index(
     student_id: Optional[str] = Query(None),
     batch_id: Optional[str] = Query(None),
     institution_id: Optional[str] = Query(None),
+    report_type: Optional[str] = Query(None, alias="type"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Main student view page - returns student info, institutions, batches, and status counts
-    Based on CI3 Studentview::index()
-    Uses TranscriptReportsModel and ArticulationReportsModel to get counts (same as CI3)
+    Main student view page - returns student info, institutions, batches, and status counts.
+    Matches: CI3 Studentview::index() (application/controllers/Studentview.php)
+    Uses TranscriptReportsModel and ArticulationReportsModel to get counts (same as CI3).
     """
     response_data = {}
     institution_name = []
@@ -351,10 +358,26 @@ async def index(
                 student_row = student_result.fetchone()
                 
                 if student_row and student_row[0]:
+                    admission_decision = ''
+                    try:
+                        # Match CI3: SELECT TOP 1 APPLICATION_STATUS_DESC FROM BANNER_APPLICANT_DATA
+                        # WHERE STUDENT_ID = ? ORDER BY SARADAP_APST_DATE DESC
+                        banner_sql = f"""
+                        SELECT TOP 1 APPLICATION_STATUS_DESC
+                        FROM {TBL_BANNER_APPLICANT_DATA} AD WITH(NOLOCK)
+                        WHERE STUDENT_ID = :sid
+                        ORDER BY AD.SARADAP_APST_DATE DESC
+                        """
+                        banner_result = db.execute(text(banner_sql), {"sid": student_row[0]})
+                        banner_row = banner_result.fetchone()
+                        if banner_row and banner_row[0]:
+                            admission_decision = banner_row[0] or ''
+                    except Exception as e:
+                        print(f"[StudentView] Error querying BANNER_APPLICANT_DATA: {e}")
                     student_info = {
                         'STUDENT_ID': student_row[0] or '',
                         'STUDENT_FULL_NAME': student_row[1] or '',
-                        'ADMISSION_DECISION': ''  # TODO: Get from BANNER_APPLICANT_DATA if needed
+                        'ADMISSION_DECISION': admission_decision,
                     }
                     print(f"[StudentView] Found student info: {student_info}")
             except Exception as e:
@@ -369,10 +392,11 @@ async def index(
         'total_transcripts': total_transcripts,
         'menu_list': response_data,
         'batch_details': batch_details,
-        'batch_metadata': batch_metadata,  # Added batch metadata (OCR_EXTRACTED_DATE, LAST_UPDATED_DATETIME)
+        'batch_metadata': batch_metadata,
         'institution_id': institution_id or '',
         'student_id': student_id or '',
         'batch_id': batch_id or '',
+        'type': report_type or '',
     }
     
     print(f"[StudentView] Returning result with {len(institution_name)} institutions, {total_transcripts} total transcripts")
@@ -388,8 +412,8 @@ async def getstudentslist(
     db: Session = Depends(get_db)
 ):
     """
-    Get students list for dropdown
-    Based on CI3 Studentview::getstudentslist()
+    Get students list for dropdown.
+    Matches: CI3 Studentview::getstudentslist() (application/controllers/Studentview.php)
     """
     if q:
         where_clause = f"(LOWER(STUDENT_FULL_NAME) LIKE '%{check_special_name(q.lower())}%' OR LOWER(STUDENT_ID) LIKE '%{check_special_name(q.lower())}%')"
@@ -418,9 +442,8 @@ async def viewpageload(
     db: Session = Depends(get_db)
 ):
     """
-    Load transcript reports view
-    Based on CI3 Studentview::viewpageload()
-    This should return the same data structure as transcriptreports endpoint
+    Load transcript reports view (SPA: frontend embeds TranscriptReports; no HTML returned).
+    Matches: CI3 Studentview::viewpageload() (application/controllers/Studentview.php)
     """
     # For now, return a redirect to transcriptreports with filters
     # In a full implementation, you'd render the view server-side or return the data
@@ -438,8 +461,8 @@ async def articulationviewpageload(
     db: Session = Depends(get_db)
 ):
     """
-    Load articulation reports view
-    Based on CI3 Studentview::articulationviewpageload()
+    Load articulation reports view (SPA: frontend embeds ArticulationReports; no HTML returned).
+    Matches: CI3 Studentview::articulationviewpageload() (application/controllers/Studentview.php)
     """
     return {
         "success": 1,

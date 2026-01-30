@@ -1,6 +1,6 @@
 import { MenuConfig } from "../../types/menu";
 
-// OCR Verify menu configuration
+// OCR Verify sidebar menu (matches CI ocrverify sidebar)
 export const ocrverifyMenu: MenuConfig = {
   module: "ocrverify",
   items: [
@@ -33,29 +33,33 @@ export const ocrverifyMenu: MenuConfig = {
       path: "/ocrverify/collegeocrbatches",
       icon: "file-text",
       permission: "college_ocr_data",
+      activePaths: ["/ocrverify/collegeocrbatch"],
     },
     {
       name: "School Assigned Batches",
       path: "/ocrverify/schoolocrbatches",
       icon: "file-text",
       permission: "school_ocr_data",
+      activePaths: ["/ocrverify/schoolocrbatch"],
     },
     {
       name: "College Header Data",
       path: "/ocrverify/collegehdrdata",
       icon: "database",
       permission: "college_header_data",
+      activePaths: ["/ocrverify/collegehdrbatch"],
     },
     {
       name: "School Header Data",
       path: "/ocrverify/schoolhdrdata",
       icon: "database",
       permission: "school_header_data",
+      activePaths: ["/ocrverify/schoolhdrbatch"],
     },
     {
       name: "Setup",
       icon: "settings",
-      permission: "ocrverify_setup",
+      permissions: ["institutions_mapping_ocr"],
       subItems: [
         {
           name: "Institution Mapping",

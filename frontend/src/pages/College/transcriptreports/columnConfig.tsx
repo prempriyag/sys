@@ -47,6 +47,7 @@ export const createTranscriptReportColumns = (
       name: "College Name",
       searchable: true,
       orderable: true,
+      width: "200px",
     },
     
     // Column 1: INSTITUTION_ID - with inline editing support
@@ -55,6 +56,7 @@ export const createTranscriptReportColumns = (
       name: "Institution ID",
       searchable: true,
       orderable: true,
+      width: "140px",
       render: (data: any, row: any) => {
         const batchId = row.BATCH_ID || "";
         const searchField = row._search_field || "";
@@ -209,6 +211,7 @@ export const createTranscriptReportColumns = (
       searchable: true,
       orderable: true,
       textCenter: true,
+      width: "200px",
     },
     
     // Column 6: STUDENT_FIRST_NAME (notvisible)
@@ -255,6 +258,7 @@ export const createTranscriptReportColumns = (
       searchable: true,
       orderable: true,
       textCenter: true,
+      width: "130px",
       render: (data: any) => {
         if (!data) return "-";
         return (
@@ -350,6 +354,7 @@ export const createTranscriptReportColumns = (
       name: "Slate Status",
       searchable: false,
       orderable: false,
+      width: "140px",
       render: (data: any) => {
         if (!data) return "-";
         return <StatusBadge status={data} size="sm" />;
@@ -362,6 +367,7 @@ export const createTranscriptReportColumns = (
       name: "Transcript uploaded to Slate",
       searchable: false,
       orderable: false,
+      width: "220px",
       render: (data: any) => {
         if (!data) return "-";
         return <StatusBadge status={data} size="sm" />;
@@ -374,6 +380,7 @@ export const createTranscriptReportColumns = (
       name: "Banner Status",
       searchable: false,
       orderable: false, // noorder
+      width: "140px",
       render: (data: any) => {
         if (!data) return "-";
         return <StatusBadge status={data} size="sm" />;
@@ -386,6 +393,7 @@ export const createTranscriptReportColumns = (
       name: "Transcript uploaded to BDMS",
       searchable: false,
       orderable: false,
+      width: "220px",
       render: (data: any) => {
         if (!data) return "-";
         return <StatusBadge status={data} size="sm" />;
@@ -416,6 +424,7 @@ export const createTranscriptReportColumns = (
       name: "Error Reason / Action",
       searchable: false,
       orderable: false,
+      width: "400px",
       render: (data: any) => {
         if (!data) return "-";
         return <span dangerouslySetInnerHTML={{ __html: data }} />;
@@ -431,6 +440,7 @@ export const createTranscriptReportColumns = (
       searchable: false,
       orderable: false,
       exportable: false, // notexport
+      width: "80px",
       render: (data: any, row: any) => {
         if (!data || data === "" || data === null || data === undefined) {
           return "-";
@@ -462,6 +472,7 @@ export const createTranscriptReportColumns = (
     searchable: false,
     orderable: false,
     exportable: false, // notexport
+    width: "80px",
     render: (data: any) => {
       if (!data || data === "" || data === null || data === undefined) {
         return "-";
@@ -493,6 +504,7 @@ export const createTranscriptReportColumns = (
     name: "Transcript Status",
     searchable: false,
     orderable: false,
+    width: "150px",
     render: (data: any) => {
       if (!data) return "-";
       return <StatusBadge status={data} size="sm" />;
@@ -506,6 +518,7 @@ export const createTranscriptReportColumns = (
       name: "Articulation Status",
       searchable: false,
       orderable: false,
+      width: "170px",
       render: (data: any) => {
         if (!data) return "-";
         return <StatusBadge status={data} size="sm" />;
@@ -529,6 +542,7 @@ export const createTranscriptReportColumns = (
       searchable: false,
       orderable: false, // noorder
       exportable: false, // notexport
+      width: "160px",
       render: (_data: any, row: any) => {
         if (!hasUpdatePermission) return "-";
         
@@ -584,6 +598,7 @@ export const createTranscriptReportColumns = (
     name: "User Comment",
     searchable: false,
     orderable: false, // noorder
+    width: "280px",
       render: (data: any, row: any) => {
         const searchField = row._search_field || "";
         const batchId = row.BATCH_ID || "";

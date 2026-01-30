@@ -9,6 +9,7 @@ interface UserPermissions {
     VIEW: number | string;
     UPDATE: number | string;
     DELETE: number | string;
+    [action: string]: number | string;
   };
 }
 
@@ -259,7 +260,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         await api.get(API_ENDPOINTS.ME);
       } catch (error: unknown) {
         // Session expired or network error
-        const err = error as { status?: number; isNetworkError?: boolean };
+        const err = error as { status?: number; isNetworkError?: boolean; isSessionExpired?: boolean };
         if (err.status === 401 || err.isSessionExpired) {
           // Session expired on server side
           removeAuthToken();

@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
-import { useAuth } from "../../context/AuthContext";
 import { API_BASE_URL, API_ENDPOINTS, setAuthToken } from "../../config/api";
 
 /**

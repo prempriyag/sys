@@ -1,12 +1,12 @@
 import { useState } from "react";
-import PageBreadcrumb from "../../../../components/common/PageBreadCrumb";
-import PageMeta from "../../../../components/common/PageMeta";
-import PageContainer, { PageWrapper } from "../../../../components/common/PageContainer";
-import DataTable from "../../../../components/ui/DataTable";
-import Button from "../../../../components/ui/button/Button";
-import { API_BASE_URL } from "../../../../config/api";
-import { RefreshIcon, PlusIcon, PencilIcon, TrashBinIcon } from "../../../../icons";
-import { useAuth } from "../../../../context/AuthContext";
+import PageBreadcrumb from "../../components/common/PageBreadCrumb";
+import PageMeta from "../../components/common/PageMeta";
+import PageContainer, { PageWrapper } from "../../components/common/PageContainer";
+import DataTable from "../../components/ui/DataTable";
+import Button from "../../components/ui/button/Button";
+import { api, API_BASE_URL } from "../../config/api";
+import { RefreshIcon, PlusIcon, PencilIcon, TrashBinIcon } from "../../icons";
+import { useAuth } from "../../context/AuthContext";
 
 export default function TermNameMapping() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);

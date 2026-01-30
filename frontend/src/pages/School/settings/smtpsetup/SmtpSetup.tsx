@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import DataTable from "../../../../components/ui/DataTable";
 import { API_BASE_URL } from "../../../../config/api";
-import { API_ENDPOINTS } from "../../../../config/api";
 
 const SmtpSetup: React.FC = () => {
   const [showAddModal, setShowAddModal] = useState(false);
@@ -24,7 +23,7 @@ const SmtpSetup: React.FC = () => {
       data: "ACTION",
       title: "Action",
       orderable: false,
-      render: (data: any, type: any, row: any) => {
+      render: (_data: any, row: any) => {
         return `
           <button class="btn btn-sm btn-primary edit-btn" data-id="${row.id}">Edit</button>
           <button class="btn btn-sm btn-danger delete-btn ml-2" data-id="${row.id}">Delete</button>

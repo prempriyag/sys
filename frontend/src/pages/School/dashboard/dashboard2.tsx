@@ -204,7 +204,7 @@ export default function Dashboard2() {
         colors: "#64748B",
       },
       markers: {
-        radius: 12,
+        size: 12,
       },
     },
     colors: ["#3C50E0", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6"],
@@ -281,7 +281,7 @@ export default function Dashboard2() {
         colors: "#64748B",
       },
       markers: {
-        radius: 12,
+        size: 12,
       },
     },
     colors: ["#3C50E0", "#10B981", "#F59E0B", "#EF4444"],
@@ -313,7 +313,7 @@ export default function Dashboard2() {
         colors: "#64748B",
       },
       markers: {
-        radius: 12,
+        size: 12,
       },
     },
     colors: ["#3C50E0", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899"],

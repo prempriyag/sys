@@ -1,6 +1,6 @@
 """
-Student View Controller
-Based on CI3 Studentview controller
+Student View Controller (HS / School)
+Matches: CI3 school/Studentview (application/controllers/school/Studentview.php)
 """
 from fastapi import APIRouter, Depends, Query, HTTPException, status
 from sqlalchemy.orm import Session
@@ -12,9 +12,15 @@ from database.connection import get_db
 from helpers.security_helper import get_current_user
 from helpers.common_helper import check_special_name
 from models.user import User
-from models.transcript_reports_model import TranscriptReportsModel
+from models.school_transcript_reports_model import SchoolTranscriptReportsModel
 from models.articulation_reports_model import ArticulationReportsModel
-from config.constants import COLLEGE_PROJECT_ID, TBL_TRANSCRIPTHDRDATA, TBL_INSTITUTION_MAPPING, TBL_KICKOUT
+from config.constants import (
+    SCHOOL_PROJECT_ID,
+    TBL_TRANSCRIPTHDRDATA,
+    TBL_INSTITUTION_MAPPING,
+    TBL_KICKOUT,
+    TBL_BANNER_APPLICANT_DATA,
+)
 
 router = APIRouter(prefix="/api/school/studentview", tags=["studentview"])
 
@@ -37,13 +43,15 @@ async def index(
     student_id: Optional[str] = Query(None),
     batch_id: Optional[str] = Query(None),
     institution_id: Optional[str] = Query(None),
+    report_type: Optional[str] = Query(None, alias="type"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Main student view page - returns student info, institutions, batches, and status counts
-    Based on CI3 Studentview::index()
-    Uses TranscriptReportsModel and ArticulationReportsModel to get counts (same as CI3)
+    Main student view page (HS) - returns student info, institutions, batches, and status counts.
+    Matches: CI3 school/Studentview::index() (application/controllers/school/Studentview.php)
+    Uses School->gethdrdatareports for transcript counts (Failed, Processed, Rerun only) and
+    Articulation_model for articulation counts.
     """
     response_data = {}
     institution_name = []
@@ -107,7 +115,7 @@ async def index(
             LEFT JOIN {TBL_TRANSCRIPTHDRDATA} as h WITH(NOLOCK) ON h.BATCH_ID = k.BATCH_ID
             WHERE {ins_where}
             AND k.INSTITUTION_ID = '{ins_id}'
-            AND k.PROJECT_ID = {COLLEGE_PROJECT_ID}
+            AND k.PROJECT_ID = {SCHOOL_PROJECT_ID}
             """
             
             try:
@@ -129,7 +137,7 @@ async def index(
                 FROM {TBL_TRANSCRIPTHDRDATA} as h WITH(NOLOCK)
                 WHERE {fallback_where}
                 AND h.INSTITUTION_ID = '{ins_id}'
-                AND h.PROJECT_ID = {COLLEGE_PROJECT_ID}
+                AND h.PROJECT_ID = {SCHOOL_PROJECT_ID}
                 """
                 try:
                     fallback_result = db.execute(text(fallback_batch_sql))
@@ -219,15 +227,14 @@ async def index(
                 if not batch_id:
                     continue
 
-                # Prepare postData for getreportsdata (matching CI3 lines 64-66)
-                # CI3 uses: fieldType = 'COLLEGE_ID', fieldName = INSTITUTION_ID, BATCH_ID = batch_id (line 64-67)
-                # Note: CI3 uses $postData['search']['value'] = $student_id (line 70, 82)
+                # Prepare postData for gethdrdatareports (matching CI3 school/Studentview lines 64-78)
+                # CI3 School uses: fieldType = 'SCHOOL_ID', fieldName = INSTITUTION_ID, BATCH_ID = batch_id
                 post_data = {
-                    'fieldType': 'COLLEGE_ID',  # CI3 uses COLLEGE_ID fieldType (line 64-65), not BATCH_ID
-                    'fieldName': ins_id,  # CI3 uses INSTITUTION_ID as fieldName (line 65)
-                    'BATCH_ID': batch_id,  # CI3 passes BATCH_ID as separate field (line 66)
-                    'STUDENT_ID': student_id,  # Also set STUDENT_ID directly for model filtering
-                    'search': {'value': student_id},  # CI3 line 70, 82
+                    'fieldType': 'SCHOOL_ID',
+                    'fieldName': ins_id,
+                    'BATCH_ID': batch_id,
+                    'STUDENT_ID': student_id,
+                    'search': {'value': student_id},
                     'draw': 1,
                     'start': 0,
                     'length': 1,
@@ -235,25 +242,17 @@ async def index(
                     'columns': [{'data': 'LAST_UPDATED_DATETIME'}]
                 }
 
-                # Check transcript statuses using TranscriptReportsModel (matching CI3 lines 67-78)
-                # CI3 passes: fieldType='COLLEGE_ID', fieldName=INSTITUTION_ID, BATCH_ID=batch_id, search.value=student_id
-                status_flags = ['Failed', 'Processed', 'Rerun', 'Articulation-Kickouts']
+                # Check transcript statuses using School->gethdrdatareports (CI3: Failed, Processed, Rerun only; no Articulation-Kickouts)
+                status_flags = ['Failed', 'Processed', 'Rerun']
                 for status_flag in status_flags:
                     post_data['Search_Field'] = status_flag
                     try:
-                        # Debug: log the post_data being sent
-                        print(f"[StudentView] Checking transcript {status_flag} for batch {batch_id}, institution {ins_id}, student {student_id}")
-                        print(f"[StudentView] Post data: fieldType={post_data.get('fieldType')}, fieldName={post_data.get('fieldName')}, BATCH_ID={post_data.get('BATCH_ID')}, STUDENT_ID={post_data.get('STUDENT_ID')}, Search_Field={post_data.get('Search_Field')}")
-                        
-                        exp_data = TranscriptReportsModel.get_reports_data(
+                        exp_data = SchoolTranscriptReportsModel.get_reports_data(
                             db=db,
                             request_data=post_data,
                             has_update_permission=False
                         )
-                        # Use recordsFiltered (filtered count) or recordsTotal as fallback, matching CI3's iTotalRecords
                         count = exp_data.get('recordsFiltered', exp_data.get('recordsTotal', exp_data.get('iTotalRecords', 0)))
-                        print(f"[StudentView] Transcript {status_flag} count for batch {batch_id}: {count}")
-                        # Always set the count (even if 0) to ensure the field exists in the structure
                         response_data.setdefault(ins_id, {}).setdefault(batch_id, {})[status_flag] = count
                         if count > 0:
                             status_flags_list.append(status_flag)
@@ -266,19 +265,19 @@ async def index(
                         continue
 
                 # Check articulation statuses using ArticulationReportsModel (matching CI3 lines 79-91)
+                # Articulation model expects fieldType COLLEGE_ID; same filter by INSTITUTION_ID
+                post_data_art = {**post_data, 'fieldType': 'COLLEGE_ID'}
                 art_status_flags = ['Failed', 'Processed', 'Rerun']
                 for status_flag in art_status_flags:
-                    post_data['Search_Field'] = status_flag
+                    post_data_art['Search_Field'] = status_flag
                     try:
                         exp_data = ArticulationReportsModel.get_reports_data(
                             db=db,
-                            request_data=post_data,
+                            request_data=post_data_art,
                             has_update_permission=False
                         )
                         # Use recordsFiltered (filtered count) or recordsTotal as fallback, matching CI3's iTotalRecords
                         count = exp_data.get('recordsFiltered', exp_data.get('recordsTotal', exp_data.get('iTotalRecords', 0)))
-                        print(f"[StudentView] Articulation {status_flag} count for batch {batch_id}: {count}")
-                        # Always set the count (even if 0) to ensure the field exists in the structure
                         key = f'articulation_{status_flag}'
                         response_data.setdefault(ins_id, {}).setdefault(batch_id, {})[key] = count
                         if count > 0:
@@ -351,10 +350,24 @@ async def index(
                 student_row = student_result.fetchone()
                 
                 if student_row and student_row[0]:
+                    admission_decision = ''
+                    try:
+                        banner_sql = f"""
+                        SELECT TOP 1 APPLICATION_STATUS_DESC
+                        FROM {TBL_BANNER_APPLICANT_DATA} AD WITH(NOLOCK)
+                        WHERE STUDENT_ID = :sid
+                        ORDER BY AD.SARADAP_APST_DATE DESC
+                        """
+                        banner_result = db.execute(text(banner_sql), {"sid": student_row[0]})
+                        banner_row = banner_result.fetchone()
+                        if banner_row and banner_row[0]:
+                            admission_decision = banner_row[0] or ''
+                    except Exception as e:
+                        print(f"[StudentView] Error querying BANNER_APPLICANT_DATA: {e}")
                     student_info = {
                         'STUDENT_ID': student_row[0] or '',
                         'STUDENT_FULL_NAME': student_row[1] or '',
-                        'ADMISSION_DECISION': ''  # TODO: Get from BANNER_APPLICANT_DATA if needed
+                        'ADMISSION_DECISION': admission_decision,
                     }
                     print(f"[StudentView] Found student info: {student_info}")
             except Exception as e:
@@ -369,10 +382,11 @@ async def index(
         'total_transcripts': total_transcripts,
         'menu_list': response_data,
         'batch_details': batch_details,
-        'batch_metadata': batch_metadata,  # Added batch metadata (OCR_EXTRACTED_DATE, LAST_UPDATED_DATETIME)
+        'batch_metadata': batch_metadata,
         'institution_id': institution_id or '',
         'student_id': student_id or '',
         'batch_id': batch_id or '',
+        'type': report_type or '',
     }
     
     print(f"[StudentView] Returning result with {len(institution_name)} institutions, {total_transcripts} total transcripts")
@@ -388,8 +402,8 @@ async def getstudentslist(
     db: Session = Depends(get_db)
 ):
     """
-    Get students list for dropdown
-    Based on CI3 Studentview::getstudentslist()
+    Get students list for dropdown (HS).
+    Matches: CI3 school/Studentview::getstudentslist() (application/controllers/school/Studentview.php)
     """
     if q:
         where_clause = f"(LOWER(STUDENT_FULL_NAME) LIKE '%{check_special_name(q.lower())}%' OR LOWER(STUDENT_ID) LIKE '%{check_special_name(q.lower())}%')"
@@ -400,7 +414,7 @@ async def getstudentslist(
     SELECT STUDENT_ID, STUDENT_FULL_NAME
     FROM {TBL_TRANSCRIPTHDRDATA}
     WHERE {where_clause}
-    AND PROJECT_ID = {COLLEGE_PROJECT_ID}
+    AND PROJECT_ID = {SCHOOL_PROJECT_ID}
     GROUP BY STUDENT_ID, STUDENT_FULL_NAME
     ORDER BY STUDENT_FULL_NAME ASC
     """
@@ -418,16 +432,13 @@ async def viewpageload(
     db: Session = Depends(get_db)
 ):
     """
-    Load transcript reports view
-    Based on CI3 Studentview::viewpageload()
-    This should return the same data structure as transcriptreports endpoint
+    Load transcript reports view (SPA: frontend embeds school/hdrreports list; no HTML returned).
+    Matches: CI3 school/Studentview::viewpageload() -> school/hdrreports/list
     """
-    # For now, return a redirect to transcriptreports with filters
-    # In a full implementation, you'd render the view server-side or return the data
     return {
         "success": 1,
         "message": "View loaded",
-        "redirect": f"/college/transcriptreports?student_id={request.student_id}&batch_id={request.batch_id}&institution_id={request.institution_id}&type={request.type}"
+        "redirect": f"/school/transcriptreports?student_id={request.student_id}&batch_id={request.batch_id}&institution_id={request.institution_id}&type={request.type}"
     }
 
 
@@ -438,8 +449,8 @@ async def articulationviewpageload(
     db: Session = Depends(get_db)
 ):
     """
-    Load articulation reports view
-    Based on CI3 Studentview::articulationviewpageload()
+    Load articulation reports view (SPA: frontend can embed ArticulationReports; CI3 loads admin/articulation/list).
+    Matches: CI3 school/Studentview::articulationviewpageload()
     """
     return {
         "success": 1,

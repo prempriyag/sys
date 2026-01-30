@@ -22,7 +22,6 @@ import Blank from "./pages/Blank";
 import AppLayout from "./layout/AppLayout";
 import { ScrollToTop } from "./components/common/ScrollToTop";
 import ToastContainer from "./components/ui/toast/ToastContainer";
-import Home from "./pages/Dashboard/Home";
 import CollegeDashboard from "./pages/College/dashboard/CollegeDashboard";
 import Dashboard2 from "./pages/College/dashboard/dashboard2";
 import Dashboard3 from "./pages/College/dashboard/dashboard3";
@@ -93,6 +92,20 @@ import SchoolTranscriptsList from "./pages/School/transcripts/TranscriptsList";
 import SchoolInstitutionMapping from "./pages/School/setup/institutionmapping/InstitutionMapping";
 import SchoolGpaPickMapping from "./pages/School/setup/gpapickmapping/GpaPickMapping";
 import SchoolGpaScaleMapping from "./pages/School/setup/gpascalemapping/GpaScaleMapping";
+
+// OCR (OCR Verify) module pages
+import OCRDashboard from "./pages/OCR/OCRDashboard";
+import Verifiers from "./pages/OCR/Verifiers";
+import AssignBatches from "./pages/OCR/AssignBatches";
+import ToBeAssignedBatches from "./pages/OCR/ToBeAssignedBatches";
+import CollegeAssignedBatches from "./pages/OCR/CollegeAssignedBatches";
+import SchoolAssignedBatches from "./pages/OCR/SchoolAssignedBatches";
+import CollegeHeaderData from "./pages/OCR/CollegeHeaderData";
+import SchoolHeaderData from "./pages/OCR/SchoolHeaderData";
+import CollegeOCRBatch from "./pages/OCR/CollegeOCRBatch";
+import CollegeHDRBatch from "./pages/OCR/CollegeHDRBatch";
+import SchoolOCRBatch from "./pages/OCR/SchoolOCRBatch";
+import SchoolHDRBatch from "./pages/OCR/SchoolHDRBatch";
 
 export default function App() {
   return (
@@ -393,15 +406,28 @@ export default function App() {
           {/* School module routes */}
           <Route path="/school/dashboard" element={<SchoolDashboard />} />
 
-          {/* OCR Verify module routes */}
-          <Route path="/ocrverify/dashboard" element={<Home />} />
+          {/* OCR (OCR Verify) module routes */}
+          <Route path="/ocrverify/dashboard" element={<OCRDashboard />} />
+          <Route path="/ocrverify/verifiers" element={<Verifiers />} />
+          <Route path="/ocrverify/assignbatches" element={<AssignBatches />} />
+          <Route path="/ocrverify/tobeassignbatches" element={<ToBeAssignedBatches />} />
+          <Route path="/ocrverify/collegeocrbatches" element={<CollegeAssignedBatches />} />
+          <Route path="/ocrverify/schoolocrbatches" element={<SchoolAssignedBatches />} />
+          <Route path="/ocrverify/collegehdrdata" element={<CollegeHeaderData />} />
+          <Route path="/ocrverify/schoolhdrdata" element={<SchoolHeaderData />} />
+          <Route path="/ocrverify/collegeocrbatch" element={<CollegeOCRBatch />} />
+          <Route path="/ocrverify/collegehdrbatch" element={<CollegeHDRBatch />} />
+          <Route path="/ocrverify/schoolocrbatch" element={<SchoolOCRBatch />} />
+          <Route path="/ocrverify/schoolhdrbatch" element={<SchoolHDRBatch />} />
 
           {/* Others Page */}
           <Route path="/profile" element={<UserProfiles />} />
           <Route path="/school/profile" element={<UserProfiles />} />
+          <Route path="/ocrverify/profile" element={<UserProfiles />} />
 
           <Route path="/settings" element={<Settings />} />
           <Route path="/school/settings" element={<Settings />} />
+          <Route path="/ocrverify/settings" element={<Settings />} />
 
           <Route path="/calendar" element={<Calendar />} />
           <Route path="/blank" element={<Blank />} />

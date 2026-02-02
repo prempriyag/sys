@@ -8,6 +8,7 @@ import StatusBadge from "../../../components/common/StatusBadge";
 import { API_ENDPOINTS, API_BASE_URL } from "../../../config/api";
 import { RefreshIcon, FilterIcon } from "../../../icons";
 import { useAuth } from "../../../context/AuthContext";
+import { alertsuccess } from "../../../utils/toast";
 
 export default function DigiScriptReports() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -23,11 +24,13 @@ export default function DigiScriptReports() {
   // Check if user has update permission
   const hasUpdatePermission = hasPermission("college_digiscript_reports", "UPDATE");
 
-  // Helper function to copy text to clipboard
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text).then(() => {
-      console.log("Copied to clipboard:", text);
-    });
+  // Helper function to copy text to clipboard (handles string, number, Batch ID, Institution ID, etc.)
+  const copyToClipboard = (text: string | number) => {
+    const str = String(text ?? "").trim();
+    if (!str) return;
+    navigator.clipboard.writeText(str).then(() => {
+      alertsuccess("Copied to clipboard!");
+    }).catch(() => console.error("Failed to copy"));
   };
 
   // Helper function to generate PDF URL

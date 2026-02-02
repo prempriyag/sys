@@ -3,7 +3,7 @@ import PageBreadcrumb from "../../../components/common/PageBreadCrumb";
 import PageMeta from "../../../components/common/PageMeta";
 import PageContainer, { PageWrapper } from "../../../components/common/PageContainer";
 import Button from "../../../components/ui/button/Button";
-import { API_BASE_URL } from "../../../config/api";
+import { API_BASE_URL, API_ENDPOINTS } from "../../../config/api";
 import Chart from "react-apexcharts";
 import { RefreshIcon } from "../../../icons";
 import { ApexOptions } from "apexcharts";
@@ -38,8 +38,11 @@ const initialDashboardData: DashboardData = {
   articulationCoursesStatusDonut: { series: [], labels: [] },
 };
 
+type CollegeOption = { INSTITUTION_NAME: string; INSTITUTION_ID: string };
+
 export default function CollegeDashboard() {
   const [loading, setLoading] = useState(false);
+  const [collegesList, setCollegesList] = useState<CollegeOption[]>([]);
   const [filters, setFilters] = useState({
     college_name: "",
     fromdate: new Date(Date.now() - 120 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
@@ -107,6 +110,29 @@ export default function CollegeDashboard() {
       setLoading(false);
     }
   };
+
+  const fetchCollegesList = async () => {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}${API_ENDPOINTS.DASHBOARD_COLLEGES_LIST}?q=`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
+          },
+        }
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setCollegesList(Array.isArray(data) ? data : []);
+      }
+    } catch (error) {
+      console.error("Error fetching colleges list:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchCollegesList();
+  }, []);
 
   useEffect(() => {
     fetchDashboardData();
@@ -375,15 +401,20 @@ export default function CollegeDashboard() {
           }}
         >
           <div className="flex flex-wrap items-end gap-4">
-            <div className="flex flex-col flex-1 min-w-[150px]">
+            <div className="flex flex-col flex-1 min-w-[200px]">
               <label className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">College Name</label>
-              <input
-                type="text"
+              <select
                 value={filters.college_name}
                 onChange={(e) => handleFilterChange("college_name", e.target.value)}
-                placeholder="Search college..."
-                className="w-full rounded-xl border border-gray-300 bg-white/50 px-4 py-2.5 text-sm text-gray-800 backdrop-blur-sm transition-all duration-200 placeholder:text-gray-400 focus:border-brand-500 focus:bg-white/70 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-gray-600 dark:bg-gray-800/50 dark:text-white/90 dark:placeholder:text-gray-500 dark:focus:border-brand-400"
-              />
+                className="w-full rounded-xl border border-gray-300 bg-white/50 px-4 py-2.5 text-sm text-gray-800 backdrop-blur-sm transition-all duration-200 focus:border-brand-500 focus:bg-white/70 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-gray-600 dark:bg-gray-800/50 dark:text-white/90 dark:focus:border-brand-400"
+              >
+                <option value="">All Colleges</option>
+                {collegesList.map((c) => (
+                  <option key={c.INSTITUTION_ID} value={c.INSTITUTION_ID}>
+                    {c.INSTITUTION_NAME || c.INSTITUTION_ID}
+                  </option>
+                ))}
+              </select>
             </div>
             <div className="flex flex-col flex-1 min-w-[150px]">
               <label className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">From Date</label>

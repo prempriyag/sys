@@ -28,6 +28,12 @@ export default function EditableSlateId({
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const { alertsuccess, alerterror } = useToast();
 
+  const handleCopyClick = () => {
+    navigator.clipboard.writeText(value).then(() => {
+      alertsuccess("Copied to clipboard!");
+    }).catch(() => console.error("Failed to copy"));
+  };
+
   // Only show edit icon for Failed/Rerun types (matching CI3)
   const showEditIcon = hasUpdatePermission && (searchField === "Failed" || searchField === "Rerun");
 
@@ -89,7 +95,7 @@ export default function EditableSlateId({
         <button
           type="button"
           className="btn-copy-icon cursor-pointer hover:text-brand-500"
-          onClick={() => navigator.clipboard.writeText(value)}
+          onClick={handleCopyClick}
           title="Copy to clipboard"
         >
           <CopyIcon className="w-4 h-4" />
@@ -107,7 +113,7 @@ export default function EditableSlateId({
           <button
             type="button"
             className="btn-copy-icon cursor-pointer hover:text-brand-500"
-            onClick={() => navigator.clipboard.writeText(value)}
+            onClick={handleCopyClick}
             title="Copy to clipboard"
           >
             <CopyIcon className="w-4 h-4" />
@@ -141,7 +147,7 @@ export default function EditableSlateId({
           <button
             type="button"
             className="btn-copy-icon cursor-pointer hover:text-brand-500"
-            onClick={() => navigator.clipboard.writeText(value)}
+            onClick={handleCopyClick}
             title="Copy to clipboard"
           >
             <CopyIcon className="w-4 h-4" />

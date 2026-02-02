@@ -788,34 +788,43 @@ class DashboardModel:
 
     @staticmethod
     def get_colleges_list(db: Session, search_term: str = "") -> List[Dict[str, str]]:
-        """Get list of colleges for filter dropdown"""
+        """Get list of colleges for filter dropdown.
+        First tries institutions that have kickout activity; if empty, falls back to all from INSTITUTION_MAPPING.
+        """
         try:
             like_condition = ""
             if search_term:
-                like_condition = f" AND (LOWER(INSTITUTION_NAME) LIKE '%{search_term.lower()}%' OR INSTITUTION_ID LIKE '%{search_term}%')"
-            
+                safe_term = search_term.strip().replace("'", "''")
+                like_condition = f" AND (LOWER(INSTITUTION_NAME) LIKE LOWER('%{safe_term}%') OR CAST(INSTITUTION_ID AS VARCHAR) LIKE '%{safe_term}%')"
+
+            # Try institutions that have kickout activity for college project
             query = text(f"""
-                SELECT DISTINCT INSTITUTION_NAME, INSTITUTION_ID
-                FROM {TBL_INSTITUTION_MAPPING}
-                WHERE INSTITUTION_ID IN (
+                SELECT DISTINCT m.INSTITUTION_NAME, m.INSTITUTION_ID
+                FROM {TBL_INSTITUTION_MAPPING} m
+                WHERE m.INSTITUTION_ID IN (
                     SELECT DISTINCT INSTITUTION_ID
                     FROM {TBL_KICKOUT}
                     WHERE (PROJECT_ID = {COLLEGE_PROJECT_ID} OR PROJECT_ID IS NULL)
                 )
-                AND INSTITUTION_ID != '000000'
+                AND m.INSTITUTION_ID != '000000'
                 {like_condition}
-                ORDER BY INSTITUTION_NAME
+                ORDER BY m.INSTITUTION_NAME
             """)
-            
             result = db.execute(query).fetchall()
-            
-            colleges = []
-            for row in result:
-                colleges.append({
-                    "INSTITUTION_NAME": row.INSTITUTION_NAME,
-                    "INSTITUTION_ID": row.INSTITUTION_ID
-                })
-            
+            colleges = [{"INSTITUTION_NAME": row.INSTITUTION_NAME, "INSTITUTION_ID": row.INSTITUTION_ID} for row in result]
+
+            # Fallback: if no institutions from kickout, return all from INSTITUTION_MAPPING
+            if not colleges:
+                fallback_query = text(f"""
+                    SELECT DISTINCT INSTITUTION_NAME, INSTITUTION_ID
+                    FROM {TBL_INSTITUTION_MAPPING}
+                    WHERE INSTITUTION_ID != '000000'
+                    {like_condition}
+                    ORDER BY INSTITUTION_NAME
+                """)
+                fallback_result = db.execute(fallback_query).fetchall()
+                colleges = [{"INSTITUTION_NAME": row.INSTITUTION_NAME, "INSTITUTION_ID": row.INSTITUTION_ID} for row in fallback_result]
+
             return colleges
         except Exception as e:
             logger.exception("Error in get_colleges_list")

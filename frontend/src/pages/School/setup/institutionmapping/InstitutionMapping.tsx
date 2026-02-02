@@ -270,8 +270,9 @@ export default function InstitutionMapping({ instType = "" }: InstitutionMapping
             { data: "INSTITUTION_NAME", name: "Institution Name", searchable: true, orderable: true },
             { data: "INSTITUTION_ZIPCODE", name: "Institution Zipcode", searchable: true, orderable: true },
             { data: "EXTERNAL_INSTITUTION_NAME", name: "External Institution Name", searchable: true, orderable: true },
-            { data: "SLATE_INSTITUTION_ID", name: "Slate Institution ID", searchable: true, orderable: true },
-            { data: "SLATE_INSTITUTION_NAME", name: "Slate Institution Name", searchable: true, orderable: true },
+            // REMOVED: Slate Institution ID & Slate Institution Name columns (commented per requirement)
+            // { data: "SLATE_INSTITUTION_ID", name: "Slate Institution ID", searchable: true, orderable: true },
+            // { data: "SLATE_INSTITUTION_NAME", name: "Slate Institution Name", searchable: true, orderable: true },
             { data: "EXTERNAL_INSTITUTION_ZIPCODE", name: "External Institution Zipcode", searchable: true, orderable: true },
             { data: "UPDATED_BY", name: "Updated By", searchable: true, orderable: true },
             { data: "LAST_UPDATED_DATETIME", name: "Updated On", searchable: false, orderable: true },

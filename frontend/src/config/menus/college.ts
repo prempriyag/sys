@@ -59,7 +59,7 @@ export const collegeMenu: MenuConfig = {
           icon: "alert",
         },
         {
-          name: "Phase-2 Kickouts",
+          name: "To be Processed Manually",
           path: "/college/articulationphase2kickouts",
           permission: "college_digiscript_reports",
           icon: "alert",

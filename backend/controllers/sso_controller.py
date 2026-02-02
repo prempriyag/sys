@@ -28,6 +28,9 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/sso", tags=["SSO"])
 
+# Router for /api/api/sso so callback works when Azure redirect URI is .../api/api/sso/...
+router_double_api = APIRouter(prefix="/api/api/sso", tags=["SSO"])
+
 
 def serialize_user_data_for_url(data: dict) -> str:
     """
@@ -502,6 +505,7 @@ async def ktech_oauth_login(
 
 @router.get("/ktech/oauth/callback")
 async def ktech_oauth_callback(
+    request: Request,
     code: Optional[str] = Query(None),
     state: Optional[str] = Query(None),
     error: Optional[str] = Query(None),
@@ -509,8 +513,9 @@ async def ktech_oauth_callback(
     db: Session = Depends(get_db)
 ):
     """
-    Handle KTech OAuth callback
-    Based on handle_response() in CI3 Ktechsso.php
+    Handle KTech OAuth callback.
+    Uses the request URL (without query) as redirect_uri for token exchange so that
+    callbacks to /api/api/sso/... work when Azure is registered with that path.
     """
     try:
         if error:
@@ -527,6 +532,10 @@ async def ktech_oauth_callback(
             )
         
         oauth_config = SSOConfig.get_ktech_oauth_config()
+        # Use actual callback URL for token exchange (required when path is /api/api/sso/...)
+        u = request.url
+        callback_url = f"{u.scheme}://{u.netloc}{u.path}"
+        oauth_config = {**oauth_config, "redirect_uri": callback_url}
         result = await request_tokens(oauth_config, code, state or "", db)
         
         if result['status'] == 0:
@@ -574,6 +583,10 @@ async def ktech_oauth_callback(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error processing OAuth callback: {str(e)}"
         )
+
+
+# Expose same callback at /api/api/sso/... for prod when redirect URI has double /api
+router_double_api.add_api_route("/ktech/oauth/callback", ktech_oauth_callback, methods=["GET"])
 
 
 @router.get("/ktech/oauth/logout")

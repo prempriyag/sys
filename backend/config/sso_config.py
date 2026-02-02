@@ -53,35 +53,43 @@ class SSOConfig(BaseSettings):
         case_sensitive = True
         extra = "ignore"
     
+    @staticmethod
+    def _base_url_for_sso() -> str:
+        """Base URL for SSO redirect URIs (no trailing /api to avoid double /api in paths)."""
+        base = (settings.BASE_URL or "").rstrip("/")
+        if base.endswith("/api"):
+            return base[:-4]  # strip /api so we get origin only
+        return base
+
     @property
     def CLIENT_OAUTH_REDIRECT_URI(self) -> str:
         """Client OAuth redirect URI"""
-        return f"{settings.BASE_URL}/api/sso/client/oauth/callback"
+        return f"{self._base_url_for_sso()}/api/sso/client/oauth/callback"
     
     @property
     def CLIENT_SAML_ACS_URL(self) -> str:
         """Client SAML Assertion Consumer Service URL"""
-        return f"{settings.BASE_URL}/api/sso/client/saml/callback"
+        return f"{self._base_url_for_sso()}/api/sso/client/saml/callback"
     
     @property
     def CLIENT_SAML_SLS_URL(self) -> str:
         """Client SAML Single Logout Service URL"""
-        return f"{settings.BASE_URL}/api/sso/client/saml/sls"
+        return f"{self._base_url_for_sso()}/api/sso/client/saml/sls"
     
     @property
     def KTECH_OAUTH_REDIRECT_URI(self) -> str:
         """KTech OAuth redirect URI"""
-        return f"{settings.BASE_URL}/api/sso/ktech/oauth/callback"
+        return f"{self._base_url_for_sso()}/api/sso/ktech/oauth/callback"
     
     @property
     def KTECH_SAML_ACS_URL(self) -> str:
         """KTech SAML Assertion Consumer Service URL"""
-        return f"{settings.BASE_URL}/api/sso/ktech/saml/callback"
+        return f"{self._base_url_for_sso()}/api/sso/ktech/saml/callback"
     
     @property
     def KTECH_SAML_SLS_URL(self) -> str:
         """KTech SAML Single Logout Service URL"""
-        return f"{settings.BASE_URL}/api/sso/ktech/saml/sls"
+        return f"{self._base_url_for_sso()}/api/sso/ktech/saml/sls"
 
     def get_client_oauth_config(self) -> Dict:
         """Get Client OAuth configuration"""

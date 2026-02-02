@@ -503,6 +503,17 @@ async def ktech_oauth_login(
         )
 
 
+def _redirect_sso_error(message: str) -> RedirectResponse:
+    """Redirect to frontend SSO callback with error. Avoids 4xx/5xx so proxy never returns 502."""
+    from config.settings import settings
+    from urllib.parse import urlencode
+    params = urlencode({
+        'error': 'authentication_failed',
+        'error_description': message[:500]  # avoid overly long URLs
+    })
+    return RedirectResponse(url=f"{settings.FRONTEND_URL}/sso/callback?{params}")
+
+
 @router.get("/ktech/oauth/callback")
 async def ktech_oauth_callback(
     request: Request,
@@ -513,74 +524,36 @@ async def ktech_oauth_callback(
     db: Session = Depends(get_db)
 ):
     """
-    Handle KTech OAuth callback.
-    Uses the request URL (without query) as redirect_uri for token exchange so that
-    callbacks to /api/api/sso/... work when Azure is registered with that path.
+    Handle KTech OAuth callback. Always returns 302 redirect (never 4xx/5xx) so reverse
+    proxy does not turn backend errors into 502 Bad Gateway.
     """
     try:
         if error:
             logger.error(f"OAuth Error: {error} - {error_description}")
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=error_description or error
-            )
-        
+            return _redirect_sso_error(error_description or error or "OAuth error")
         if not code:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Authorization code not provided"
-            )
-        
+            return _redirect_sso_error("Authorization code not provided")
         oauth_config = SSOConfig.get_ktech_oauth_config()
-        # Use the same redirect_uri as in the auth request (from config). request.url can differ
-        # after proxy (e.g. /api/sso/... vs public .../api/api/sso/...), causing 400 on token exchange.
         result = await request_tokens(oauth_config, code, state or "", db)
-        
         if result['status'] == 0:
-            # Redirect to frontend with error
-            from config.settings import settings
-            from urllib.parse import urlencode
-            error_params = urlencode({
-                'error': 'authentication_failed',
-                'error_description': result['message']
-            })
-            redirect_url = f"{settings.FRONTEND_URL}/sso/callback?{error_params}"
-            return RedirectResponse(url=redirect_url)
-        
-        # Redirect to frontend with token and user data (matching CI3 behavior)
+            return _redirect_sso_error(result.get('message', 'Token exchange failed'))
         from config.settings import settings
         from urllib.parse import urlencode
-        import json
-        
-        # Format user data to include all fields including permissions
         if 'user' in result:
             formatted_user_data = format_user_data_for_response(result['user'])
             user_data_json = serialize_user_data_for_url(formatted_user_data)
         else:
             user_data_json = "{}"
-        
-        # Build redirect URL with token and user data
         params = {
             'access_token': result['access_token'],
             'user': user_data_json
         }
-        
-        # Add permissions if available
         if 'permissions' in result:
-            permissions_json = json.dumps(result['permissions'])
-            params['permissions'] = permissions_json
-        
-        redirect_url = f"{settings.FRONTEND_URL}/sso/callback?{urlencode(params)}"
-        return RedirectResponse(url=redirect_url)
-        
-    except HTTPException:
-        raise
+            params['permissions'] = json.dumps(result['permissions'])
+        return RedirectResponse(url=f"{settings.FRONTEND_URL}/sso/callback?{urlencode(params)}")
     except Exception as e:
-        logger.error(f"KTech OAuth Callback Error: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error processing OAuth callback: {str(e)}"
-        )
+        logger.exception("KTech OAuth Callback Error")
+        return _redirect_sso_error(str(e)[:500])
 
 
 # Expose same callback at /api/api/sso/... for prod when redirect URI has double /api

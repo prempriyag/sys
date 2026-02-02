@@ -37,6 +37,8 @@ class SSOConfig(BaseSettings):
     KTECH_OAUTH_CLIENT_SECRET: Optional[str] = None
     KTECH_OAUTH_AUTHORITY: str = "https://login.microsoftonline.com"
     KTECH_OAUTH_RESOURCE_URI: str = "https://graph.microsoft.com"  # KTech uses Microsoft Graph API (matches CI3 aad_auth_ktech.php)
+    # Optional: set KTECH_OAUTH_REDIRECT_URI to match Azure app registration exactly (e.g. .../api/api/sso/ktech/oauth/callback)
+    KTECH_OAUTH_REDIRECT_URI_OVERRIDE: Optional[str] = None
     
     # KTech SSO - SAML
     KTECH_SAML_ENTITY_ID: Optional[str] = None
@@ -75,7 +77,9 @@ class SSOConfig(BaseSettings):
     
     @property
     def KTECH_OAUTH_REDIRECT_URI(self) -> str:
-        """KTech OAuth redirect URI"""
+        """KTech OAuth redirect URI. Use KTECH_OAUTH_REDIRECT_URI_OVERRIDE in .env to match Azure exactly."""
+        if self.KTECH_OAUTH_REDIRECT_URI_OVERRIDE and self.KTECH_OAUTH_REDIRECT_URI_OVERRIDE.strip():
+            return self.KTECH_OAUTH_REDIRECT_URI_OVERRIDE.strip().rstrip("/")
         return f"{self._base_url_for_sso()}/api/sso/ktech/oauth/callback"
     
     @property

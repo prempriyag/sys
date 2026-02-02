@@ -4,11 +4,11 @@ import { alerterror } from "../utils/toast";
 // Environment: DEV | UAT | PROD (set via VITE_APP_ENV, e.g. in .env or build)
 const APP_ENV = (import.meta.env.VITE_APP_ENV || "DEV").toUpperCase();
 
-// Backend API base URL per environment
+// Backend API base URL per environment (UAT/PROD use /backend path)
 const API_BASE_URL_BY_ENV: Record<string, string> = {
   DEV: "http://localhost:8000",
-  UAT: "https://digiscript-csc-uat.ktechproducts.com/api",
-  PROD: "https://digiscript-csc.ktechproducts.com/api",
+  UAT: "https://digiscript-csc-uat.ktechproducts.com/backend",
+  PROD: "https://digiscript-csc.ktechproducts.com/backend",
 };
 
 // API Configuration: VITE_API_BASE_URL overrides; else use URL for current env

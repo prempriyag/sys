@@ -4,6 +4,7 @@ import { api } from "../../config/api";
 import { useToast } from "../../context/ToastContext";
 import { PencilIcon, PaperPlaneIcon, CloseIcon, CopyIcon } from "../../icons";
 import ConfirmationModal from "../common/ConfirmationModal";
+import InlineEdit from "../common/InlineEdit";
 
 interface EditableStudentIdProps {
   value: string;
@@ -11,6 +12,7 @@ interface EditableStudentIdProps {
   studentName: string;
   searchField: string;
   hasUpdatePermission: boolean;
+  hasActionSelected?: boolean;
   onSuccess?: () => void;
 }
 
@@ -20,6 +22,7 @@ export default function EditableStudentId({
   studentName,
   searchField,
   hasUpdatePermission,
+  hasActionSelected = false,
   onSuccess,
 }: EditableStudentIdProps) {
   const [isEditing, setIsEditing] = useState(false);
@@ -28,8 +31,16 @@ export default function EditableStudentId({
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const { alertsuccess, alerterror } = useToast();
 
-  // Only show edit icon for Failed/Rerun types (matching CI3)
-  const showEditIcon = hasUpdatePermission && (searchField === "Failed" || searchField === "Rerun");
+  const handleCopyClick = () => {
+    navigator.clipboard.writeText(value).then(() => {
+      alertsuccess("Copied to clipboard!");
+    }).catch(() => console.error("Failed to copy"));
+  };
+
+  // Show edit icon for Failed/Rerun types OR when action is selected (Processed/Reprocess)
+  const showEditIcon = hasUpdatePermission && (
+    searchField === "Failed" || searchField === "Rerun" || hasActionSelected
+  );
 
   const handleEditClick = () => {
     if (!showEditIcon) return;
@@ -76,20 +87,32 @@ export default function EditableStudentId({
     }
   };
 
-  if (!value) {
+  // Empty value: show editable input when action selected, otherwise dash
+  if (!value || String(value).trim() === "") {
+    if (showEditIcon) {
+      return (
+        <InlineEdit
+          value=""
+          batchId={batchId}
+          type="student"
+          studentName={studentName}
+          onSuccess={() => onSuccess?.()}
+        />
+      );
+    }
     return <span>-</span>;
   }
 
-  // For Processed/equivalenthours/Articulation-Kickouts - show as link only
-  if (searchField === "Processed" || searchField === "equivalenthours" || 
+  // For Processed/equivalenthours/Articulation-Kickouts - show as link only (unless action selected with edit)
+  if ((searchField === "Processed" || searchField === "equivalenthours" || 
       searchField === "Articulation-Kickouts" || searchField === "ArticulationKickouts" || 
-      searchField === "") {
+      searchField === "") && !hasActionSelected) {
     return (
       <div className="inline-flex items-center gap-2">
         <button
           type="button"
           className="btn-copy-icon cursor-pointer hover:text-brand-500"
-          onClick={() => navigator.clipboard.writeText(value)}
+          onClick={handleCopyClick}
           title="Copy to clipboard"
         >
           <CopyIcon className="w-4 h-4" />
@@ -114,7 +137,7 @@ export default function EditableStudentId({
           <button
             type="button"
             className="btn-copy-icon cursor-pointer hover:text-brand-500"
-            onClick={() => navigator.clipboard.writeText(value)}
+            onClick={handleCopyClick}
             title="Copy to clipboard"
           >
             <CopyIcon className="w-4 h-4" />
@@ -148,7 +171,7 @@ export default function EditableStudentId({
           <button
             type="button"
             className="btn-copy-icon cursor-pointer hover:text-brand-500"
-            onClick={() => navigator.clipboard.writeText(value)}
+            onClick={handleCopyClick}
             title="Copy to clipboard"
           >
             <CopyIcon className="w-4 h-4" />

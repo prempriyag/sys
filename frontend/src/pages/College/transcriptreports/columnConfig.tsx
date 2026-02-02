@@ -26,7 +26,7 @@ export const createTranscriptReportColumns = (
   type: string,
   hasUpdatePermission: boolean,
   helpers: {
-    copyToClipboard: (text: string) => void;
+    copyToClipboard: (text: string | number) => void;
     getPdfUrl: (filePath: string, type: "transcript" | "articulation") => string;
     navigate: (path: string) => void;
     refreshTable?: () => void;
@@ -140,6 +140,7 @@ export const createTranscriptReportColumns = (
     
     // Column 3: STUDENT_ID (text-center) - with inline editing support
     // Matching CI3: Shows edit icon for Failed/Rerun types, link for Processed/equivalenthours
+    // When action is selected (Processed/Reprocess), empty IDs become editable
     {
       data: "STUDENT_ID",
       name: "Student ID",
@@ -151,18 +152,20 @@ export const createTranscriptReportColumns = (
         const studentName = row.STUDENT_FULL_NAME || "";
         const searchField = row._search_field || "";
         const refreshTable = helpers?.refreshTable;
-        
-        if (!data) {
-          return <span>-</span>;
-        }
+        const hasPendingChanges = rowChanges?.get?.(batchId);
+        const hasActionSelected = hasPendingChanges && (
+          (hasPendingChanges.reprocessTranscript && hasPendingChanges.reprocessTranscript !== "0") ||
+          (hasPendingChanges.articulationProcess && hasPendingChanges.articulationProcess !== "0")
+        );
         
         return (
           <EditableStudentId
-            value={data}
+            value={data || ""}
             batchId={batchId}
             studentName={studentName}
             searchField={searchField}
             hasUpdatePermission={hasUpdatePermission}
+            hasActionSelected={!!hasActionSelected}
             onSuccess={() => {
               if (refreshTable) refreshTable();
             }}
@@ -549,6 +552,7 @@ export const createTranscriptReportColumns = (
             })}
             onCommentChange={handleCommentChange || (() => {})}
             onScenarioChange={handleScenarioChange || (() => {})}
+            rowChanges={rowChanges}
           />
         );
       },

@@ -57,6 +57,9 @@ export const API_ENDPOINTS = {
   USERS_DELETE: "/api/users/delete",
   USERS_UPDATE_STATUS: "/api/users/updateStatus",
   USERS_RESET_PASSWORD: "/api/users/resetpassword",
+  // College Dashboard
+  DASHBOARD_COLLEGES_LIST: "/api/dashboard/colleges",
+
   // Student View endpoints
   STUDENTVIEW: "/api/studentview",
   STUDENTVIEW_GET_STUDENTS: "/api/studentview/getstudentslist",

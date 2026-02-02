@@ -78,10 +78,11 @@ export default function TranscriptReports(props?: TranscriptReportsProps) {
   // Check if user has update permission
   const hasUpdatePermission = hasPermission("college_digiscript_reports", "UPDATE");
 
-  // Helper function to copy text to clipboard
-  const copyToClipboard = (text: string) => {
-    if (!text || text.trim() === "") return;
-    navigator.clipboard.writeText(text).then(() => {
+  // Helper function to copy text to clipboard (handles string, number, Batch ID, Institution ID, etc.)
+  const copyToClipboard = (text: string | number) => {
+    const str = String(text ?? "").trim();
+    if (!str) return;
+    navigator.clipboard.writeText(str).then(() => {
       alertsuccess("Copied to clipboard!");
     }).catch((err) => {
       console.error("Failed to copy to clipboard:", err);
@@ -225,9 +226,7 @@ export default function TranscriptReports(props?: TranscriptReportsProps) {
         // Action is valid - set it
         if (data.type === "transcript") {
           changes.reprocessTranscript = action;
-          if (data.dataType) {
-            changes.processTranscript_articulated = data.dataType;
-          }
+          changes.processTranscript_articulated = data.dataType || "";
         } else if (data.type === "articulation") {
           changes.articulationProcess = action;
         }
@@ -674,6 +673,7 @@ export default function TranscriptReports(props?: TranscriptReportsProps) {
 
         {/* Transcript Reports DataTable */}
         <DataTable
+          ref={tableRef}
           refreshTrigger={refreshTrigger}
           columns={getColumns()}
           ajaxUrl={`${API_BASE_URL}${API_ENDPOINTS.TRANSCRIPT_REPORTS_LIST}`}

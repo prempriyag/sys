@@ -10,6 +10,7 @@ interface RowActionsProps {
   onActionChange: (action: string, batchId: string, data: any) => void;
   onCommentChange: (batchId: string, comment: string) => void;
   onScenarioChange: (batchId: string, scenario: string) => void;
+  rowChanges?: Map<string, any>;
 }
 
 export default function RowActions({
@@ -19,6 +20,7 @@ export default function RowActions({
   onActionChange,
   onCommentChange,
   onScenarioChange,
+  rowChanges,
 }: RowActionsProps) {
   const [transcriptAction, setTranscriptAction] = useState<string>("0");
   const [articulationAction, setArticulationAction] = useState<string>("0");
@@ -59,10 +61,8 @@ export default function RowActions({
     let comment = "";
 
     if (transcriptAction === "Processed") {
-      const selectedOption = document.querySelector(
-        `.transcriptreprocess[data-batch-id="${batchId}"]`
-      ) as HTMLSelectElement;
-      const dataType = selectedOption?.selectedOptions[0]?.getAttribute("data-type") || "";
+      const changes = rowChanges?.get(batchId);
+      const dataType = changes?.processTranscript_articulated || "";
 
       if (dataType === "Articulated") {
         comment = "Processed and Articulated manually by OSU-OKC";
@@ -70,7 +70,9 @@ export default function RowActions({
         comment = "Processed manually by OSU-OKC";
       }
     } else if (transcriptAction === "Rerun") {
-      comment = "Reprocess this Transcript";
+      const changes = rowChanges?.get(batchId);
+      const dataType = changes?.processTranscript_articulated || "";
+      comment = dataType === "Rerun15" ? "Reprocess for 30 days" : "Reprocess this Transcript";
     } else if (transcriptAction === "Noaction") {
       comment = "No Action Needed";
     } else if (articulationAction === "Processed") {
@@ -86,11 +88,24 @@ export default function RowActions({
       onCommentChange(batchId, comment);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [transcriptAction, articulationAction, batchId]);
+  }, [transcriptAction, articulationAction, batchId, rowChanges]);
 
   const handleTranscriptActionChange = (action: string, batchId: string, data: any) => {
     setTranscriptAction(action);
-    // Always call onActionChange to properly track state (including "0" to remove)
+    // Set comment immediately (don't wait for rowChanges) so User Comments updates correctly
+    if (action === "Processed") {
+      const dataType = data?.dataType || "";
+      const comment = dataType === "Articulated" 
+        ? "Processed and Articulated manually by OSU-OKC" 
+        : "Processed manually by OSU-OKC";
+      onCommentChange(batchId, comment);
+    } else if (action === "Rerun") {
+      const dataType = data?.dataType || "";
+      onCommentChange(batchId, dataType === "Rerun15" ? "Reprocess for 30 days" : "Reprocess this Transcript");
+    } else if (action === "Noaction") {
+      onCommentChange(batchId, "No Action Needed");
+    }
+    // "0" case handled by useEffect when both actions are cleared
     if (typeof onActionChange === 'function') {
       onActionChange(action, batchId, { ...data, type: "transcript" });
     }
@@ -98,7 +113,14 @@ export default function RowActions({
 
   const handleArticulationActionChange = (action: string, batchId: string, data: any) => {
     setArticulationAction(action);
-    // Always call onActionChange to properly track state (including "0" to remove)
+    // Set comment immediately so User Comments updates correctly
+    if (action === "Processed") {
+      onCommentChange(batchId, "Processed manually by OSU-OKC");
+    } else if (action === "Rerun") {
+      onCommentChange(batchId, "Reprocess this Transcript");
+    } else if (action === "Noaction") {
+      onCommentChange(batchId, "No Action Needed");
+    }
     if (typeof onActionChange === 'function') {
       onActionChange(action, batchId, { ...data, type: "articulation" });
     }
@@ -143,8 +165,8 @@ export default function RowActions({
         </div>
       )}
 
-      {/* Scenario dropdown - shown when Processed action is selected */}
-      {transcriptAction === "Processed" && hasUpdatePermission && (
+      {/* Scenario dropdown - shown when Processed action is selected (transcript or articulation) */}
+      {(transcriptAction === "Processed" || articulationAction === "Processed") && hasUpdatePermission && (
         <select
           className="form-select SCENARIO rounded border border-gray-300 bg-white px-2 py-1 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white"
           value={scenario}

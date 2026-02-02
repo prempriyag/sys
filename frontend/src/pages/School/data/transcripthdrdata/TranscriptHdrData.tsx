@@ -8,6 +8,7 @@ import StatusBadge from "../../../../components/common/StatusBadge";
 import { API_ENDPOINTS } from "../../../../config/api";
 import { RefreshIcon, FilterIcon } from "../../../../icons";
 import { useAuth } from "../../../../context/AuthContext";
+import { alertsuccess } from "../../../../utils/toast";
 
 export default function TranscriptHdrData() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -19,10 +20,12 @@ export default function TranscriptHdrData() {
 
   const hasUpdatePermission = hasPermission("college_transcript_header_data", "UPDATE");
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text).then(() => {
-      console.log("Copied to clipboard:", text);
-    });
+  const copyToClipboard = (text: string | number) => {
+    const str = String(text ?? "").trim();
+    if (!str) return;
+    navigator.clipboard.writeText(str).then(() => {
+      alertsuccess("Copied to clipboard!");
+    }).catch(() => console.error("Failed to copy"));
   };
 
   const clearFilters = () => {

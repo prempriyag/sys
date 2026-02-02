@@ -532,10 +532,8 @@ async def ktech_oauth_callback(
             )
         
         oauth_config = SSOConfig.get_ktech_oauth_config()
-        # Use actual callback URL for token exchange (required when path is /api/api/sso/...)
-        u = request.url
-        callback_url = f"{u.scheme}://{u.netloc}{u.path}"
-        oauth_config = {**oauth_config, "redirect_uri": callback_url}
+        # Use the same redirect_uri as in the auth request (from config). request.url can differ
+        # after proxy (e.g. /api/sso/... vs public .../api/api/sso/...), causing 400 on token exchange.
         result = await request_tokens(oauth_config, code, state or "", db)
         
         if result['status'] == 0:

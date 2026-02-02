@@ -2,6 +2,7 @@
 FastAPI Main Application
 """
 import logging
+from typing import Optional
 from fastapi import FastAPI
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
@@ -136,6 +137,45 @@ class _CORSMiddleware(BaseHTTPMiddleware):
         return r
 
 app.add_middleware(_CORSMiddleware)
+
+
+def _get_header(scope: dict, name: str) -> Optional[str]:
+    """Get a single header value from ASGI scope (case-insensitive)."""
+    name_lower = name.encode().lower()
+    for key, value in scope.get("headers", []):
+        if key.lower() == name_lower:
+            return value.decode("latin-1").strip()
+    return None
+
+
+class _ProxyHeadersMiddleware:
+    """Trust X-Forwarded-Proto and X-Forwarded-Host when request is from 127.0.0.1 (behind nginx)."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http" and scope.get("client"):
+            try:
+                client_host = scope["client"][0]
+                if isinstance(client_host, bytes):
+                    client_host = client_host.decode("utf-8")
+            except (IndexError, TypeError):
+                client_host = None
+            if client_host == "127.0.0.1":
+                proto = _get_header(scope, "x-forwarded-proto")
+                host = _get_header(scope, "x-forwarded-host")
+                if proto and proto.lower() in ("https", "http") or host:
+                    scope = dict(scope)
+                    if proto and proto.lower() in ("https", "http"):
+                        scope["scheme"] = proto.lower()
+                    if host:
+                        port = 443 if (scope.get("scheme") or "").lower() == "https" else 80
+                        scope["server"] = (host, port)
+        await self.app(scope, receive, send)
+
+
+app.add_middleware(_ProxyHeadersMiddleware)
 
 # Import dashboard controller
 try:

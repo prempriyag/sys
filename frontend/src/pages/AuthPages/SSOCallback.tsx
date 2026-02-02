@@ -12,13 +12,22 @@ export default function SSOCallback() {
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [pingSuccess, setPingSuccess] = useState(false);
 
   useEffect(() => {
     const handleSSOCallback = async () => {
       try {
-        // Check if we have an error from SSO
+        // Check if we have an error from SSO (or ping success)
         const errorParam = searchParams.get("error");
         if (errorParam) {
+          // Ping check: error=ping means "path reachable" — show success, not error
+          if (errorParam === "ping") {
+            setError(null);
+            setLoading(false);
+            setPingSuccess(true);
+            setTimeout(() => navigate("/login"), 5000);
+            return;
+          }
           const errorDescription = searchParams.get("error_description") || errorParam;
           setError(errorDescription);
           setLoading(false);
@@ -139,6 +148,24 @@ export default function SSOCallback() {
         <div className="text-center">
           <div className="inline-block w-8 h-8 border-4 border-gray-300 border-t-brand-500 rounded-full animate-spin mb-4"></div>
           <p className="text-gray-600 dark:text-gray-400">Completing SSO login...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (pingSuccess) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center max-w-md p-6 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+          <h2 className="text-lg font-semibold text-green-800 dark:text-green-400 mb-2">
+            SSO path OK
+          </h2>
+          <p className="text-green-600 dark:text-green-300 mb-4">
+            SSO callback path is reachable. You can try KTech login now.
+          </p>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Redirecting to login page...
+          </p>
         </div>
       </div>
     );

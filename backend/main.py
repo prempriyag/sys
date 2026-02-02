@@ -3,7 +3,8 @@ FastAPI Main Application
 """
 import logging
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response
 from sqlalchemy import text
 from controllers import auth_controller, users_controller, theme_settings_controller, sso_controller
 from controllers.college import transcriptreports_controller
@@ -91,22 +92,50 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Configure CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",  # React frontend (Vite default port)
-        "http://localhost:5174",  # React frontend (Vite alternative port)
-        "http://localhost:3000",  # Alternative React port
-        "http://127.0.0.1:5173",  # React frontend (127.0.0.1)
-        "http://127.0.0.1:5174",  # React frontend (127.0.0.1)
-        "http://127.0.0.1:3000",  # Alternative React port (127.0.0.1)
-        "https://digiscript-csc-uat.ktechproducts.com"
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# CORS: one middleware, set Access-Control-Allow-Origin to request Origin when allowed (local + server)
+import re
+
+_CORS_ORIGINS = [
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "http://localhost:3000",
+    "http://localhost:8000",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:5174",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:8000",
+    "https://digiscript-csc-uat.ktechproducts.com",
+    "https://digiscript-csc.ktechproducts.com",
+]
+_CORS_ORIGIN_REGEX = re.compile(r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$")
+
+def _cors_origin_allowed(origin: str) -> bool:
+    if not origin:
+        return False
+    if origin in _CORS_ORIGINS:
+        return True
+    return bool(_CORS_ORIGIN_REGEX.match(origin))
+
+class _CORSMiddleware(BaseHTTPMiddleware):
+    """Set CORS headers with Access-Control-Allow-Origin = request Origin when allowed."""
+    async def dispatch(self, request, call_next):
+        origin = request.headers.get("origin")
+        if request.method == "OPTIONS":
+            # Preflight: 200 with CORS headers; origin must match request
+            r = Response(status_code=200)
+        else:
+            r = await call_next(request)
+        if origin and _cors_origin_allowed(origin):
+            r.headers["Access-Control-Allow-Origin"] = origin
+            r.headers["Access-Control-Allow-Credentials"] = "true"
+            r.headers["Access-Control-Expose-Headers"] = "*"
+            if request.method == "OPTIONS":
+                r.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+                r.headers["Access-Control-Allow-Headers"] = "*"
+                r.headers["Access-Control-Max-Age"] = "600"
+        return r
+
+app.add_middleware(_CORSMiddleware)
 
 # Import dashboard controller
 try:

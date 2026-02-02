@@ -523,10 +523,10 @@ async def ktech_oauth_callback(
     error_description: Optional[str] = Query(None),
 ):
     """
-    Handle KTech OAuth callback. Always returns 302 redirect (never 4xx/5xx) so reverse
-    proxy does not turn backend errors into 502 Bad Gateway. DB session is obtained
-    inside the handler so DB failure returns redirect instead of 500.
+    Handle KTech OAuth callback. Always returns 302 redirect (never 4xx/5xx).
+    If you get 502 on UAT: usually proxy timeout — set proxy_read_timeout 120s for /api/.
     """
+    logger.info("KTech OAuth callback hit (code=%s)", "yes" if code else "no")
     if error:
         logger.error(f"OAuth Error: {error} - {error_description}")
         return _redirect_sso_error(error_description or error or "OAuth error")

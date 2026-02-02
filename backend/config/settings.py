@@ -7,15 +7,15 @@ from typing import Optional
 import os
 
 # Default BASE_URL (origin for SSO) and FRONTEND_URL per environment (override with env vars)
-# UAT/PROD: backend at {origin}/api, frontend at {origin}
+# UAT/PROD: backend at {origin}/backend, frontend at {origin}
 _ENV_URLS = {
     "DEV": ("http://localhost:8000", "http://localhost:5173"),
     "UAT": (
-        "https://digiscript-csc-uat.ktechproducts.com/api",
+        "https://digiscript-csc-uat.ktechproducts.com/backend",
         "https://digiscript-csc-uat.ktechproducts.com",
     ),
     "PROD": (
-        "https://digiscript-csc.ktechproducts.com/api",
+        "https://digiscript-csc.ktechproducts.com/backend",
         "https://digiscript-csc.ktechproducts.com",
     ),
 }

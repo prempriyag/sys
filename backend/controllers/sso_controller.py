@@ -6,7 +6,7 @@ import logging
 from fastapi import APIRouter, Request, Response, HTTPException, status, Depends, Query
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
-from database.connection import get_db
+from database.connection import get_db, SessionLocal
 from config.sso_config import sso_config as SSOConfig
 from helpers.saml_helper import (
     initiate_saml_login,
@@ -521,18 +521,24 @@ async def ktech_oauth_callback(
     state: Optional[str] = Query(None),
     error: Optional[str] = Query(None),
     error_description: Optional[str] = Query(None),
-    db: Session = Depends(get_db)
 ):
     """
     Handle KTech OAuth callback. Always returns 302 redirect (never 4xx/5xx) so reverse
-    proxy does not turn backend errors into 502 Bad Gateway.
+    proxy does not turn backend errors into 502 Bad Gateway. DB session is obtained
+    inside the handler so DB failure returns redirect instead of 500.
     """
+    if error:
+        logger.error(f"OAuth Error: {error} - {error_description}")
+        return _redirect_sso_error(error_description or error or "OAuth error")
+    if not code:
+        return _redirect_sso_error("Authorization code not provided")
+    db = None
     try:
-        if error:
-            logger.error(f"OAuth Error: {error} - {error_description}")
-            return _redirect_sso_error(error_description or error or "OAuth error")
-        if not code:
-            return _redirect_sso_error("Authorization code not provided")
+        db = SessionLocal()
+    except Exception as e:
+        logger.exception("DB session failed in KTech OAuth callback")
+        return _redirect_sso_error("Service temporarily unavailable")
+    try:
         oauth_config = SSOConfig.get_ktech_oauth_config()
         result = await request_tokens(oauth_config, code, state or "", db)
         if result['status'] == 0:
@@ -554,10 +560,26 @@ async def ktech_oauth_callback(
     except Exception as e:
         logger.exception("KTech OAuth Callback Error")
         return _redirect_sso_error(str(e)[:500])
+    finally:
+        if db is not None:
+            try:
+                db.close()
+            except Exception:
+                pass
 
 
 # Expose same callback at /api/api/sso/... for prod when redirect URI has double /api
 router_double_api.add_api_route("/ktech/oauth/callback", ktech_oauth_callback, methods=["GET"])
+
+
+async def ktech_oauth_callback_ping():
+    """Immediate 302 to verify /api/api/sso path is reachable (no DB, no token exchange)."""
+    from config.settings import settings
+    return RedirectResponse(url=f"{settings.FRONTEND_URL}/sso/callback?error=ping&error_description=SSO+callback+path+reachable")
+
+
+router_double_api.add_api_route("/ktech/oauth/callback-ping", ktech_oauth_callback_ping, methods=["GET"])
+router.add_api_route("/ktech/oauth/callback-ping", ktech_oauth_callback_ping, methods=["GET"])
 
 
 @router.get("/ktech/oauth/logout")

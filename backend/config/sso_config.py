@@ -55,11 +55,8 @@ class SSOConfig(BaseSettings):
     
     @staticmethod
     def _base_url_for_sso() -> str:
-        """Base URL for SSO redirect URIs (no trailing /api to avoid double /api in paths)."""
-        base = (settings.BASE_URL or "").rstrip("/")
-        if base.endswith("/api"):
-            return base[:-4]  # strip /api so we get origin only
-        return base
+        """Base URL for SSO redirect URIs. Use full backend root (e.g. .../api or .../backend). No stripping."""
+        return (settings.BASE_URL or "").rstrip("/")
 
     @property
     def CLIENT_OAUTH_REDIRECT_URI(self) -> str:

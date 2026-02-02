@@ -11,11 +11,11 @@ import os
 _ENV_URLS = {
     "DEV": ("http://localhost:8000", "http://localhost:5173"),
     "UAT": (
-        "https://digiscript-csc-uat.ktechproducts.com",
+        "https://digiscript-csc-uat.ktechproducts.com/api",
         "https://digiscript-csc-uat.ktechproducts.com",
     ),
     "PROD": (
-        "https://digiscript-csc.ktechproducts.com",
+        "https://digiscript-csc.ktechproducts.com/api",
         "https://digiscript-csc.ktechproducts.com",
     ),
 }

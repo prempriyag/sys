@@ -103,7 +103,8 @@ async def request_tokens(
         'client_secret': client_secret,
         'resource': resource_uri,
     }
-    
+    logger.info("OAuth token request redirect_uri=%s (must match Azure app registration exactly)", redirect_uri)
+
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(
@@ -123,8 +124,16 @@ async def request_tokens(
                 return {'status': 0, 'message': error_msg}
                 
     except httpx.HTTPStatusError as e:
-        logger.error(f"HTTP Error requesting tokens: {str(e)}")
-        return {'status': 0, 'message': f'HTTP Error: {str(e)}'}
+        # Surface Microsoft's error_description so redirect_uri mismatch etc. are visible
+        try:
+            body = e.response.json()
+            err = body.get('error', '')
+            desc = body.get('error_description', e.response.text or str(e))
+            msg = f"{err}: {desc}" if err else desc
+        except Exception:
+            msg = f"HTTP Error: {str(e)}"
+        logger.error("OAuth token request failed: %s", msg)
+        return {'status': 0, 'message': msg}
     except Exception as e:
         logger.error(f"Error requesting tokens: {str(e)}")
         return {'status': 0, 'message': str(e)}

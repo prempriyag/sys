@@ -101,7 +101,7 @@ app.add_middleware(
         "http://127.0.0.1:5173",  # React frontend (127.0.0.1)
         "http://127.0.0.1:5174",  # React frontend (127.0.0.1)
         "http://127.0.0.1:3000",  # Alternative React port (127.0.0.1)
-	    "https://digiscript-csc-uat.ktechproducts.com/api/"
+        "https://digiscript-csc-uat.ktechproducts.com"
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -164,6 +164,8 @@ if school_dashboard_controller is not None:
 try:
     from fastapi import APIRouter
     app.include_router(sso_controller.router)
+    # Support /api/api/sso/... so OAuth callback works when Azure redirect URI has double /api
+    app.include_router(sso_controller.router_double_api)
     # Also include router with /sso prefix (without /api) for unified entry points
     sso_router_short = APIRouter(prefix="/sso", tags=["SSO"])
     # Add routes using add_api_route method

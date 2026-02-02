@@ -1,8 +1,21 @@
 // Import toast functions for error notifications
 import { alerterror } from "../utils/toast";
 
-// API Configuration
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+// Environment: DEV | UAT | PROD (set via VITE_APP_ENV, e.g. in .env or build)
+const APP_ENV = (import.meta.env.VITE_APP_ENV || "DEV").toUpperCase();
+
+// Backend API base URL per environment
+const API_BASE_URL_BY_ENV: Record<string, string> = {
+  DEV: "http://localhost:8000",
+  UAT: "https://digiscript-csc-uat.ktechproducts.com/api",
+  PROD: "https://digiscript-csc.ktechproducts.com/api",
+};
+
+// API Configuration: VITE_API_BASE_URL overrides; else use URL for current env
+export const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || API_BASE_URL_BY_ENV[APP_ENV] || API_BASE_URL_BY_ENV.DEV;
+
+export const APP_ENVIRONMENT = APP_ENV;
 
 export const API_ENDPOINTS = {
   LOGIN: "/api/login",

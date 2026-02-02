@@ -10,6 +10,7 @@ interface ButtonProps {
   onClick?: () => void; // Click handler
   disabled?: boolean; // Disabled state
   className?: string; // Custom classes
+  form?: string; // Native form attribute (id of form to submit)
 }
 
 const Button: React.FC<ButtonProps> = ({
@@ -22,6 +23,7 @@ const Button: React.FC<ButtonProps> = ({
   onClick,
   className = "",
   disabled = false,
+  form,
 }) => {
   // Size Classes
   const sizeClasses = {
@@ -45,6 +47,7 @@ const Button: React.FC<ButtonProps> = ({
   return (
     <button
       type={type}
+      form={form}
       className={`inline-flex items-center justify-center gap-2 rounded-lg transition ${className} ${
         sizeClasses[size]
       } ${variantClass} ${

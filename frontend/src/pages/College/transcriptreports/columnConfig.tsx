@@ -18,6 +18,7 @@ export interface ColumnConfig {
   exportable?: boolean; // false for notexport columns
   textCenter?: boolean; // true for text-center columns
   defaultOrder?: boolean; // true for defaultOrderby column
+  width?: string; // column width e.g. "200px"
   render?: (data: any, row: any, helpers?: any) => React.ReactNode;
 }
 

@@ -84,7 +84,6 @@ from config.constants import (
     COPY_RIGHTS,
     VERSION,
     TABLES,
-    get_environment,
 )
 
 __all__ = [
@@ -172,5 +171,4 @@ __all__ = [
     "COPY_RIGHTS",
     "VERSION",
     "TABLES",
-    "get_environment",
 ]

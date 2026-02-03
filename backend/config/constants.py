@@ -2,37 +2,27 @@
 Application Constants
 Based on app-constants.php from CodeIgniter
 
-This file contains all table names and configuration constants
+This file contains all table names and configuration constants.
+Path/institution values are loaded from .env via config.settings.
 """
 from datetime import datetime
-import os
 
+from config.settings import settings
 
-# Environment detection (similar to PHP getEnvironment())
-def get_environment() -> str:
-    """
-    Get environment based on host
-    Based on getEnvironment() from config.php
-    """
-    # In FastAPI, we'll use the ENVIRONMENT from .env
-    # This is kept for compatibility
-    return os.getenv('ENVIRONMENT', 'DEV')
+# Portal Environment (from .env ENVIRONMENT)
+PORTAL_ENV = settings.ENVIRONMENT
 
-# Portal Environment
-PORTAL_ENV = get_environment()
+# Path / share config (from .env)
+HOT_FOLDER = settings.HOT_FOLDER
+HOT_PATH = settings.HOT_PATH
+SHARE_PATH = settings.SHARE_PATH
+SHARE_PATH_REPLACE = settings.SHARE_PATH_REPLACE
+IS_UBUNTU = settings.IS_UBUNTU
+SHARE_PATH_UBUNTU = settings.SHARE_PATH_UBUNTU
 
-# Get values from environment or use defaults
-# These would typically come from .env file, but we provide defaults
-HOT_FOLDER = os.getenv('HOT_FOLDER', 'osucsc_dev')
-HOT_PATH = os.getenv('HOT_PATH', 'OSUCSC')
-SHARE_PATH = os.getenv('SHARE_PATH', f'\\\\172.16.2.22\\{HOT_FOLDER}\\')
-SHARE_PATH_REPLACE = os.getenv('SHARE_PATH_REPLACE', f'//172.16.2.22/{HOT_FOLDER}/')
-IS_UBUNTU = os.getenv('IS_UBUNTU', 'False').lower() == 'false'
-SHARE_PATH_UBUNTU = os.getenv('SHARE_PATH_UBUNTU', f'/mnt/digiscript-uat/{HOT_FOLDER}/')
-
-# Institution Name
-INS_NAME = os.getenv('INS_NAME', 'OSUCSC')
-STUDENT_LABEL = os.getenv('STUDENT_LABEL', 'OSUCSC')
+# Institution Name (from .env)
+INS_NAME = settings.INS_NAME
+STUDENT_LABEL = settings.STUDENT_LABEL
 
 # Paths
 TRANSCRIPTS_HIGH_SCHOOL = f'{SHARE_PATH}{HOT_PATH}_HIGH_SCHOOL_TRANSCRIPT/ToBeProcessed/'

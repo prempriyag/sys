@@ -30,6 +30,9 @@ export default function TranscriptsUpload() {
             setSourceType("Scanned");
           }
         }
+        if (data.sources?.length === 0 && (data.path || data.error)) {
+          console.warn("Transcript sources path:", data.path, data.error || "");
+        }
       })
       .catch(err => {
         console.error("Error fetching source types:", err);

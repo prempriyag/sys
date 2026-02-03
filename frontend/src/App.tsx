@@ -1,6 +1,7 @@
 import { Routes, Route } from "react-router";
 import SignIn from "./pages/AuthPages/SignIn";
 import SignUp from "./pages/AuthPages/SignUp";
+import ForgotPassword from "./pages/AuthPages/ForgotPassword";
 import SSOCallback from "./pages/AuthPages/SSOCallback";
 import SSORedirect from "./pages/AuthPages/SSORedirect";
 import NotFound from "./pages/OtherPage/NotFound";
@@ -117,6 +118,7 @@ export default function App() {
         {/* <Route path="/signin" element={<SignIn />} /> */}
         <Route path="/login" element={<SignIn />} />
         <Route path="/signup" element={<SignUp />} />
+        <Route path="/reset-password" element={<ForgotPassword />} />
         <Route path="/sso/callback" element={<SSOCallback />} />
         <Route path="/sso/client" element={<SSORedirect />} />
         <Route path="/sso/ktech" element={<SSORedirect />} />

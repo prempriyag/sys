@@ -7,6 +7,7 @@ interface InputProps {
   name?: string;
   placeholder?: string;
   value?: string | number;
+  autoComplete?: string;
   onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onBlur?: (e: React.FocusEvent<HTMLInputElement>) => void;
   onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
@@ -28,6 +29,7 @@ const Input: FC<InputProps> = ({
   name,
   placeholder,
   value,
+  autoComplete,
   onChange,
   onBlur,
   onKeyDown,
@@ -73,6 +75,7 @@ const Input: FC<InputProps> = ({
         name={name}
         placeholder={placeholder}
         value={value}
+        autoComplete={autoComplete}
         onChange={onChange}
         onBlur={onBlur}
         onKeyDown={onKeyDown}

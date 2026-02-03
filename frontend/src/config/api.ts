@@ -22,6 +22,8 @@ export const API_ENDPOINTS = {
   LOGOUT: "/api/logout",
   VERIFY: "/api/verify",
   ME: "/api/me",
+  FORGOT_PASSWORD: "/api/forgot-password",
+  FORGOT_PASSWORD_RESET: "/api/forgot-password/reset",
   TRANSCRIPT_REPORTS: "/api/transcriptreports",
   TRANSCRIPT_REPORTS_LIST: "/api/transcriptreports/ajaxlist",
   ARTICULATION_REPORTS_LIST: "/api/articulationreports/ajaxlist",

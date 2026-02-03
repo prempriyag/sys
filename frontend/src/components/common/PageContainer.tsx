@@ -23,6 +23,7 @@ export default function PageContainer({
     : pageStyles.contentContainer.baseClasses;
 
   const mergedStyles = {
+    ...pageStyles.contentContainer.baseStyle,
     ...pageStyles.contentContainer.inlineStyles,
     ...style,
   };

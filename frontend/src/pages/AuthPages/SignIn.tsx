@@ -4,6 +4,7 @@ import PageMeta from "../../components/common/PageMeta";
 import AuthLayout from "./AuthPageLayout";
 import SignInForm from "../../components/auth/SignInForm";
 import { useAuth } from "../../context/AuthContext";
+import ThemedLoader from "../../components/common/ThemedLoader";
 
 export default function SignIn() {
   const { isAuthenticated, user, loading } = useAuth();
@@ -31,7 +32,7 @@ export default function SignIn() {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div>
+          <ThemedLoader size={32} className="text-brand-500" label="Loading" />
           <p className="mt-4 text-gray-500">Loading...</p>
         </div>
       </div>

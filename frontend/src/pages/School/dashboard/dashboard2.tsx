@@ -6,6 +6,7 @@ import Button from "../../../components/ui/button/Button";
 import { API_BASE_URL } from "../../../config/api";
 import Chart from "react-apexcharts";
 import { ApexOptions } from "apexcharts";
+import ThemedLoader from "../../../components/common/ThemedLoader";
 import {
   FileIcon,
   CheckCircleIcon,
@@ -461,10 +462,13 @@ export default function Dashboard2() {
 
         {loading ? (
           <div className="flex h-96 items-center justify-center">
-            <div className="text-center">
-              <div className="inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-primary border-t-transparent"></div>
-              <p className="mt-4 text-lg font-medium text-gray-600 dark:text-gray-400">Loading dashboard data...</p>
-            </div>
+            <ThemedLoader
+              size={80}
+              className="text-primary"
+              title="Loading Dashboard"
+              description="Preparing your data visualization..."
+              showProgress={true}
+            />
           </div>
         ) : (
           <div className="space-y-6">

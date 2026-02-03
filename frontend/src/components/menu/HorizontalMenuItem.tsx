@@ -68,51 +68,54 @@ export default function HorizontalMenuItem({
     prevLocationRef.current = location.pathname;
   }, [location.pathname, isSubmenuOpen, key, onSubmenuToggle]);
 
-  // Handle hover to open submenu
+  // Handle hover to open submenu - DISABLED
   const handleMouseEnter = () => {
     setIsButtonHovered(true);
-    if (hasSubItems) {
-      // Clear any pending close timeout
-      if (hoverTimeoutRef.current) {
-        clearTimeout(hoverTimeoutRef.current);
-        hoverTimeoutRef.current = null;
-      }
-      // Open submenu if not already open
-      if (!isSubmenuOpen) {
-        onSubmenuToggle(key);
-      }
-    }
+    // Hover-triggered dropdown disabled - only allow click
+    // if (hasSubItems) {
+    //   // Clear any pending close timeout
+    //   if (hoverTimeoutRef.current) {
+    //     clearTimeout(hoverTimeoutRef.current);
+    //     hoverTimeoutRef.current = null;
+    //   }
+    //   // Open submenu if not already open
+    //   if (!isSubmenuOpen) {
+    //     onSubmenuToggle(key);
+    //   }
+    // }
   };
 
-  // Handle mouse leave with delay to allow moving to dropdown
+  // Handle mouse leave with delay - DISABLED
   const handleMouseLeave = () => {
     setIsButtonHovered(false);
-    if (hasSubItems && isSubmenuOpen) {
-      // Set a timeout to close the submenu
-      hoverTimeoutRef.current = setTimeout(() => {
-        onSubmenuToggle(key);
-      }, 200); // 200ms delay to allow moving to dropdown
-    }
+    // Auto-close on hover-away disabled
+    // if (hasSubItems && isSubmenuOpen) {
+    //   // Set a timeout to close the submenu
+    //   hoverTimeoutRef.current = setTimeout(() => {
+    //     onSubmenuToggle(key);
+    //   }, 200); // 200ms delay to allow moving to dropdown
+    // }
   };
 
-  // Handle mouse enter on dropdown to keep it open
+  // Handle mouse enter on dropdown to keep it open - DISABLED
   const handleDropdownMouseEnter = () => {
     setIsButtonHovered(true);
     // Clear any pending close timeout
-    if (hoverTimeoutRef.current) {
-      clearTimeout(hoverTimeoutRef.current);
-      hoverTimeoutRef.current = null;
-    }
+    // if (hoverTimeoutRef.current) {
+    //   clearTimeout(hoverTimeoutRef.current);
+    //   hoverTimeoutRef.current = null;
+    // }
   };
 
-  // Handle mouse leave on dropdown to close it
+  // Handle mouse leave on dropdown to close it - DISABLED
   const handleDropdownMouseLeave = () => {
     setIsButtonHovered(false);
-    if (isSubmenuOpen) {
-      hoverTimeoutRef.current = setTimeout(() => {
-        onSubmenuToggle(key);
-      }, 200);
-    }
+    // Auto-close on leave disabled
+    // if (isSubmenuOpen) {
+    //   hoverTimeoutRef.current = setTimeout(() => {
+    //     onSubmenuToggle(key);
+    //   }, 200);
+    // }
   };
 
   // Hide tooltip when button is hovered (text expands)

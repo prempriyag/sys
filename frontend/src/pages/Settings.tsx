@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import PageBreadcrumb from "../components/common/PageBreadCrumb";
 import PageMeta from "../components/common/PageMeta";
 import PageContainer from "../components/common/PageContainer";
+import ThemedLoader from "../components/common/ThemedLoader";
 import Button from "../components/ui/button/Button";
 import { useThemeColor } from "../context/ThemeColorContext";
 import { API_BASE_URL, API_ENDPOINTS, api } from "../config/api";
@@ -163,25 +164,30 @@ export default function Settings() {
   useEffect(() => {
     const loadAllSettings = async () => {
       try {
-        setLoading(true);
-        setSystemLoading(true);
-        
-        // Load theme settings
-        const themeSettings = await api.get(API_ENDPOINTS.SETTINGS);
-        if (themeSettings.primaryColor) {
-          setPrimaryColor(themeSettings.primaryColor);
-          setSelectedColor(themeSettings.primaryColor);
+        // Load theme settings SILENTLY - no loading screen for theme changes
+        try {
+          const themeSettings = await api.get(API_ENDPOINTS.SETTINGS);
+          if (themeSettings.primaryColor) {
+            setPrimaryColor(themeSettings.primaryColor);
+            setSelectedColor(themeSettings.primaryColor);
+          }
+          if (themeSettings.logoUrl) setLogoUrl(themeSettings.logoUrl);
+          if (themeSettings.logoIconUrl) setLogoIconUrl(themeSettings.logoIconUrl);
+          if (themeSettings.logoLightUrl) setLogoLightUrl(themeSettings.logoLightUrl);
+          if (themeSettings.logoDarkUrl) setLogoDarkUrl(themeSettings.logoDarkUrl);
+          
+          // IMPORTANT: Always keep header/sidebar backgrounds WHITE
+          // Do NOT apply derived colors from API to background elements
+          setHeaderBgColor("#ffffff");
+          setHeaderTextColor("#1d2939");
+          setSidebarBgColor("#ffffff");
+          setSidebarTextColor("#1d2939");
+        } catch (e) {
+          console.error("Error loading theme settings:", e);
         }
-        if (themeSettings.logoUrl) setLogoUrl(themeSettings.logoUrl);
-        if (themeSettings.logoIconUrl) setLogoIconUrl(themeSettings.logoIconUrl);
-        if (themeSettings.logoLightUrl) setLogoLightUrl(themeSettings.logoLightUrl);
-        if (themeSettings.logoDarkUrl) setLogoDarkUrl(themeSettings.logoDarkUrl);
-        if (themeSettings.headerBgColor) setHeaderBgColor(themeSettings.headerBgColor);
-        if (themeSettings.headerTextColor) setHeaderTextColor(themeSettings.headerTextColor);
-        if (themeSettings.sidebarBgColor) setSidebarBgColor(themeSettings.sidebarBgColor);
-        if (themeSettings.sidebarTextColor) setSidebarTextColor(themeSettings.sidebarTextColor);
         
-        // Load system settings
+        // Show loading only for system settings
+        setSystemLoading(true);
         const settingsResponse = await api.get("/api/mastersettings/get");
         if (settingsResponse.status === 1 && settingsResponse.data) {
           setSystemSettings(prev => ({
@@ -229,11 +235,14 @@ export default function Settings() {
           setRoles(rolesResponse.data || []);
         }
         
+        // Mark initial page load as complete
+        setLoading(false);
+        
       } catch (error) {
         console.error("Error loading settings:", error);
         alerterror("Failed to load settings");
-      } finally {
         setLoading(false);
+      } finally {
         setSystemLoading(false);
       }
     };
@@ -292,14 +301,38 @@ export default function Settings() {
   const handleColorChange = async (color: string) => {
     setSelectedColor(color);
     updateThemeColor(color);
-    await saveSettings({ primaryColor: color });
+    // Keep header and sidebar backgrounds white when changing primary color
+    await saveSettings({ 
+      primaryColor: color,
+      headerBgColor: "#ffffff",
+      sidebarBgColor: "#ffffff",
+      headerTextColor: "#1d2939",
+      sidebarTextColor: "#1d2939"
+    });
+    // Update context to reflect white backgrounds
+    setHeaderBgColor("#ffffff");
+    setSidebarBgColor("#ffffff");
+    setHeaderTextColor("#1d2939");
+    setSidebarTextColor("#1d2939");
   };
 
   const handleColorInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const color = e.target.value;
     setSelectedColor(color);
     updateThemeColor(color);
-    await saveSettings({ primaryColor: color });
+    // Keep header and sidebar backgrounds white when changing primary color
+    await saveSettings({ 
+      primaryColor: color,
+      headerBgColor: "#ffffff",
+      sidebarBgColor: "#ffffff",
+      headerTextColor: "#1d2939",
+      sidebarTextColor: "#1d2939"
+    });
+    // Update context to reflect white backgrounds
+    setHeaderBgColor("#ffffff");
+    setSidebarBgColor("#ffffff");
+    setHeaderTextColor("#1d2939");
+    setSidebarTextColor("#1d2939");
   };
 
   const handleLogoUpload = async (
@@ -636,10 +669,14 @@ export default function Settings() {
         <PageBreadcrumb pageTitle="Settings" />
         <PageContainer>
           <div className="flex items-center justify-center min-h-[400px]">
-            <div className="text-center">
-              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div>
-              <p className="mt-4 text-gray-500">Loading settings...</p>
-            </div>
+            <ThemedLoader 
+              size={80} 
+              className="text-brand-500" 
+              label="Loading settings"
+              title="Loading Settings"
+              description="Please wait while we load your settings..."
+              showProgress={true}
+            />
           </div>
         </PageContainer>
       </>
@@ -700,7 +737,7 @@ export default function Settings() {
         {/* Tab Content */}
         <div className="mt-6">
           {activeTab === "system" && (
-            <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-white/[0.03]">
+            <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
               {systemMessage && (
                 <div className={`mb-6 p-4 rounded-lg ${
                   systemMessage.type === 'success' 
@@ -713,10 +750,14 @@ export default function Settings() {
               
               {systemLoading ? (
                 <div className="flex items-center justify-center min-h-[400px]">
-                  <div className="text-center">
-                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div>
-                    <p className="mt-4 text-gray-500">Loading system settings...</p>
-                  </div>
+                  <ThemedLoader 
+                    size={80} 
+                    className="text-brand-500" 
+                    label="Loading system settings"
+                    title="Loading System Settings"
+                    description="Please wait while we load your system configuration..."
+                    showProgress={true}
+                  />
                 </div>
               ) : (
                 <form onSubmit={handleSystemSettingsSubmit}>
@@ -1033,7 +1074,7 @@ export default function Settings() {
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* SMS Settings */}
-                <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-white/[0.03]">
+                <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
                   <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">SMS Settings</h3>
                   <form onSubmit={handleSmsSettingsSubmit}>
                     <div className="space-y-4">
@@ -1078,7 +1119,7 @@ export default function Settings() {
                 </div>
 
                 {/* SMTP Settings */}
-                <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-white/[0.03]">
+                <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
                   <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">SMTP Settings</h3>
                   <form onSubmit={handleSmtpSettingsSubmit}>
                     <div className="space-y-4">
@@ -1137,7 +1178,7 @@ export default function Settings() {
           )}
 
           {activeTab === "logo" && (
-            <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-white/[0.03]">
+            <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
               {systemMessage && (
                 <div className={`mb-6 p-4 rounded-lg ${
                   systemMessage.type === 'success' 
@@ -1225,7 +1266,7 @@ export default function Settings() {
           {activeTab === "theme" && (
             <div className="space-y-6">
               {/* Primary Color Section */}
-              <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-white/[0.03]">
+              <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
                 <h3 className="mb-4 text-lg font-semibold text-gray-800 dark:text-white/90">
                   Primary Color
                 </h3>
@@ -1279,7 +1320,7 @@ export default function Settings() {
               </div>
 
               {/* Logo Section */}
-              <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-white/[0.03]">
+              <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
                 <h3 className="mb-4 text-lg font-semibold text-gray-800 dark:text-white/90">
                   Logos
                 </h3>
@@ -1503,7 +1544,7 @@ export default function Settings() {
               </div>
 
               {/* Header Colors Section */}
-              <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-white/[0.03]">
+              <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
                 <h3 className="mb-4 text-lg font-semibold text-gray-800 dark:text-white/90">
                   Header Colors
                 </h3>
@@ -1572,7 +1613,7 @@ export default function Settings() {
               </div>
 
               {/* Sidebar Colors Section */}
-              <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-white/[0.03]">
+              <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
                 <h3 className="mb-4 text-lg font-semibold text-gray-800 dark:text-white/90">
                   Sidebar Colors
                 </h3>

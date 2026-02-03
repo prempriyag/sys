@@ -2,6 +2,7 @@ import { ReactNode } from "react";
 import { Navigate, useLocation } from "react-router";
 import { useAuth } from "../../context/AuthContext";
 import { checkPermission } from "../../utils/permissions";
+import ThemedLoader from "../common/ThemedLoader";
 
 interface PermissionRouteProps {
   children: ReactNode;
@@ -35,7 +36,7 @@ export default function PermissionRoute({
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div>
+          <ThemedLoader size={32} className="text-brand-500" label="Loading" />
           <p className="mt-4 text-gray-500">Loading...</p>
         </div>
       </div>

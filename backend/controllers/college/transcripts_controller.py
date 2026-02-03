@@ -23,6 +23,7 @@ from config.constants import (
     TRANSCRIPTS_COLLEGE,
     COLLEGE_PROJECT_ID,
     TBL_DOWNLOAD,
+    resolve_transcript_path,
 )
 from config.settings import settings
 
@@ -129,8 +130,9 @@ async def upload_transcripts(
         if len(files) > 10:
             raise HTTPException(status_code=400, detail="Please upload a maximum of 10 files")
 
-        # Build folder path
+        # Build folder path - resolve for Ubuntu (matches CI3 Transcripts::insert)
         folder = os.path.join(TRANSCRIPTS_COLLEGE, source_type)
+        folder = resolve_transcript_path(folder)
         
         # Create folder if it doesn't exist
         os.makedirs(folder, exist_ok=True)
@@ -227,6 +229,7 @@ async def get_source_types(
         override = getattr(settings, "TRANSCRIPTS_COLLEGE_PATH", None)
         base_path = override.strip() if override and str(override).strip() else TRANSCRIPTS_COLLEGE
         base_path = os.path.normpath(base_path.rstrip("/\\"))
+        base_path = resolve_transcript_path(base_path)
 
         if not os.path.exists(base_path):
             return {"sources": [], "path": base_path, "error": "Path does not exist or is not accessible"}

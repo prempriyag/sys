@@ -35,6 +35,19 @@ TRANSCRIPTS_COLLEGE_TOBEPROCESSED = f'{SHARE_PATH_REPLACE}{HOT_PATH}_COLLEGE_TRA
 TRANSCRIPTS_HIGH_SCHOOL_PROCESSED = f'{SHARE_PATH_REPLACE}{HOT_PATH}_HIGH_SCHOOL_TRANSCRIPT/Processed/'
 TRANSCRIPTS_COLLEGE_PROCESSED = f'{SHARE_PATH_REPLACE}{HOT_PATH}_COLLEGE_TRANSCRIPT/Processed/'
 
+
+def resolve_transcript_path(path: str) -> str:
+    """
+    Resolve transcript path for Ubuntu - matches CI3 Transcripts::insert() logic.
+    When IS_UBUNTU: replace \\ with /, then SHARE_PATH_REPLACE with SHARE_PATH_UBUNTU.
+    """
+    if IS_UBUNTU:
+        path = path.replace('\\', '/')
+        if SHARE_PATH_REPLACE and SHARE_PATH_UBUNTU:
+            path = path.replace(SHARE_PATH_REPLACE, SHARE_PATH_UBUNTU)
+    return path
+
+
 # Status Colors
 STATUS_SUCC = 'blue'
 STATUS_FAIL = 'red'

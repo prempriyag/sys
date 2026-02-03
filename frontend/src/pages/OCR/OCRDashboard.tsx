@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import PageMeta from "../../components/common/PageMeta";
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
 import PageContainer, { PageWrapper } from "../../components/common/PageContainer";
+import ThemedLoader from "../../components/common/ThemedLoader";
 import Chart from "react-apexcharts";
 import { ApexOptions } from "apexcharts";
 import { API_ENDPOINTS, api } from "../../config/api";
@@ -159,7 +160,7 @@ export default function OCRDashboard() {
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <div className="text-center">
-              <div className="inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-brand-500 border-r-transparent" />
+              <ThemedLoader size={48} className="text-brand-500" label="Loading dashboard" />
               <p className="mt-4 text-gray-500 dark:text-gray-400">Loading dashboard...</p>
             </div>
           </div>

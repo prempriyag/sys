@@ -7,6 +7,7 @@ import { API_BASE_URL } from "../../../config/api";
 import Chart from "react-apexcharts";
 import { RefreshIcon } from "../../../icons";
 import { ApexOptions } from "apexcharts";
+import ThemedLoader from "../../../components/common/ThemedLoader";
 
 export default function SchoolDashboard() {
   const [loading, setLoading] = useState(false);
@@ -23,8 +24,37 @@ export default function SchoolDashboard() {
     initialKickouts: { labels: [], datasets: [] },
     transcriptKickouts: { labels: [], datasets: [] },
     transcriptStatusDonut: { series: [], labels: [] },
-
   });
+  
+  const [filterGradient, setFilterGradient] = useState<string>(
+    "linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%)"
+  );
+
+  // Update gradient when dark mode changes
+  useEffect(() => {
+    const updateGradient = () => {
+      const isDark = document.documentElement.classList.contains("dark");
+      setFilterGradient(
+        isDark
+          ? "linear-gradient(135deg, rgba(30, 41, 59, 0.3) 0%, rgba(30, 41, 59, 0.15) 100%)"
+          : "linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%)"
+      );
+    };
+
+    updateGradient();
+    
+    // Listen for dark mode changes
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.attributeName === "class") {
+          updateGradient();
+        }
+      });
+    });
+
+    observer.observe(document.documentElement, { attributes: true });
+    return () => observer.disconnect();
+  }, []);
 
   const handleFilterChange = (field: string, value: string) => {
     setFilters((prev) => ({ ...prev, [field]: value }));
@@ -317,9 +347,9 @@ export default function SchoolDashboard() {
       <PageContainer>
         {/* Glassmorphic Filter Section */}
         <div
-          className="mb-8 rounded-2xl border border-white/20 bg-white/10 p-4 sm:p-6 shadow-md backdrop-blur-xl transition-all duration-300 animate-fade-in"
+          className="mb-8 rounded-2xl border border-white/20 bg-white/10 p-4 sm:p-6 shadow-md backdrop-blur-xl transition-all duration-300 animate-fade-in dark:border-white/10 dark:bg-white/5"
           style={{
-            background: "linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%)",
+            background: filterGradient,
             backdropFilter: "blur(20px)",
           }}
         >
@@ -381,10 +411,13 @@ export default function SchoolDashboard() {
 
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <div className="text-center">
-              <div className="inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-brand-500 border-r-transparent"></div>
-              <p className="mt-4 text-lg text-gray-500 dark:text-gray-400">Loading dashboard data...</p>
-            </div>
+            <ThemedLoader
+              size={80}
+              className="text-brand-500"
+              title="Loading Dashboard"
+              description="Fetching your analytics and statistics..."
+              showProgress={true}
+            />
           </div>
         ) : (
           <div className="space-y-4">

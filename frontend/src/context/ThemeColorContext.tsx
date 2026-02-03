@@ -36,6 +36,30 @@ export const ThemeColorProvider: React.FC<{ children: ReactNode }> = ({ children
   const [headerTextColor, setHeaderTextColorState] = useState<string>("#1d2939");
   const [sidebarBgColor, setSidebarBgColorState] = useState<string>("#ffffff");
   const [sidebarTextColor, setSidebarTextColorState] = useState<string>("#1d2939");
+  const [isDark, setIsDark] = useState<boolean>(false);
+
+  // Monitor dark mode changes
+  useEffect(() => {
+    const updateDarkMode = () => {
+      const darkMode = document.documentElement.classList.contains("dark");
+      setIsDark(darkMode);
+    };
+
+    // Initial check
+    updateDarkMode();
+
+    // Watch for dark mode changes
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.attributeName === "class") {
+          updateDarkMode();
+        }
+      });
+    });
+
+    observer.observe(document.documentElement, { attributes: true });
+    return () => observer.disconnect();
+  }, []);
 
   // Load saved theme color and logos from localStorage on mount
   useEffect(() => {
@@ -52,6 +76,9 @@ export const ThemeColorProvider: React.FC<{ children: ReactNode }> = ({ children
     if (savedColor) {
       setPrimaryColorState(savedColor);
       updateCSSVariables(savedColor);
+    } else {
+      // Initialize with default color if no saved color
+      updateCSSVariables("#465fff");
     }
     
     if (savedLogo) setLogoUrlState(savedLogo);
@@ -101,6 +128,27 @@ export const ThemeColorProvider: React.FC<{ children: ReactNode }> = ({ children
     Object.entries(shades).forEach(([shade, value]) => {
       root.style.setProperty(`--color-brand-${shade}`, value);
     });
+    
+    // Force browser to recalculate styles by triggering a DOM reflow
+    // This is crucial for dark mode to pick up new colors
+    if (root.classList.contains("dark")) {
+      // If in dark mode, temporarily remove and re-add dark class to force recalculation
+      root.classList.remove("dark");
+      // Force the browser to recalculate styles
+      void root.offsetHeight;
+      root.classList.add("dark");
+    } else {
+      // For light mode, use style property toggle
+      const originalDisplay = root.style.display;
+      root.style.display = "none";
+      // Force the browser to recalculate
+      void root.offsetHeight;
+      root.style.display = originalDisplay;
+    }
+    
+    // Note: We intentionally do NOT set body-bg, white, or white-theme colors here
+    // to keep cards and backgrounds neutral white, preventing unwanted tinting
+    // Theme color is only used for accent elements (buttons, borders, icons, etc.)
   };
 
   const setPrimaryColor = (color: string) => {
@@ -163,6 +211,12 @@ export const ThemeColorProvider: React.FC<{ children: ReactNode }> = ({ children
     root.style.setProperty("--sidebar-text-color", sidebarTextColor);
   };
 
+  // Computed colors that adapt to dark mode
+  const computedHeaderBgColor = isDark ? "#1f2937" : headerBgColor; // gray-800 in dark mode
+  const computedHeaderTextColor = isDark ? "#f9fafb" : headerTextColor; // gray-50 in dark mode
+  const computedSidebarBgColor = isDark ? "#1f2937" : sidebarBgColor; // gray-800 in dark mode
+  const computedSidebarTextColor = isDark ? "#f9fafb" : sidebarTextColor; // gray-50 in dark mode
+
   return (
     <ThemeColorContext.Provider
       value={{
@@ -176,13 +230,13 @@ export const ThemeColorProvider: React.FC<{ children: ReactNode }> = ({ children
         setLogoLightUrl,
         logoDarkUrl,
         setLogoDarkUrl,
-        headerBgColor,
+        headerBgColor: computedHeaderBgColor, // Use computed color
         setHeaderBgColor,
-        headerTextColor,
+        headerTextColor: computedHeaderTextColor, // Use computed color
         setHeaderTextColor,
-        sidebarBgColor,
+        sidebarBgColor: computedSidebarBgColor, // Use computed color
         setSidebarBgColor,
-        sidebarTextColor,
+        sidebarTextColor: computedSidebarTextColor, // Use computed color
         setSidebarTextColor,
         updateThemeColor,
         updateColors,

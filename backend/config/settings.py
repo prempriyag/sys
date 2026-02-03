@@ -45,13 +45,17 @@ class Settings(BaseSettings):
     BASE_URL: Optional[str] = None   # Backend base URL for SSO redirects
     FRONTEND_URL: Optional[str] = None  # Frontend URL for SSO callbacks
 
-    # Path / share config (from .env)
+    # Path / share config - build paths in code like CI3 config.php (avoids .env backslash escaping)
+    # SHARE_HOST + HOT_FOLDER have no backslashes, so .env is safe
+    SHARE_HOST: str = "172.16.2.22"
     HOT_FOLDER: str = "osucsc_dev"
     HOT_PATH: str = "OSUCSC"
-    SHARE_PATH: Optional[str] = None
-    SHARE_PATH_REPLACE: Optional[str] = None
     IS_UBUNTU: bool = False
     SHARE_PATH_UBUNTU: Optional[str] = None
+    SHARE_PATH: Optional[str] = None  # Built in validator, ignore if in .env
+    SHARE_PATH_REPLACE: Optional[str] = None  # Built in validator
+    # Optional: override transcript sources path for local dev when network share unreachable
+    TRANSCRIPTS_COLLEGE_PATH: Optional[str] = None
 
     # Institution labels
     INS_NAME: str = "OSUCSC"
@@ -65,13 +69,13 @@ class Settings(BaseSettings):
             object.__setattr__(self, "BASE_URL", base)
         if self.FRONTEND_URL is None or self.FRONTEND_URL.strip() == "":
             object.__setattr__(self, "FRONTEND_URL", front)
-        # Derive SHARE_PATH and SHARE_PATH_REPLACE from HOT_FOLDER if not set
-        if not self.SHARE_PATH or (isinstance(self.SHARE_PATH, str) and self.SHARE_PATH.strip() == ""):
-            object.__setattr__(self, "SHARE_PATH", f"\\\\172.16.2.22\\{self.HOT_FOLDER}\\")
-        if not self.SHARE_PATH_REPLACE or (isinstance(self.SHARE_PATH_REPLACE, str) and self.SHARE_PATH_REPLACE.strip() == ""):
-            object.__setattr__(self, "SHARE_PATH_REPLACE", f"//172.16.2.22/{self.HOT_FOLDER}/")
+        # Build SHARE_PATH in code like CI3 config.php - avoids .env backslash escaping
+        host = (self.SHARE_HOST or "172.16.2.22").strip()
+        folder = (self.HOT_FOLDER or "osucsc_dev").strip()
+        object.__setattr__(self, "SHARE_PATH", f"\\\\{host}\\{folder}\\")
+        object.__setattr__(self, "SHARE_PATH_REPLACE", f"//{host}/{folder}/")
         if not self.SHARE_PATH_UBUNTU or (isinstance(self.SHARE_PATH_UBUNTU, str) and self.SHARE_PATH_UBUNTU.strip() == ""):
-            object.__setattr__(self, "SHARE_PATH_UBUNTU", f"/mnt/digiscript-uat/{self.HOT_FOLDER}/")
+            object.__setattr__(self, "SHARE_PATH_UBUNTU", f"/mnt/digiscript-uat/{folder}/")
         return self
     
     class Config:

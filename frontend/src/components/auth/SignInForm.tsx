@@ -122,7 +122,7 @@ export default function SignInForm() {
                   </Label>
                   <Input
                     type="email"
-                    placeholder="info@gmail.com"
+                    placeholder="info@ktechproducts.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     error={!!error}

@@ -3,7 +3,7 @@ Application Constants
 Based on app-constants.php from CodeIgniter
 
 This file contains all table names and configuration constants.
-Path/institution values are loaded from .env via config.settings.
+Path values are built in config.settings from SHARE_HOST+HOT_FOLDER (like CI3 config.php).
 """
 from datetime import datetime
 
@@ -24,9 +24,10 @@ SHARE_PATH_UBUNTU = settings.SHARE_PATH_UBUNTU
 INS_NAME = settings.INS_NAME
 STUDENT_LABEL = settings.STUDENT_LABEL
 
-# Paths
-TRANSCRIPTS_HIGH_SCHOOL = f'{SHARE_PATH}{HOT_PATH}_HIGH_SCHOOL_TRANSCRIPT/ToBeProcessed/'
-TRANSCRIPTS_COLLEGE = f'{SHARE_PATH}{HOT_PATH}_COLLEGE_TRANSCRIPT/ToBeProcessed/'
+# Paths - match CI3 app-constants.php: SHARE_PATH + HOT_PATH + "_COLLEGE_TRANSCRIPT/ToBeProcessed/"
+# SHARE_PATH is built in settings (not from .env) so backslashes are correct
+TRANSCRIPTS_HIGH_SCHOOL = f"{SHARE_PATH}{HOT_PATH}_HIGH_SCHOOL_TRANSCRIPT/ToBeProcessed/"
+TRANSCRIPTS_COLLEGE = f"{SHARE_PATH}{HOT_PATH}_COLLEGE_TRANSCRIPT/ToBeProcessed/"
 
 TRANSCRIPTS_HIGH_SCHOOL_TOBEPROCESSED = f'{SHARE_PATH_REPLACE}{HOT_PATH}_HIGH_SCHOOL_TRANSCRIPT/ToBeProcessed/'
 TRANSCRIPTS_COLLEGE_TOBEPROCESSED = f'{SHARE_PATH_REPLACE}{HOT_PATH}_COLLEGE_TRANSCRIPT/ToBeProcessed/'

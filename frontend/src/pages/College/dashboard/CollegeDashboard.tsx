@@ -561,7 +561,6 @@ export default function CollegeDashboard() {
               <select
                 value={filters.college_name}
                 onChange={(e) => handleFilterChange("college_name", e.target.value)}
-                placeholder="Search college..."
                 className="w-full rounded-xl border border-gray-300 bg-white/50 px-4 py-2.5 text-sm text-gray-800 backdrop-blur-sm transition-all duration-200 placeholder:text-gray-400 focus:border-brand-500 focus:bg-white/70 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-gray-600 dark:bg-gray-800/50 dark:text-white/90 dark:placeholder:text-gray-500 dark:focus:border-brand-400 dark:focus:bg-gray-800/70"
               >
                 <option value="">All Colleges</option>

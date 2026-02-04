@@ -194,22 +194,31 @@ export default function TranscriptsList() {
               name: "Formatted Filename", 
               searchable: true, 
               orderable: true,
-              render: (data: any) => {
-                // If data is an encrypted URL (starts with /api/viewfile), display as link icon (matches reports format)
-                if (data && (data.startsWith("/api/viewfile") || data.startsWith("http"))) {
-                  const pdfUrl = getPdfUrl(data, "transcript");
-                  if (!pdfUrl || pdfUrl === "") {
-                    return "-";
+              render: (data: any, _type: any, row: any) => {
+                // Display filename with optional link (matches CI3 line 146: '<a href="pdfpath">FORMATTED_FILENAME</a>')
+                const filename = data || "-";
+                const url = row?.FORMATTED_FILENAME_URL;
+                
+                // If we have a URL, show filename as clickable link
+                if (url && url.startsWith("/api/viewfile")) {
+                  const pdfUrl = getPdfUrl(url, "transcript");
+                  if (pdfUrl) {
+                    return (
+                      <a 
+                        href={pdfUrl} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="text-brand-500 hover:text-brand-700 hover:underline inline-flex items-center gap-1" 
+                        title="View PDF"
+                      >
+                        <FileIcon className="w-4 h-4" />
+                        <span>{filename}</span>
+                      </a>
+                    );
                   }
-                  return (
-                    <a href={pdfUrl} target="_blank" rel="noopener noreferrer" className="text-brand-500 hover:text-brand-700 inline-flex items-center gap-1" title="View PDF">
-                      <FileIcon className="w-4 h-4" />
-                    </a>
-                  );
                 }
-                // Fallback: if it's just a filename (backward compatibility)
-                if (!data) return "-";
-                return <span>{data}</span>;
+                // No link available - just show filename
+                return <span>{filename}</span>;
               }
             },
             { data: "STUDENT_FULL_NAME", name: "Student Name", searchable: true, orderable: true },

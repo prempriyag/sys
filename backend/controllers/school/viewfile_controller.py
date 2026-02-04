@@ -13,7 +13,7 @@ import logging
 from helpers.encryption_helper import file_decrypt, get_encrypt_file_path
 from database.connection import get_db
 from config.settings import Settings
-from config.constants import TBL_KICKOUT, SHARE_PATH_REPLACE, SHARE_PATH_UBUNTU, IS_UBUNTU
+from config.constants import TBL_KICKOUT, resolve_transcript_path
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/school/viewfile", tags=["viewfile"])
@@ -22,15 +22,6 @@ settings = Settings()
 class EncryptRequest(BaseModel):
     """Request model for encrypting file paths"""
     file_path: str
-
-# File path constants (should match CI3 constants)
-# These should be in .env or config
-SHAR_PATH = os.getenv("SHAR_PATH", "")
-SHARE_PATH_REPLACE = os.getenv("SHARE_PATH_REPLACE", "")
-SHARE_PATH_UBUNTU = os.getenv("SHARE_PATH_UBUNTU", "")
-IS_UBUNTU = os.getenv("IS_UBUNTU", "false").lower() == "true"
-SCHOOL_SHARE_PATH = os.getenv("SCHOOL_SHARE_PATH", "")
-UPLOAD_TRANSCRIPT_PATH = os.getenv("UPLOAD_TRANSCRIPT_PATH", "")
 
 @router.post("/encrypt", response_model=Dict[str, Any])
 async def encrypt_file_path(
@@ -71,16 +62,17 @@ async def transcript_file(
             raise HTTPException(status_code=400, detail="Missing pdf parameter")
         
         # Decrypt the file path
-        path = file_decrypt(pdf)
-        print(path)
-        # Handle Ubuntu path conversion
-        if IS_UBUNTU:
-            path = path.replace('\\', '/')
-            if SHARE_PATH_REPLACE and SHARE_PATH_UBUNTU:
-                path = path.replace(SHARE_PATH_REPLACE, SHARE_PATH_UBUNTU)
+        decrypted_path = file_decrypt(pdf)
+        logger.debug(f"Decrypted path: {decrypted_path}")
+        
+        # Handle Ubuntu path conversion (matches CI3 lines 133-136)
+        # Uses resolve_transcript_path which handles IS_UBUNTU conversion
+        path = resolve_transcript_path(decrypted_path)
+        logger.debug(f"Resolved path: {path}")
         
         # Check if file exists
         if not os.path.exists(path):
+            logger.warning(f"File not found - decrypted: {decrypted_path}, resolved: {path}")
             raise HTTPException(status_code=404, detail="File not found")
         
         # Get filename for Content-Disposition
@@ -130,15 +122,12 @@ async def error_screenshot(
             raise HTTPException(status_code=404, detail="Error screenshot not found")
         
         # Handle path conversion for Ubuntu (matches CI3 imagepreview.php lines 28-31)
-        error_path = error_screenshot
-        if IS_UBUNTU:
-            error_path = error_path.replace('\\', '/')
-            if SHARE_PATH_REPLACE and SHARE_PATH_UBUNTU:
-                error_path = error_path.replace(SHARE_PATH_REPLACE, SHARE_PATH_UBUNTU)
+        # Uses resolve_transcript_path which handles IS_UBUNTU conversion
+        error_path = resolve_transcript_path(error_screenshot)
         
         # Check if file exists
         if not os.path.exists(error_path):
-            logger.warning(f"Error screenshot file not found at path: {error_path} (original: {error_screenshot})")
+            logger.warning(f"Error screenshot file not found - original: {error_screenshot}, resolved: {error_path}")
             raise HTTPException(status_code=404, detail="Screenshot file not found")
         
         # Determine content type based on file extension

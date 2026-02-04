@@ -135,10 +135,32 @@ async def upload_transcripts(
         folder = os.path.join(TRANSCRIPTS_COLLEGE, source_type)
         folder = resolve_transcript_path(folder)
         
+        # Log path details for debugging
+        logger.info(f"Upload folder path: {folder}")
+        logger.info(f"IS_UBUNTU: {IS_UBUNTU}, TRANSCRIPTS_COLLEGE: {TRANSCRIPTS_COLLEGE}")
+        
         # Create folder if it doesn't exist
-        os.makedirs(folder, exist_ok=True)
+        try:
+            os.makedirs(folder, exist_ok=True)
+            logger.info(f"Folder created/verified: {folder}")
+        except Exception as mkdir_err:
+            error_msg = f"Failed to create upload folder: {folder}. Error: {str(mkdir_err)}"
+            logger.error(error_msg)
+            raise HTTPException(status_code=500, detail=error_msg)
+        
+        # Verify folder exists and is writable
+        if not os.path.exists(folder):
+            error_msg = f"Upload folder does not exist after creation attempt: {folder}"
+            logger.error(error_msg)
+            raise HTTPException(status_code=500, detail=error_msg)
+        
+        if not os.access(folder, os.W_OK):
+            error_msg = f"Upload folder is not writable: {folder}"
+            logger.error(error_msg)
+            raise HTTPException(status_code=500, detail=error_msg)
 
         uploaded_files = []
+        failed_files = []
         uploaded_count = 0
 
         for file in files:
@@ -148,11 +170,18 @@ async def upload_transcripts(
             # Validate PDF
             if not file.filename.lower().endswith('.pdf'):
                 logger.warning(f"Skipping non-PDF file: {file.filename}")
+                failed_files.append({"filename": file.filename, "error": "Not a PDF file"})
                 continue
 
             try:
                 # Read file content
                 contents = await file.read()
+                
+                if not contents or len(contents) == 0:
+                    error_msg = f"File {file.filename} is empty"
+                    logger.warning(error_msg)
+                    failed_files.append({"filename": file.filename, "error": "File is empty"})
+                    continue
 
                 # Generate formatted filename (matches CI3 lines 228-243)
                 file_base_name = os.path.splitext(file.filename)[0]
@@ -169,8 +198,19 @@ async def upload_transcripts(
                 else:
                     file_path = os.path.join(folder, new_filename)
                 
+                logger.info(f"Attempting to save file to: {file_path}")
+                
                 with open(file_path, 'wb') as f:
-                    f.write(contents)
+                    bytes_written = f.write(contents)
+                
+                # Verify file was written
+                if not os.path.exists(file_path):
+                    error_msg = f"File was not created at: {file_path}"
+                    logger.error(error_msg)
+                    failed_files.append({"filename": file.filename, "error": error_msg})
+                    continue
+                
+                logger.info(f"File saved successfully: {file_path} ({bytes_written} bytes)")
 
                 # Insert into database (matches CI3 lines 252-267)
                 from sqlalchemy import text
@@ -195,20 +235,40 @@ async def upload_transcripts(
                 uploaded_files.append(file.filename)
                 uploaded_count += 1
 
-                logger.info(f"File uploaded successfully: {file.filename} -> {new_filename}")
+                logger.info(f"File uploaded and recorded: {file.filename} -> {new_filename}")
 
+            except PermissionError as pe:
+                error_msg = f"Permission denied writing file: {str(pe)}"
+                logger.error(f"Permission error for {file.filename}: {pe}")
+                failed_files.append({"filename": file.filename, "error": error_msg})
+                continue
+            except IOError as ioe:
+                error_msg = f"IO error writing file: {str(ioe)}"
+                logger.error(f"IO error for {file.filename}: {ioe}")
+                failed_files.append({"filename": file.filename, "error": error_msg})
+                continue
             except Exception as e:
+                error_msg = f"Error: {str(e)}"
                 logger.error(f"Error uploading file {file.filename}: {e}")
+                failed_files.append({"filename": file.filename, "error": error_msg})
                 continue
 
         if uploaded_count > 0:
-            return {
+            response = {
                 "success": True,
                 "message": f"Successfully uploaded {uploaded_count} file(s) for processing",
                 "uploaded_files": uploaded_files
             }
+            if failed_files:
+                response["failed_files"] = failed_files
+                response["message"] += f". {len(failed_files)} file(s) failed."
+            return response
         else:
-            raise HTTPException(status_code=400, detail="No files were uploaded successfully")
+            # No files uploaded - return detailed error info
+            error_detail = f"No files were uploaded successfully. Folder: {folder}"
+            if failed_files:
+                error_detail += f". Errors: {failed_files}"
+            raise HTTPException(status_code=400, detail=error_detail)
 
     except HTTPException:
         raise

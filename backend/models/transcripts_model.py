@@ -14,6 +14,7 @@ from config.constants import (
     TBL_TRANSCRIPTHDRDATA,
     TBL_INSTITUTION_MAPPING,
     COLLEGE_PROJECT_ID,
+    resolve_transcript_path,
 )
 from helpers.common_helper import check_special_name
 
@@ -193,29 +194,43 @@ class TranscriptsModel:
                 filepath = record_dict.get("FILEPATH", "")
 
                 # Build file path (matches CI3 lines 125-130)
+                # my_file_path is Windows-style path (used for URL encryption)
                 if file_path:
                     my_file_path = file_path
                 else:
                     my_file_path = (filepath + "/" + formatted_filename) if (filepath and formatted_filename) else ""
 
-                # Generate encrypted PDF URL for FORMATTED_FILENAME (matches reports format)
-                # Matches CI3 line 131: $pdfpath = SESSION_PATH.'transcript_file?pdf='.getencryptfilepath($my_file_path);
+                # Generate encrypted PDF URL BEFORE converting path for Ubuntu
+                # (matches CI3 line 131: URL uses Windows path)
                 formatted_filename_url = ""
+                file_exists = False
+                
                 if my_file_path:
                     try:
                         import os
+                        from helpers.encryption_helper import get_encrypt_file_path
+                        
+                        # Generate URL using original path (matches CI3 line 131)
+                        encrypted_path = get_encrypt_file_path(my_file_path)
+                        formatted_filename_url = f"/api/viewfile/transcript_file?pdf={encrypted_path}"
+                        
+                        # For file_exists check, convert to Ubuntu path if needed (matches CI3 lines 133-136)
+                        # CI3: if(IS_ubuntu){ $my_file_path=str_replace('\\', '/',$my_file_path); ... }
+                        check_path = resolve_transcript_path(my_file_path)
+                        
                         # Check if file exists (matches CI3 line 145)
-                        if os.path.exists(my_file_path):
-                            from helpers.encryption_helper import get_encrypt_file_path
-                            encrypted_path = get_encrypt_file_path(my_file_path)
-                            formatted_filename_url = f"/api/viewfile/transcript_file?pdf={encrypted_path}"
+                        file_exists = os.path.exists(check_path)
+                        logger.debug(f"File check - original: {my_file_path}, resolved: {check_path}, exists: {file_exists}")
+                        
                     except Exception as e:
                         logger.warning(f"Error generating PDF URL for {my_file_path}: {e}")
 
                 data_row = {
                     "SOURCE_TYPE": record_dict.get("SOURCE_TYPE", ""),
                     "FILENAME": record_dict.get("FILENAME", ""),
-                    "FORMATTED_FILENAME": formatted_filename_url if formatted_filename_url else formatted_filename,  # Return URL if available, else filename
+                    # Return both filename and URL (matches CI3 line 146: '<a href="pdfpath">FORMATTED_FILENAME</a>')
+                    "FORMATTED_FILENAME": formatted_filename,  # Always return the actual filename
+                    "FORMATTED_FILENAME_URL": formatted_filename_url if file_exists else "",  # URL only if file exists
                     "STUDENT_FULL_NAME": record_dict.get("STUDENT_FULL_NAME", ""),
                     "STUDENT_ID": student_id,
                     "INSTITUTION_ID": record_dict.get("INSTITUTION_ID", ""),
@@ -229,6 +244,7 @@ class TranscriptsModel:
                     "FILE_PATH": file_path if file_path else (filepath + "/" + formatted_filename if filepath and formatted_filename else ""),
                     # Metadata for frontend rendering
                     "_has_update_permission": has_update_permission,
+                    "_file_exists": file_exists,  # Let frontend know if file exists
                 }
 
                 data.append(data_row)

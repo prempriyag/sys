@@ -24,6 +24,7 @@ from config.constants import (
     COLLEGE_PROJECT_ID,
     TBL_DOWNLOAD,
     resolve_transcript_path,
+    IS_UBUNTU,
 )
 from config.settings import settings
 
@@ -161,8 +162,13 @@ async def upload_transcripts(
                 random_str = generate_random_string(5)
                 new_filename = f"{sanitized_name.lower()}_{source_type}_{date_str}_{random_str}{ext}"
 
-                # Save file
-                file_path = os.path.join(folder, new_filename)
+                # Save file - match CI3: $folder . '/' . $newFileName
+                # On Ubuntu use explicit forward slash, on Windows use os.path.join
+                if IS_UBUNTU:
+                    file_path = f"{folder}/{new_filename}"
+                else:
+                    file_path = os.path.join(folder, new_filename)
+                
                 with open(file_path, 'wb') as f:
                     f.write(contents)
 

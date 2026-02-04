@@ -22,6 +22,8 @@ export const API_ENDPOINTS = {
   LOGOUT: "/api/logout",
   VERIFY: "/api/verify",
   ME: "/api/me",
+  FORGOT_PASSWORD: "/api/forgot-password",
+  FORGOT_PASSWORD_RESET: "/api/forgot-password/reset",
   TRANSCRIPT_REPORTS: "/api/transcriptreports",
   TRANSCRIPT_REPORTS_LIST: "/api/transcriptreports/ajaxlist",
   ARTICULATION_REPORTS_LIST: "/api/articulationreports/ajaxlist",
@@ -73,6 +75,7 @@ export const API_ENDPOINTS = {
   // Student View endpoints
   STUDENTVIEW: "/api/studentview",
   STUDENTVIEW_GET_STUDENTS: "/api/studentview/getstudentslist",
+  DASHBOARD_COLLEGES_LIST: "/api/dashboard/colleges",
   STUDENTVIEW_VIEW_PAGE_LOAD: "/api/studentview/viewpageload",
   STUDENTVIEW_ARTICULATION_PAGE_LOAD: "/api/studentview/articulationviewpageload",
   // Theme Settings endpoints

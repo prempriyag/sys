@@ -393,8 +393,14 @@ const AppSidebar: React.FC = () => {
   if (menuLayout === "horizontal") {
     return (
       <nav
-        className="w-full bg-white border-b border-gray-200 dark:bg-gray-900 dark:border-gray-800 shadow-sm"
-        style={{ position: "relative", zIndex: 100, overflow: "visible" }}
+        className="w-full border-b border-gray-200 dark:border-gray-800 shadow-sm"
+        style={{ 
+          position: "relative", 
+          zIndex: 100, 
+          overflow: "visible",
+          backgroundColor: sidebarBgColor,
+          color: sidebarTextColor,
+        }}
       >
         <div
           className="px-4"

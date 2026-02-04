@@ -8,6 +8,7 @@ import Button from "../../components/ui/button/Button";
 import StatusBadge from "../../components/common/StatusBadge";
 import { API_ENDPOINTS } from "../../config/api";
 import { RefreshIcon, FilterIcon } from "../../icons";
+import { alertsuccess } from "../../utils/toast";
 
 export default function SchoolHeaderData() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -16,8 +17,12 @@ export default function SchoolHeaderData() {
   const [fieldType, setFieldType] = useState<string>("");
   const [fieldName, setFieldName] = useState<string>("");
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text).then(() => {});
+  const copyToClipboard = (text: string | number) => {
+    const str = String(text ?? "").trim();
+    if (!str) return;
+    navigator.clipboard.writeText(str).then(() => {
+      alertsuccess("Copied to clipboard!");
+    }).catch(() => console.error("Failed to copy"));
   };
 
   const clearFilters = () => {

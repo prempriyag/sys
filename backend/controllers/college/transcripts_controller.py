@@ -23,6 +23,8 @@ from config.constants import (
     TRANSCRIPTS_COLLEGE,
     COLLEGE_PROJECT_ID,
     TBL_DOWNLOAD,
+    resolve_transcript_path,
+    IS_UBUNTU,
 )
 from config.settings import settings
 
@@ -129,8 +131,9 @@ async def upload_transcripts(
         if len(files) > 10:
             raise HTTPException(status_code=400, detail="Please upload a maximum of 10 files")
 
-        # Build folder path
+        # Build folder path - resolve for Ubuntu (matches CI3 Transcripts::insert)
         folder = os.path.join(TRANSCRIPTS_COLLEGE, source_type)
+        folder = resolve_transcript_path(folder)
         
         # Log path details for debugging
         logger.info(f"Upload folder path: {folder}")
@@ -285,12 +288,17 @@ async def get_source_types(
     """
     Get available source types from folder structure
     Matches CI3 Transcripts::add() method source type logic
+    For local dev when network share is unreachable, set TRANSCRIPTS_COLLEGE_PATH in .env
     """
     try:
-        # Get source types from folder structure
-        base_path = TRANSCRIPTS_COLLEGE
+        # Use override for local dev when network path (e.g. \\11.11.11.11\csc_uat\...) is unreachable
+        override = getattr(settings, "TRANSCRIPTS_COLLEGE_PATH", None)
+        base_path = override.strip() if override and str(override).strip() else TRANSCRIPTS_COLLEGE
+        base_path = os.path.normpath(base_path.rstrip("/\\"))
+        base_path = resolve_transcript_path(base_path)
+
         if not os.path.exists(base_path):
-            return {"sources": []}
+            return {"sources": [], "path": base_path, "error": "Path does not exist or is not accessible"}
         
         sources = []
         for item in os.listdir(base_path):
@@ -299,10 +307,11 @@ async def get_source_types(
                 sources.append(item)
         
         sources.sort()
-        return {"sources": sources}
+        return {"sources": sources, "path": base_path}
     except Exception as e:
         logger.error(f"Error getting source types: {e}")
-        return {"sources": []}
+        base_path = getattr(settings, "TRANSCRIPTS_COLLEGE_PATH", None) or TRANSCRIPTS_COLLEGE
+        return {"sources": [], "path": base_path, "error": str(e)}
 
 
 

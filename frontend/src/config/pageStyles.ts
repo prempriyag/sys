@@ -14,7 +14,10 @@ export const pageStyles = {
   // Content container styles (the main white box)
   contentContainer: {
     // Base classes - modify these to change all pages
-    baseClasses: 'rounded-2xl border border-gray-200 bg-white px-5 py-7 dark:border-gray-800 dark:bg-white/[0.03] xl:px-4 xl:py-4',
+    baseClasses: 'rounded-2xl border border-gray-200 bg-white px-5 py-7 dark:border-gray-800 dark:bg-gray-900 xl:px-4 xl:py-4',
+    baseStyle: {
+      backgroundColor: 'transparent',
+    },
     
     // Inline styles (if needed)
     inlineStyles: {

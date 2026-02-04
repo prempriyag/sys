@@ -9,12 +9,14 @@ from database.connection import get_db
 from models import User
 from config.settings import settings
 from schemas.auth import (
-    LoginRequest, LoginResponse, VerifyCodeRequest, 
-    MessageResponse, UserResponse
+    LoginRequest, LoginResponse, VerifyCodeRequest,
+    MessageResponse, UserResponse,
+    ForgotPasswordRequest, ForgotPasswordResetRequest
 )
 from helpers.auth_helper import (
-    hash_password, create_access_token, password_form_validation
+    hash_password, create_access_token, verify_token, password_form_validation
 )
+from helpers.email_helper import send_email
 from helpers.db_helper import (
     update_last_login, roletype, get_setting
 )
@@ -264,11 +266,16 @@ async def logout(
 
 @router.get("/me", response_model=UserResponse)
 async def get_current_user_info(
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     """
-    Get current user information
+    Get current user information (including permissions for SSO callback flow)
     """
+    try:
+        user_permissions = load_user_permissions(db, current_user.role_id, current_user.email)
+    except Exception:
+        user_permissions = {}
     return UserResponse(
         id=current_user.id,
         name=current_user.name,
@@ -278,6 +285,86 @@ async def get_current_user_info(
         college_perm=current_user.college_perm,
         hs_perm=current_user.hs_perm,
         ocr_perm=current_user.ocr_perm,
-        last_login=current_user.last_login
+        last_login=current_user.last_login,
+        permissions=user_permissions
     )
+
+
+# --- Forgot Password ---
+
+def _build_reset_email_html(link: str) -> str:
+    """Build HTML email body for password reset."""
+    return f"""<table style="width:100%; border-collapse:collapse;">
+<tr><td colspan="2" style="background:#b31f24;color:white;padding:10px;text-align:center;font-size:17px;">Reset Your DigiScript Password</td></tr>
+<tr><td colspan="2" style="padding:10px; border:1px solid #ccc;">
+<h4>Dear DigiScript User,</h4>
+<p>We received a request to reset the password for your account. If you did not make this request, please ignore this email.</p>
+<p><strong>To reset your password, please follow the link below:</strong></p>
+<p><a href="{link}" style="color:blue;">Click Here</a></p>
+<p>If clicking the link does not work, copy and paste it into your browser's address bar.</p>
+<p>The link expires in 30 minutes. Password must be at least 8 characters with uppercase, lowercase, number, and special character.</p>
+<p>DigiScript - Powered by <a href="https://www.ktechproducts.com">KTech Products</a></p>
+</td></tr></table>"""
+
+
+@router.post("/forgot-password", response_model=MessageResponse)
+async def forgot_password(request_data: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    """
+    Request password reset - sends email with reset link if user exists.
+    Always returns success to avoid email enumeration.
+    """
+    from helpers.db_helper import get_user_by_email
+
+    user = get_user_by_email(db, request_data.email)
+    if user:
+        token = create_access_token(
+            data={"sub": user.email, "type": "password_reset"},
+            expires_delta=timedelta(minutes=30)
+        )
+        reset_link = f"{settings.FRONTEND_URL}/reset-password?token={token}"
+        system_name = get_setting(db, "system_name") or "DigiScript"
+        subject = f"{system_name} Reset Password"
+        html_body = _build_reset_email_html(reset_link)
+        if not send_email(db, user.email, subject, html_body):
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Failed to send email. Please ensure SMTP is configured and try again."
+            )
+    return MessageResponse(
+        message="If your email is registered, you will receive a password reset link shortly.",
+        success=True
+    )
+
+
+@router.post("/forgot-password/reset", response_model=MessageResponse)
+async def forgot_password_reset(request_data: ForgotPasswordResetRequest, db: Session = Depends(get_db)):
+    """
+    Reset password using token from email link.
+    """
+    if request_data.npassword != request_data.cpassword:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Passwords do not match"
+        )
+    if not password_form_validation(request_data.npassword):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must be at least 8 characters with uppercase, lowercase, number, and special character"
+        )
+    payload = verify_token(request_data.token)
+    if not payload or payload.get("type") != "password_reset":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired reset link. Please request a new one."
+        )
+    email = payload.get("sub")
+    if not email:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid token")
+    user = db.query(User).filter(User.email.ilike(email)).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User not found")
+    user.password = hash_password(request_data.npassword)
+    user.updated_by = "ForgotPassword"
+    db.commit()
+    return MessageResponse(message="Password updated successfully. You can now log in.", success=True)
 

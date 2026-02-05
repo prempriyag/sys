@@ -2,6 +2,8 @@
 Users controller
 Based on Users.php controller from CodeIgniter
 """
+import logging
+import time
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
@@ -15,8 +17,13 @@ from helpers.common_helper import generate_rand_number, upr2lwr
 from helpers.permission_helper import check_permission, logged_in_user, roletype, user_main_permission
 from helpers.db_helper import get_setting, roletype as get_roletype
 from helpers.permission_dependency import require_permission
+from helpers.email_helper import send_user_registration_email
+from helpers.encryption_helper import encrypt as encrypt_string
+from config.settings import settings
 from pydantic import BaseModel, EmailStr, Field
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/users", tags=["Users"])
 
@@ -283,13 +290,37 @@ async def insert(
     db.commit()
     db.refresh(new_user)
     
-    # TODO: Send email with password
-    # sendmail(user_data.email, get_setting(db, 'system_name') + ' User Registration Email', message)
-    
-    return MessageResponse(
-        message="Successfully added",
-        success=True
-    )
+    # Send registration email with password setup link
+    # Matches CI3: encrypt($emailid.'/'.time()) for the link
+    try:
+        encoded_token = encrypt_string(f"{user_data.email}/{int(time.time())}")
+        # Use FRONTEND_URL for the reset link
+        reset_link = f"{settings.FRONTEND_URL}/reset-password?token={encoded_token}"
+        
+        email_sent = send_user_registration_email(
+            db=db,
+            email=user_data.email,
+            name=user_data.name,
+            reset_link=reset_link
+        )
+        
+        if email_sent:
+            return MessageResponse(
+                message="Successfully added",
+                success=True
+            )
+        else:
+            logger.warning(f"User created but email not sent to {user_data.email}")
+            return MessageResponse(
+                message="Successfully added but mail not sent",
+                success=True
+            )
+    except Exception as e:
+        logger.exception(f"Error sending registration email: {e}")
+        return MessageResponse(
+            message="Successfully added but mail not sent",
+            success=True
+        )
 
 
 @router.get("/edit/{user_id}", response_model=dict)

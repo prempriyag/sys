@@ -16,6 +16,7 @@ from config.constants import (
     SCHOOL_PROJECT_ID,
 )
 from helpers.common_helper import check_special_name
+from helpers.encryption_helper import get_encrypt_file_path
 
 logger = logging.getLogger(__name__)
 
@@ -224,6 +225,13 @@ class TranscriptHdrDataModel:
                 
                 batch_id = record_dict.get("BATCH_ID", "")
                 student_id = record_dict.get("STUDENT_ID", "")
+                file_path = record_dict.get("FILE_PATH", "")
+                
+                # Generate encrypted PDF URL for FILE_PATH (matches CI3 encryption pattern)
+                file_path_url = ""
+                if file_path and str(file_path).strip():
+                    encrypted_path = get_encrypt_file_path(file_path)
+                    file_path_url = f"/api/viewfile/transcript_file?pdf={encrypted_path}"
 
                 data_row = {
                     "BATCH_ID": batch_id,
@@ -254,7 +262,7 @@ class TranscriptHdrDataModel:
                     "LEVEL": record_dict.get("LEVEL", ""),
                     "COMMENTS": record_dict.get("COMMENTS", ""),
                     "STATUS_FLAG": record_dict.get("STATUS_FLAG", ""),
-                    "FILE_PATH": record_dict.get("FILE_PATH", ""),
+                    "FILE_PATH": file_path_url,  # Encrypted URL, not raw path
                     "OCR_EXTRACTED_DATE": str(record_dict.get("OCR_EXTRACTED_DATE", "")) if record_dict.get("OCR_EXTRACTED_DATE") else "",
                     "OCR_START_TERM_DT": str(record_dict.get("OCR_START_TERM_DT", "")) if record_dict.get("OCR_START_TERM_DT") else "",
                     "OCR_END_TERM_DT": str(record_dict.get("OCR_END_TERM_DT", "")) if record_dict.get("OCR_END_TERM_DT") else "",

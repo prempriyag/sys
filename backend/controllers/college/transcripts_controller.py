@@ -17,6 +17,7 @@ import string
 from database.connection import get_db
 from helpers.permission_dependency import require_permission
 from helpers.common_helper import sanitize_string
+from helpers.email_helper import trigger_update_mail
 from models import User
 from models.transcripts_model import TranscriptsModel
 from config.constants import (
@@ -254,6 +255,25 @@ async def upload_transcripts(
                 continue
 
         if uploaded_count > 0:
+            # Trigger update email notification (matches CI3 trigger_update_mail)
+            try:
+                mail_data = {
+                    "table_name": TBL_DOWNLOAD,
+                    "institution_type": "College",
+                    "source_type": source_type,
+                    "files_count": uploaded_count,
+                    "uploaded_by": "System",  # TODO: Get from current_user when auth is enabled
+                    "uploaded_datetime": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                    "uploaded_files": uploaded_files
+                }
+                mail_sent = trigger_update_mail(db, mail_data)
+                if mail_sent:
+                    logger.info("Trigger update mail sent successfully")
+                else:
+                    logger.warning("Trigger update mail not sent (disabled or not configured)")
+            except Exception as mail_err:
+                logger.warning(f"Error sending trigger update mail: {mail_err}")
+            
             response = {
                 "success": True,
                 "message": f"Successfully uploaded {uploaded_count} file(s) for processing",

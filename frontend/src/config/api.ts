@@ -1,20 +1,11 @@
 // Import toast functions for error notifications
 import { alerterror } from "../utils/toast";
 
-// Environment: DEV | UAT | PROD (set via VITE_APP_ENV, e.g. in .env or build)
-const APP_ENV = (import.meta.env.VITE_APP_ENV || "DEV").toUpperCase();
+// Import centralized app config
+import { APP_ENV, API_BASE_URL as CONFIG_API_BASE_URL } from "./app.config";
 
-// Backend API base URL per environment (UAT/PROD use /backend path)
-const API_BASE_URL_BY_ENV: Record<string, string> = {
-  DEV: "http://localhost:8000",
-  UAT: "https://digiscript-csc-uat.ktechproducts.com/backend",
-  PROD: "https://digiscript-csc.ktechproducts.com/backend",
-};
-
-// API Configuration: VITE_API_BASE_URL overrides; else use URL for current env
-export const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || API_BASE_URL_BY_ENV[APP_ENV] || API_BASE_URL_BY_ENV.DEV;
-
+// Re-export from centralized config for backward compatibility
+export const API_BASE_URL = CONFIG_API_BASE_URL;
 export const APP_ENVIRONMENT = APP_ENV;
 
 export const API_ENDPOINTS = {
@@ -151,6 +142,11 @@ export const API_ENDPOINTS = {
   OCR_SCHOOL_HDR_BATCH: "/api/ocrverify/schoolhdrbatch",
   OCR_SCHOOL_HDR_UPDATE_BATCH_HDR: "/api/ocrverify/schoolhdrdata/updatebatchdatahdr",
   OCR_UPDATE_BATCH_DATA_HDR: "/api/ocrverify/updatebatchdatahdr",
+  
+  // Profiler endpoints (for debugging - KTech users only)
+  PROFILER_DATA: "/api/profiler/data",
+  PROFILER_STATUS: "/api/profiler/status",
+  PROFILER_SPEEDTEST: "/api/profiler/speedtest",
 };
 
 // Helper function to get auth token from localStorage

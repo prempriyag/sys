@@ -14,6 +14,7 @@ from config.constants import (
     COLLEGE_PROJECT_ID,
 )
 from helpers.common_helper import check_special_name
+from helpers.encryption_helper import get_encrypt_file_path
 
 logger = logging.getLogger(__name__)
 
@@ -201,6 +202,13 @@ class TranscriptHdrOcrModel:
                 record_dict = dict(record._mapping)
                 
                 batch_id = record_dict.get("BATCH_ID", "")
+                file_path = record_dict.get("FILE_PATH", "")
+                
+                # Generate encrypted PDF URL for FILE_PATH (matches CI3 encryption pattern)
+                file_path_url = ""
+                if file_path and str(file_path).strip():
+                    encrypted_path = get_encrypt_file_path(file_path)
+                    file_path_url = f"/api/viewfile/transcript_file?pdf={encrypted_path}"
 
                 data_row = {
                     "BATCH_ID": batch_id,
@@ -214,7 +222,7 @@ class TranscriptHdrOcrModel:
                     "CITY": record_dict.get("CITY", ""),
                     "STATE": record_dict.get("STATE", ""),
                     "ZIPCODE": record_dict.get("ZIPCODE", ""),
-                    "FILE_PATH": record_dict.get("FILE_PATH", ""),
+                    "FILE_PATH": file_path_url,  # Encrypted URL, not raw path
                     "BOT_PROCESSED_DATE": str(record_dict.get("BOT_PROCESSED_DATE", "")) if record_dict.get("BOT_PROCESSED_DATE") else "",
                     "OCR_EXTRACTED_DATE": str(record_dict.get("OCR_EXTRACTED_DATE", "")) if record_dict.get("OCR_EXTRACTED_DATE") else "",
                     "CGPA": record_dict.get("CGPA", ""),

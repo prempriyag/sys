@@ -94,6 +94,9 @@ import SchoolInstitutionMapping from "./pages/School/setup/institutionmapping/In
 import SchoolGpaPickMapping from "./pages/School/setup/gpapickmapping/GpaPickMapping";
 import SchoolGpaScaleMapping from "./pages/School/setup/gpascalemapping/GpaScaleMapping";
 
+// Admin/System Pages
+import Profiler from "./pages/Admin/Profiler";
+
 // OCR (OCR Verify) module pages
 import OCRDashboard from "./pages/OCR/OCRDashboard";
 import Verifiers from "./pages/OCR/Verifiers";
@@ -430,6 +433,12 @@ export default function App() {
           <Route path="/settings" element={<Settings />} />
           <Route path="/school/settings" element={<Settings />} />
           <Route path="/ocrverify/settings" element={<Settings />} />
+
+          {/* Admin/System Tools - Profiler (KTech users only) */}
+          <Route path="/profiler" element={<Profiler />} />
+          <Route path="/college/profiler" element={<Profiler />} />
+          <Route path="/school/profiler" element={<Profiler />} />
+          <Route path="/ocrverify/profiler" element={<Profiler />} />
 
           <Route path="/calendar" element={<Calendar />} />
           <Route path="/blank" element={<Blank />} />

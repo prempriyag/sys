@@ -194,7 +194,7 @@ export default function TranscriptsList() {
               name: "Formatted Filename", 
               searchable: true, 
               orderable: true,
-              render: (data: any, _type: any, row: any) => {
+              render: (data: any, row: any) => {
                 // Display filename with optional link (matches CI3 line 146: '<a href="pdfpath">FORMATTED_FILENAME</a>')
                 const filename = data || "-";
                 const url = row?.FORMATTED_FILENAME_URL;

@@ -15,6 +15,7 @@ from config.constants import (
     COLLEGE_PROJECT_ID,
 )
 from helpers.common_helper import check_special_name
+from helpers.encryption_helper import get_encrypt_file_path
 
 logger = logging.getLogger(__name__)
 
@@ -216,13 +217,20 @@ class DigiScriptReportsModel:
                 institution_id = record_dict.get("INSTITUTION_ID", "")
                 student_id = record_dict.get("STUDENT_ID", "")
                 file_path = record_dict.get("FILE_PATH", "")
+                
+                # Generate encrypted PDF URL for FILE_PATH (matches CI3 line 122)
+                # CI3: $pdfpath = SESSION_PATH . 'transcript_file?pdf=' . getencryptfilepath($record->FILE_PATH);
+                file_path_url = ""
+                if file_path and str(file_path).strip():
+                    encrypted_path = get_encrypt_file_path(file_path)
+                    file_path_url = f"/api/viewfile/transcript_file?pdf={encrypted_path}"
 
                 data_row = {
                     "INSTITUTION_NAME": record_dict.get("INSTITUTION_NAME", ""),
                     "BATCH_ID": batch_id,
                     "INSTITUTION_ID": institution_id,
                     "STUDENT_FULL_NAME": record_dict.get("STUDENT_FULL_NAME", ""),
-                    "FILE_PATH": file_path,
+                    "FILE_PATH": file_path_url,  # Encrypted URL, not raw path
                     "OCR_EXTRACTED_DATE": str(record_dict.get("OCR_EXTRACTED_DATE", "")) if record_dict.get("OCR_EXTRACTED_DATE") else "",
                     "STATUS_FLAG": record_dict.get("STATUS_FLAG", ""),
                     "STUDENT_ID": student_id,

@@ -8,9 +8,10 @@ import { Modal } from "../../../../components/ui/modal";
 import Input from "../../../../components/form/input/InputField";
 import Label from "../../../../components/form/Label";
 import { api } from "../../../../config/api";
-import { RefreshIcon, PlusIcon, PencilIcon, TrashBinIcon } from "../../../../icons";
+import { RefreshIcon, PlusIcon, PencilIcon, TrashBinIcon, CopyIcon } from "../../../../icons";
 import { useAuth } from "../../../../context/AuthContext";
 import ConfirmationModal from "../../../../components/common/ConfirmationModal";
+import { alertsuccess } from "../../../../utils/toast";
 
 interface InstitutionMappingProps {
   instType?: string;
@@ -36,6 +37,15 @@ export default function InstitutionMapping({ instType = "" }: InstitutionMapping
   const hasAddPermission = hasPermission("institutions_mapping", "ADD");
   const hasUpdatePermission = hasPermission("institutions_mapping", "UPDATE");
   const hasDeletePermission = hasPermission("institutions_mapping", "DELETE");
+
+  // Helper function to copy text to clipboard
+  const copyToClipboard = (text: string | number) => {
+    const str = String(text ?? "").trim();
+    if (!str) return;
+    navigator.clipboard.writeText(str).then(() => {
+      alertsuccess("Copied to clipboard!");
+    }).catch(() => console.error("Failed to copy"));
+  };
 
   const handleAdd = () => {
     setFormData({
@@ -266,7 +276,25 @@ export default function InstitutionMapping({ instType = "" }: InstitutionMapping
           columns={[
             { data: "SOURCE_TYPE", name: "Source Type", searchable: true, orderable: true },
             { data: "INSTITUTION_TYPE", name: "Institution Type", searchable: true, orderable: true },
-            { data: "INSTITUTION_ID", name: "Institution ID", searchable: true, orderable: true },
+            { 
+              data: "INSTITUTION_ID", 
+              name: "Institution ID", 
+              searchable: true, 
+              orderable: true,
+              render: (data: any) => {
+                if (!data) return "-";
+                return (
+                  <span 
+                    className="cursor-pointer hover:text-brand-500" 
+                    onClick={() => copyToClipboard(data)}
+                    title="Click to copy"
+                  >
+                    <CopyIcon className="w-4 h-4 me-1" />
+                    {data}
+                  </span>
+                );
+              }
+            },
             { data: "INSTITUTION_NAME", name: "Institution Name", searchable: true, orderable: true },
             { data: "INSTITUTION_ZIPCODE", name: "Institution Zipcode", searchable: true, orderable: true },
             { data: "EXTERNAL_INSTITUTION_NAME", name: "External Institution Name", searchable: true, orderable: true },

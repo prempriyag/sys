@@ -7,7 +7,7 @@ import Button from "../../../../components/ui/button/Button";
 import StatusBadge from "../../../../components/common/StatusBadge";
 import { useNavigate } from "react-router";
 import { API_ENDPOINTS, API_BASE_URL } from "../../../../config/api";
-import { RefreshIcon, FilterIcon } from "../../../../icons";
+import { RefreshIcon, FilterIcon, CopyIcon } from "../../../../icons";
 import { useAuth } from "../../../../context/AuthContext";
 import { alertsuccess } from "../../../../utils/toast";
 
@@ -161,7 +161,25 @@ export default function DigiScriptBotLog() {
           ajaxUrl={API_ENDPOINTS.DIGISCRIPT_BOT_LOG_LIST}
           ajaxData={ajaxData}
           columns={[
-            { data: "INSTITUTION_ID", name: "Institution Name", searchable: true, orderable: true },
+            { 
+              data: "INSTITUTION_ID", 
+              name: "Institution Name", 
+              searchable: true, 
+              orderable: true,
+              render: (data: any) => {
+                if (!data) return "-";
+                return (
+                  <span 
+                    className="cursor-pointer hover:text-brand-500" 
+                    onClick={() => copyToClipboard(data)}
+                    title="Click to copy"
+                  >
+                    <CopyIcon className="w-4 h-4 me-1" />
+                    {data}
+                  </span>
+                );
+              }
+            },
             { 
               data: "BATCH_ID", 
               name: "Batch ID", 
@@ -170,12 +188,13 @@ export default function DigiScriptBotLog() {
               render: (data: any) => {
                 if (!data) return "-";
                 return (
-                  <span>
+                  <span className="inline-flex items-center whitespace-nowrap">
                     <span 
-                      className="copyinstid cursor-pointer hover:text-brand-500 me-2" 
+                      className="cursor-pointer hover:text-brand-500 flex-shrink-0 me-1" 
                       onClick={() => copyToClipboard(data)}
+                      title="Click to copy"
                     >
-                      <i className="btn-copy-icon fa-duotone fa-paste me-1"></i>
+                      <CopyIcon className="w-4 h-4" />
                     </span>
                     <a 
                       href={`/college/batchdetails/${data}`}

@@ -13,6 +13,29 @@ interface ResetPasswordModalProps {
   onSuccess: () => void;
 }
 
+// Password validation helper - matches backend requirements
+const validatePasswordFormat = (password: string): { valid: boolean; error: string } => {
+  if (!password || password.trim() === "") {
+    return { valid: false, error: "New Password is required" };
+  }
+  if (password.length < 8) {
+    return { valid: false, error: "Password must be at least 8 characters" };
+  }
+  if (!/[A-Z]/.test(password)) {
+    return { valid: false, error: "Password must contain at least one uppercase letter" };
+  }
+  if (!/[a-z]/.test(password)) {
+    return { valid: false, error: "Password must contain at least one lowercase letter" };
+  }
+  if (!/[0-9]/.test(password)) {
+    return { valid: false, error: "Password must contain at least one number" };
+  }
+  if (!/[^\w]/.test(password)) {
+    return { valid: false, error: "Password must contain at least one special character (!@#$%^&*)" };
+  }
+  return { valid: true, error: "" };
+};
+
 export default function ResetPasswordModal({
   userId,
   userName,
@@ -21,6 +44,7 @@ export default function ResetPasswordModal({
 }: ResetPasswordModalProps) {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
   const [resetPasswordData, setResetPasswordData] = useState({
     npassword: "",
     cpassword: "",
@@ -43,12 +67,17 @@ export default function ResetPasswordModal({
     const newErrors: Record<string, string> = { ...errors };
     
     if (name === "npassword") {
-      if (!value || value.trim() === "") {
-        newErrors.npassword = "New Password is required";
-      } else if (value.length < 8) {
-        newErrors.npassword = "Password must be at least 8 characters";
+      const validation = validatePasswordFormat(value);
+      if (!validation.valid) {
+        newErrors.npassword = validation.error;
       } else {
         delete newErrors.npassword;
+      }
+      // Also check confirm password if it has a value
+      if (resetPasswordData.cpassword && value !== resetPasswordData.cpassword) {
+        newErrors.cpassword = "Passwords do not match";
+      } else if (resetPasswordData.cpassword) {
+        delete newErrors.cpassword;
       }
     } else if (name === "cpassword") {
       if (!value || value.trim() === "") {
@@ -70,10 +99,11 @@ export default function ResetPasswordModal({
 
     // Validate all fields
     const newErrors: Record<string, string> = {};
-    if (!resetPasswordData.npassword || resetPasswordData.npassword.trim() === "") {
-      newErrors.npassword = "New Password is required";
-    } else if (resetPasswordData.npassword.length < 8) {
-      newErrors.npassword = "Password must be at least 8 characters";
+    
+    // Validate password format
+    const passwordValidation = validatePasswordFormat(resetPasswordData.npassword);
+    if (!passwordValidation.valid) {
+      newErrors.npassword = passwordValidation.error;
     }
 
     if (!resetPasswordData.cpassword || resetPasswordData.cpassword.trim() === "") {
@@ -92,17 +122,25 @@ export default function ResetPasswordModal({
     try {
       const response = await api.post(`${API_ENDPOINTS.USERS_RESET_PASSWORD}/${userId}`, resetPasswordData);
       
-      if (response.data?.status === 1 || response.data?.message?.includes("success")) {
-        alertsuccess(response.data?.message || "Password reset successfully");
+      // Check for success response - api returns JSON directly (not wrapped in response.data)
+      // Backend returns { message: "...", success: true }
+      const isSuccess = response.success || response.message?.toLowerCase().includes("success");
+      
+      if (isSuccess) {
+        setSuccess(true);
+        alertsuccess(response.message || "Password reset successfully");
         setResetPasswordData({ npassword: "", cpassword: "" });
         onSuccess();
-        onClose();
+        // Delay closing modal so user can see success message
+        setTimeout(() => {
+          onClose();
+        }, 1500);
       } else {
-        alerterror(response.data?.message || "Failed to reset password");
+        alerterror(response.message || "Failed to reset password");
       }
     } catch (err: any) {
       console.error("Reset password error:", err);
-      alerterror(err.response?.data?.message || err.message || "Failed to reset password");
+      alerterror(err.message || "Failed to reset password");
     } finally {
       setLoading(false);
     }
@@ -125,9 +163,12 @@ export default function ResetPasswordModal({
               value={resetPasswordData.npassword}
               onChange={(e) => handleFieldChange("npassword", e.target.value)}
               onBlur={(e) => handleBlur("npassword", e.target.value)}
-              placeholder="Enter New Password (min 8 characters)"
+              placeholder="Enter New Password"
               className={errors.npassword ? "border-red-500" : ""}
             />
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Must be 8+ characters with uppercase, lowercase, number, and special character (!@#$%^&*)
+            </p>
             {errors.npassword && (
               <p className="mt-1 text-xs text-red-500">{errors.npassword}</p>
             )}
@@ -147,11 +188,22 @@ export default function ResetPasswordModal({
             )}
           </div>
           <div className="flex gap-4 pt-4">
-            <Button type="submit" className="flex-1" disabled={loading}>
+            <Button 
+              type="submit" 
+              className={`flex-1 ${success ? "bg-green-600 hover:bg-green-600" : ""}`} 
+              disabled={loading || success}
+            >
               {loading ? (
                 <>
                   <span className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></span>
                   Resetting...
+                </>
+              ) : success ? (
+                <>
+                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Password Reset Successfully!
                 </>
               ) : (
                 "Reset Password"
@@ -162,9 +214,9 @@ export default function ResetPasswordModal({
               variant="outline"
               onClick={onClose}
               className="flex-1"
-              disabled={loading}
+              disabled={loading || success}
             >
-              Cancel
+              {success ? "Closing..." : "Cancel"}
             </Button>
           </div>
         </form>

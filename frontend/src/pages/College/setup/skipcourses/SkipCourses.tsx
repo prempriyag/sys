@@ -8,9 +8,10 @@ import { Modal } from "../../../../components/ui/modal";
 import Input from "../../../../components/form/input/InputField";
 import Label from "../../../../components/form/Label";
 import { api } from "../../../../config/api";
-import { RefreshIcon, PlusIcon, PencilIcon, TrashBinIcon } from "../../../../icons";
+import { RefreshIcon, PlusIcon, PencilIcon, TrashBinIcon, CopyIcon } from "../../../../icons";
 import { useAuth } from "../../../../context/AuthContext";
 import ConfirmationModal from "../../../../components/common/ConfirmationModal";
+import { alertsuccess } from "../../../../utils/toast";
 
 export default function SkipCourses() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -29,6 +30,15 @@ export default function SkipCourses() {
   const hasAddPermission = hasPermission("skip_exclude_courses", "ADD");
   const hasUpdatePermission = hasPermission("skip_exclude_courses", "UPDATE");
   const hasDeletePermission = hasPermission("skip_exclude_courses", "DELETE");
+
+  // Helper function to copy text to clipboard
+  const copyToClipboard = (text: string | number) => {
+    const str = String(text ?? "").trim();
+    if (!str) return;
+    navigator.clipboard.writeText(str).then(() => {
+      alertsuccess("Copied to clipboard!");
+    }).catch(() => console.error("Failed to copy"));
+  };
 
   const handleAdd = () => {
     setFormData({ INSTITUTION_ID: "", EXTERNAL_SUBJECT: "", EXTERNAL_COURSE_ID: "" });
@@ -220,7 +230,25 @@ export default function SkipCourses() {
           refreshTrigger={refreshTrigger}
           ajaxUrl="/api/skipcourses/ajaxlist"
           columns={[
-            { data: "INSTITUTION_ID", name: "Institution ID", searchable: true, orderable: true },
+            { 
+              data: "INSTITUTION_ID", 
+              name: "Institution ID", 
+              searchable: true, 
+              orderable: true,
+              render: (data: any) => {
+                if (!data) return "-";
+                return (
+                  <span 
+                    className="cursor-pointer hover:text-brand-500" 
+                    onClick={() => copyToClipboard(data)}
+                    title="Click to copy"
+                  >
+                    <CopyIcon className="w-4 h-4 me-1" />
+                    {data}
+                  </span>
+                );
+              }
+            },
             { data: "INSTITUTION_NAME", name: "Institution Name", searchable: true, orderable: true },
             { data: "CATEGORY", name: "Category", searchable: true, orderable: true },
             { data: "EXTERNAL_SUBJECT", name: "External Subject", searchable: true, orderable: true },

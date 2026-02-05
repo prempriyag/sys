@@ -6,7 +6,7 @@ import DataTable from "../../../components/ui/DataTable";
 import Button from "../../../components/ui/button/Button";
 import StatusBadge from "../../../components/common/StatusBadge";
 import { API_ENDPOINTS, API_BASE_URL } from "../../../config/api";
-import { RefreshIcon, FilterIcon } from "../../../icons";
+import { RefreshIcon, FilterIcon, CopyIcon } from "../../../icons";
 import { useAuth } from "../../../context/AuthContext";
 import { alertsuccess } from "../../../utils/toast";
 
@@ -159,20 +159,22 @@ export default function DigiScriptReports() {
           ajaxUrl={API_ENDPOINTS.DIGISCRIPT_REPORTS_LIST}
           ajaxData={ajaxData}
           columns={[
-            { data: "INSTITUTION_NAME", name: "College Name", searchable: true, orderable: true },
+            { data: "INSTITUTION_NAME", name: "College Name", searchable: true, orderable: true, width: "180px" },
             { 
               data: "INSTITUTION_ID", 
               name: "Institution ID", 
               searchable: true, 
               orderable: true,
+              width: "120px",
               render: (data: any) => {
                 if (!data) return "-";
                 return (
                   <span 
-                    className="copyinstid cursor-pointer hover:text-brand-500" 
+                    className="cursor-pointer hover:text-brand-500 inline-flex items-center" 
                     onClick={() => copyToClipboard(data)}
+                    title="Click to copy"
                   >
-                    <i className="btn-copy-icon fa-duotone fa-paste me-1"></i>
+                    <CopyIcon className="w-4 h-4 me-1" />
                     {data}
                   </span>
                 );
@@ -183,15 +185,17 @@ export default function DigiScriptReports() {
               name: "Student ID", 
               searchable: true, 
               orderable: true,
+              width: "120px",
               render: (data: any) => {
                 if (!data) return "-";
                 if (hasUpdatePermission) {
                   return (
                     <span 
-                      className="copyinstid cursor-pointer hover:text-brand-500" 
+                      className="cursor-pointer hover:text-brand-500 inline-flex items-center" 
                       onClick={() => copyToClipboard(data)}
+                      title="Click to copy"
                     >
-                      <i className="btn-copy-icon fa-duotone fa-paste me-1"></i>
+                      <CopyIcon className="w-4 h-4 me-1" />
                       {data}
                     </span>
                   );
@@ -199,21 +203,23 @@ export default function DigiScriptReports() {
                 return <span>{data}</span>;
               }
             },
-            { data: "STUDENT_FULL_NAME", name: "Student Name", searchable: true, orderable: true },
+            { data: "STUDENT_FULL_NAME", name: "Student Name", searchable: true, orderable: true, width: "180px" },
             { 
               data: "BATCH_ID", 
               name: "Batch ID", 
               searchable: true, 
               orderable: true,
+              width: "120px",
               render: (data: any) => {
                 if (!data) return "-";
                 return (
-                  <span>
+                  <span className="inline-flex items-center whitespace-nowrap">
                     <span 
-                      className="copyinstid cursor-pointer hover:text-brand-500 me-2" 
+                      className="cursor-pointer hover:text-brand-500 flex-shrink-0 me-1" 
                       onClick={() => copyToClipboard(data)}
+                      title="Click to copy"
                     >
-                      <i className="btn-copy-icon fa-duotone fa-paste me-1"></i>
+                      <CopyIcon className="w-4 h-4" />
                     </span>
                     <a 
                       href={`/college/batchdetails/${data}`}
@@ -231,89 +237,63 @@ export default function DigiScriptReports() {
               name: "Transcript", 
               searchable: false, 
               orderable: false,
+              width: "100px",
               render: (data: any) => {
                 if (!data) return "-";
                 const pdfUrl = getPdfUrl(data);
                 if (!pdfUrl) return "-";
                 return (
                   <a href={pdfUrl} target="_blank" rel="noopener noreferrer" className="text-brand-500 hover:underline">
-                    <i className="fa fa-link me-1"></i>
                     View PDF
                   </a>
                 );
               }
             },
-            // REMOVED: Slate Status column (commented per requirement)
-            // { 
-            //   data: "FOUND_IN_SLATE_YN", 
-            //   name: "Slate Status", 
-            //   searchable: false, 
-            //   orderable: false,
-            //   render: (data: any) => {
-            //     if (!data) return "-";
-            //     return <StatusBadge status={data} size="sm" />;
-            //   }
-            // },
             { 
               data: "TRANSFER_LETTER_FILE_LINK", 
-              name: "Transfer Letter File Link", 
+              name: "Transfer Letter", 
               searchable: false, 
               orderable: false,
+              width: "120px",
               render: (data: any) => {
                 if (!data) return "-";
                 const pdfUrl = data && getPdfUrl(data);
                 if (!pdfUrl) return "-";
                 return (
                   <a href={pdfUrl} target="_blank" rel="noopener noreferrer" className="text-brand-500 hover:underline">
-                    <i className="fa fa-link me-1"></i> Link
+                    Link
                   </a>
                 );
               }
             },
-            { data: "LETTER_SENT_DATE", name: "Letter Sent Date", searchable: false, orderable: false, render: (data: any) => data || "-" },
+            { data: "LETTER_SENT_DATE", name: "Letter Sent Date", searchable: false, orderable: false, width: "120px", render: (data: any) => data || "-" },
             { 
               data: "FOUND_IN_BANNER_YN", 
               name: "Banner Status", 
               searchable: false, 
               orderable: false,
+              width: "100px",
               render: (data: any) => {
                 if (!data) return "-";
                 return <StatusBadge status={data} size="sm" />;
               }
             },
-            { data: "DEGREE_CD", name: "Degree", searchable: false, orderable: false },
-            { 
-              data: "DEGREE_RECEIVED_DATE", 
-              name: "Degree Date", 
-              searchable: false, 
-              orderable: false,
-              render: (data: any) => data || "-"
-            },
-            { data: "SECOND_DEGREE_CD", name: "Second Degree", searchable: false, orderable: false },
-            { 
-              data: "SECOND_DEGREE_RECEIVED_DATE", 
-              name: "Second Degree Date", 
-              searchable: false, 
-              orderable: false,
-              render: (data: any) => data || "-"
-            },
-            { data: "EFFECTIVE_TERM", name: "Effective Term", searchable: false, orderable: false },
-            { data: "OCR_MIN_START_TERM", name: "Start Term", searchable: false, orderable: false },
-            { data: "OCR_MAX_END_TERM", name: "End Term", searchable: false, orderable: false },
-            { data: "LEVEL", name: "Level", searchable: false, orderable: false },
-            { data: "COMMENTS", name: "Comments", searchable: false, orderable: false },
-            { 
-              data: "OCR_EXTRACTED_DATE", 
-              name: "OCR Date", 
-              searchable: false, 
-              orderable: true,
-              render: (data: any) => data || "-"
-            },
+            { data: "DEGREE_CD", name: "Degree", searchable: false, orderable: false, width: "80px", render: (data: any) => data || "-" },
+            { data: "DEGREE_RECEIVED_DATE", name: "Degree Date", searchable: false, orderable: false, width: "110px", render: (data: any) => data || "-" },
+            { data: "SECOND_DEGREE_CD", name: "Second Degree", searchable: false, orderable: false, width: "110px", render: (data: any) => data || "-" },
+            { data: "SECOND_DEGREE_RECEIVED_DATE", name: "Second Degree Date", searchable: false, orderable: false, width: "130px", render: (data: any) => data || "-" },
+            { data: "EFFECTIVE_TERM", name: "Effective Term", searchable: false, orderable: false, width: "110px", render: (data: any) => data || "-" },
+            { data: "OCR_MIN_START_TERM", name: "Start Term", searchable: false, orderable: false, width: "100px", render: (data: any) => data || "-" },
+            { data: "OCR_MAX_END_TERM", name: "End Term", searchable: false, orderable: false, width: "100px", render: (data: any) => data || "-" },
+            { data: "LEVEL", name: "Level", searchable: false, orderable: false, width: "70px", render: (data: any) => data || "-" },
+            { data: "COMMENTS", name: "Comments", searchable: false, orderable: false, width: "300px", render: (data: any) => data || "-" },
+            { data: "OCR_EXTRACTED_DATE", name: "OCR Date", searchable: false, orderable: true, width: "120px", render: (data: any) => data || "-" },
             { 
               data: "STATUS_FLAG", 
               name: "Status", 
               searchable: false, 
               orderable: false,
+              width: "100px",
               render: (data: any) => {
                 if (!data) return "-";
                 return <StatusBadge status={data} size="sm" />;

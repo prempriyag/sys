@@ -6,9 +6,10 @@ import PageContainer, { PageWrapper } from "../../components/common/PageContaine
 import DataTable from "../../components/ui/DataTable";
 import Button from "../../components/ui/button/Button";
 import { API_ENDPOINTS, api } from "../../config/api";
-import { RefreshIcon } from "../../icons";
+import { RefreshIcon, CopyIcon } from "../../icons";
 import { useAuth } from "../../context/AuthContext";
 import StatusBadge from "../../components/common/StatusBadge";
+import { alertsuccess } from "../../utils/toast";
 
 const STATUS_OPTIONS = [
   { value: "", label: "Select Option" },
@@ -31,6 +32,15 @@ export default function SchoolAssignedBatches() {
   const [selectedBatchIds, setSelectedBatchIds] = useState<Set<string>>(new Set());
   const { hasPermission } = useAuth();
   const canReassign = hasPermission("school_ocr_data", "update");
+
+  // Helper function to copy text to clipboard
+  const copyToClipboard = (text: string | number) => {
+    const str = String(text ?? "").trim();
+    if (!str) return;
+    navigator.clipboard.writeText(str).then(() => {
+      alertsuccess("Copied to clipboard!");
+    }).catch(() => console.error("Failed to copy"));
+  };
 
   const ajaxData: Record<string, string> = {};
   if (fieldType) ajaxData.fieldType = fieldType;
@@ -207,12 +217,21 @@ export default function SchoolAssignedBatches() {
               orderable: true,
               render: (data: string) =>
                 data ? (
-                  <Link
-                    to={`/ocrverify/schoolocrbatch?batch_id=${encodeURIComponent(data)}&verify=no`}
-                    className="text-brand-500 hover:underline"
-                  >
-                    {data}
-                  </Link>
+                  <span className="inline-flex items-center whitespace-nowrap">
+                    <span 
+                      className="cursor-pointer hover:text-brand-500 flex-shrink-0 me-1" 
+                      onClick={() => copyToClipboard(data)}
+                      title="Click to copy"
+                    >
+                      <CopyIcon className="w-4 h-4" />
+                    </span>
+                    <Link
+                      to={`/ocrverify/schoolocrbatch?batch_id=${encodeURIComponent(data)}&verify=no`}
+                      className="text-brand-500 hover:underline"
+                    >
+                      {data}
+                    </Link>
+                  </span>
                 ) : (
                   "-"
                 ),

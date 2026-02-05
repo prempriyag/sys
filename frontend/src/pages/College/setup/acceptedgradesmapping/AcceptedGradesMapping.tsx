@@ -8,9 +8,10 @@ import { Modal } from "../../../../components/ui/modal";
 import Input from "../../../../components/form/input/InputField";
 import Label from "../../../../components/form/Label";
 import { api } from "../../../../config/api";
-import { RefreshIcon, PlusIcon, PencilIcon, TrashBinIcon } from "../../../../icons";
+import { RefreshIcon, PlusIcon, PencilIcon, TrashBinIcon, CopyIcon } from "../../../../icons";
 import { useAuth } from "../../../../context/AuthContext";
 import ConfirmationModal from "../../../../components/common/ConfirmationModal";
+import { alertsuccess } from "../../../../utils/toast";
 
 export default function AcceptedGradesMapping() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -29,6 +30,15 @@ export default function AcceptedGradesMapping() {
   const hasAddPermission = hasPermission("accepted_grades_mapping", "ADD");
   const hasUpdatePermission = hasPermission("accepted_grades_mapping", "UPDATE");
   const hasDeletePermission = hasPermission("accepted_grades_mapping", "DELETE");
+
+  // Helper function to copy text to clipboard
+  const copyToClipboard = (text: string | number) => {
+    const str = String(text ?? "").trim();
+    if (!str) return;
+    navigator.clipboard.writeText(str).then(() => {
+      alertsuccess("Copied to clipboard!");
+    }).catch(() => console.error("Failed to copy"));
+  };
 
   const handleAdd = () => {
     setFormData({ INSTITUTION_ID: "", ACCEPTED_GRADE: "", TRANSFER_GRADE: "" });
@@ -256,7 +266,25 @@ export default function AcceptedGradesMapping() {
           refreshTrigger={refreshTrigger}
           ajaxUrl="/api/acceptedgrades/ajaxlist"
           columns={[
-            { data: "INSTITUTION_ID", name: "Institution ID", searchable: true, orderable: true },
+            { 
+              data: "INSTITUTION_ID", 
+              name: "Institution ID", 
+              searchable: true, 
+              orderable: true,
+              render: (data: any) => {
+                if (!data) return "-";
+                return (
+                  <span 
+                    className="cursor-pointer hover:text-brand-500" 
+                    onClick={() => copyToClipboard(data)}
+                    title="Click to copy"
+                  >
+                    <CopyIcon className="w-4 h-4 me-1" />
+                    {data}
+                  </span>
+                );
+              }
+            },
             { data: "ACCEPTED_GRADE", name: "Accepted Grade", searchable: true, orderable: true },
             { data: "TRANSFER_GRADE", name: "Transfer Grade", searchable: true, orderable: true },
             { data: "UPDATED_BY", name: "Updated By", searchable: true, orderable: true },

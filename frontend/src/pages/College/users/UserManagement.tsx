@@ -209,15 +209,48 @@ export default function UserManagement() {
         <DataTable
           refreshTrigger={refreshTrigger}
           columns={[
-            { data: "name", name: "Name", searchable: true, orderable: true },
-            { data: "email", name: "Email", searchable: true, orderable: true },
-            { data: "ROLE_NAME", name: "Role", searchable: true, orderable: true },
-            { data: "permission", name: "Permissions", searchable: true, orderable: false },
+            { data: "name", name: "Name", searchable: true, orderable: true, width: "150px" },
+            { data: "email", name: "Email", searchable: true, orderable: true, width: "220px" },
+            { data: "ROLE_NAME", name: "Role", searchable: true, orderable: true, width: "120px" },
+            { 
+              data: "permission", 
+              name: "Module Permission", 
+              searchable: true, 
+              orderable: false, 
+              width: "280px",
+              render: (data: any, row: any) => {
+                // Try to get permission from data first, then from row
+                const permissionData = data || row?.permission || "";
+                const permissionStr = String(permissionData).trim();
+                
+                if (!permissionStr || permissionStr === "-" || permissionStr === "null" || permissionStr === "undefined") {
+                  return <span className="text-gray-400">-</span>;
+                }
+                
+                // Split permissions and display as badges
+                const permissions = permissionStr.split(", ").filter(Boolean);
+                if (permissions.length === 0) return <span className="text-gray-400">-</span>;
+                
+                return (
+                  <div className="flex flex-wrap gap-1">
+                    {permissions.map((perm: string, idx: number) => (
+                      <span
+                        key={idx}
+                        className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
+                      >
+                        {perm}
+                      </span>
+                    ))}
+                  </div>
+                );
+              }
+            },
             {
               data: "password",
               name: "Reset Password",
               searchable: false,
               orderable: false,
+              width: "130px",
               render: (data: string) => {
                 // Parse the HTML to extract user ID and name
                 const resetMatch = data.match(/getUsername\((\d+)\)/);
@@ -248,6 +281,7 @@ export default function UserManagement() {
               name: "Status",
               searchable: false,
               orderable: false,
+              width: "90px",
               render: (data: string) => {
                 const statusText = extractStatusText(data);
                 const userId = extractStatusUserId(data);
@@ -271,16 +305,17 @@ export default function UserManagement() {
                 );
               },
             },
-            { data: "created_by", name: "Created By", searchable: true, orderable: true },
-            { data: "created_at", name: "Created At", searchable: false, orderable: true },
-            { data: "last_login", name: "Last Login", searchable: false, orderable: true },
-            { data: "updated_by", name: "Updated By", searchable: true, orderable: true },
-            { data: "updated_at", name: "Updated On", searchable: false, orderable: true },
+            { data: "created_by", name: "Created By", searchable: true, orderable: true, width: "120px" },
+            { data: "created_at", name: "Created At", searchable: false, orderable: true, width: "140px" },
+            { data: "last_login", name: "Last Login", searchable: false, orderable: true, width: "140px" },
+            { data: "updated_by", name: "Updated By", searchable: true, orderable: true, width: "120px" },
+            { data: "updated_at", name: "Updated On", searchable: false, orderable: true, width: "140px" },
             {
               data: "actions",
               name: "Actions",
               searchable: false,
               orderable: false,
+              width: "90px",
               render: (data: string) => {
                 // Parse the HTML to extract user IDs
                 const editMatch = data.match(/getUserValue\((\d+)\)/);

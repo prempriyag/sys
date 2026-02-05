@@ -6,7 +6,7 @@ import StatusBadge from "../../../components/common/StatusBadge";
 import InlineEdit from "../../../components/common/InlineEdit";
 import EditableStudentId from "../../../components/transcriptreports/EditableStudentId";
 import RowActions from "../../../components/transcriptreports/RowActions";
-import { EyeIcon, FileIcon } from "../../../icons";
+import { EyeIcon, FileIcon, CopyIcon } from "../../../icons";
 
 export interface ColumnConfig {
   data: string;
@@ -101,11 +101,11 @@ export const createTranscriptReportColumns = (
         // Show with copy icon and inline edit if editable
         return (
           <span className="flex items-center">
-            <i
-              className="btn-copy-icon fa-duotone fa-paste me-1 cursor-pointer hover:text-brand-500"
+            <CopyIcon 
+              className="w-4 h-4 me-1 cursor-pointer hover:text-brand-500"
               onClick={() => copyToClipboard(data)}
               title="Copy to clipboard"
-            ></i>
+            />
             {isEditable ? (
               <InlineEdit
                 value={data}
@@ -233,12 +233,12 @@ export const createTranscriptReportColumns = (
         if (!data) return "-";
         return (
           <span className="copyinstid" id={data}>
-            <i 
-              className="btn-copy-icon fa-duotone fa-paste me-1 cursor-pointer hover:text-brand-500" 
+            <CopyIcon 
+              className="w-4 h-4 me-1 cursor-pointer hover:text-brand-500" 
               onClick={() => copyToClipboard(data)}
               style={{ cursor: "pointer" }}
               title="Copy to clipboard"
-            ></i>
+            />
             <a 
               href={`/school/batchdetails/${data}`}
               target="_blank"

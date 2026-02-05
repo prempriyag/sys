@@ -1,15 +1,23 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useMemo } from "react";
 
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { useSidebar } from "../context/SidebarContext";
 import { useThemeColor } from "../context/ThemeColorContext";
 import { useMenuLayout } from "../context/MenuLayoutContext";
 import { useModule } from "../context/ModuleContext";
+import { useAuth } from "../context/AuthContext";
 import { ThemeToggleButton } from "../components/common/ThemeToggleButton";
 import NotificationDropdown from "../components/header/NotificationDropdown";
 import UserDropdown from "../components/header/UserDropdown";
 import FullscreenToggle from "../components/header/FullscreenToggle";
 import MenuLayoutToggle from "../components/header/MenuLayoutToggle";
+import { 
+  APP_ENV, 
+  IS_PROD, 
+  SHOW_ENV_BADGE, 
+  isProfilerAllowedEmail,
+  PROFILER_ENABLED
+} from "../config/app.config";
 
 const AppHeader: React.FC = () => {
   const { isMobileOpen, toggleSidebar, toggleMobileSidebar } = useSidebar();
@@ -17,6 +25,15 @@ const AppHeader: React.FC = () => {
   const { menuLayout } = useMenuLayout();
   const { currentModule } = useModule();
   const { logoLightUrl, logoDarkUrl } = useThemeColor();
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  // Check if user can access profiler based on their email
+  const showProfiler = useMemo(() => {
+    if (!PROFILER_ENABLED) return false;
+    if (!user?.email) return false;
+    return isProfilerAllowedEmail(user.email);
+  }, [user?.email]);
 
   const handleToggle = () => {
     if (window.innerWidth >= 1024) {
@@ -178,6 +195,40 @@ const AppHeader: React.FC = () => {
 
           {/* Action buttons - All in one row */}
           <div className="flex items-center gap-2 2xsm:gap-3">
+            {/* Profiler Icon - Only for allowed users (configurable via VITE_PROFILER_ALLOWED_DOMAINS) */}
+            {showProfiler && (
+              <button
+                onClick={() => navigate("/profiler")}
+                className="flex items-center justify-center w-10 h-10 text-blue-500 rounded-lg hover:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-900/50 transition-colors"
+                title="System Profiler"
+              >
+                <svg 
+                  className="w-5 h-5 animate-pulse" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                >
+                  <path 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round" 
+                    strokeWidth={2} 
+                    d="M13 10V3L4 14h7v7l9-11h-7z" 
+                  />
+                </svg>
+              </button>
+            )}
+            
+            {/* Environment Badge - Show when not PROD */}
+            {SHOW_ENV_BADGE && !IS_PROD && (
+              <span className={`px-2 py-1 text-xs font-semibold rounded ${
+                APP_ENV === "DEV" 
+                  ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200" 
+                  : "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200"
+              }`}>
+                {APP_ENV === "DEV" ? "Development" : "UAT"}
+              </span>
+            )}
+            
             {/* Menu Layout Toggle - Desktop only */}
             <div className="hidden lg:block">
               <MenuLayoutToggle />

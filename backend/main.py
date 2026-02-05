@@ -2,8 +2,10 @@
 FastAPI Main Application
 """
 import logging
+import os
 from typing import Optional
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 from sqlalchemy import text
@@ -92,6 +94,16 @@ app = FastAPI(
     description="FastAPI backend for OSUCSC portal",
     version="1.0.0"
 )
+
+# Static files for user profile images and other assets
+# Create static/assets directory if it doesn't exist
+STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
+ASSETS_DIR = os.path.join(STATIC_DIR, "assets")
+USERPROFILE_DIR = os.path.join(ASSETS_DIR, "userprofile")
+os.makedirs(USERPROFILE_DIR, exist_ok=True)
+
+# Mount static files for assets (user profile images, etc.)
+app.mount("/assets", StaticFiles(directory=ASSETS_DIR), name="assets")
 
 # CORS: one middleware, set Access-Control-Allow-Origin to request Origin when allowed (local + server)
 import re

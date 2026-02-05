@@ -5,6 +5,8 @@ Based on CI3 Aad_auth.php and Aad_auth_ktech.php implementations
 import logging
 import secrets
 import httpx
+import os
+import base64
 from typing import Dict, Optional, Any
 from urllib.parse import urlencode
 from sqlalchemy.orm import Session
@@ -16,6 +18,9 @@ from datetime import timedelta
 from config.settings import settings
 
 logger = logging.getLogger(__name__)
+
+# Path for storing user profile images
+PROFILE_IMAGE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "assets", "userprofile")
 
 
 def generate_nonce() -> str:
@@ -239,7 +244,17 @@ async def handle_token_response_success(
     # Determine SSO type from config
     sso_type = "ktech" if "ktech" in oauth_config.get('redirect_uri', '').lower() else "client"
     
-    return get_userinfo(user_info, sso_type, db)
+    # Get user info first to get the user_id
+    result = get_userinfo(user_info, sso_type, db)
+    
+    # If login successful, try to fetch and save profile photo
+    if result.get('status') == 1 and result.get('user', {}).get('id'):
+        user_id = result['user']['id']
+        profile_image = await fetch_and_save_profile_photo(access_token, user_id, resource_uri)
+        if profile_image:
+            result['user']['profile_image'] = profile_image
+    
+    return result
 
 
 def get_userinfo(user_data: Dict, sso_type: str, db: Optional[Session] = None) -> Dict[str, Any]:
@@ -343,6 +358,55 @@ def get_userinfo(user_data: Dict, sso_type: str, db: Optional[Session] = None) -
             'status': 0,
             'message': f'Error processing user information: {str(e)}'
         }
+
+
+async def fetch_and_save_profile_photo(access_token: str, user_id: int, resource_uri: str) -> Optional[str]:
+    """
+    Fetch user's profile photo from Microsoft Graph API and save it locally.
+    
+    Args:
+        access_token: OAuth access token
+        user_id: User ID for saving the file
+        resource_uri: Resource URI to determine which API to use
+    
+    Returns:
+        Path to saved image or None if not available
+    """
+    try:
+        # Ensure directory exists
+        os.makedirs(PROFILE_IMAGE_DIR, exist_ok=True)
+        
+        # Determine photo endpoint based on resource URI
+        if 'graph.microsoft.com' in resource_uri:
+            # Microsoft Graph API v1.0
+            photo_endpoint = 'https://graph.microsoft.com/v1.0/me/photo/$value'
+        else:
+            # Azure AD Graph API doesn't reliably support photos
+            # Try Microsoft Graph anyway
+            photo_endpoint = 'https://graph.microsoft.com/v1.0/me/photo/$value'
+        
+        async with httpx.AsyncClient() as client:
+            headers = {'Authorization': f'Bearer {access_token}'}
+            response = await client.get(photo_endpoint, headers=headers, timeout=15.0)
+            
+            if response.status_code == 200:
+                # Save the image
+                image_path = os.path.join(PROFILE_IMAGE_DIR, f"{user_id}.png")
+                with open(image_path, 'wb') as f:
+                    f.write(response.content)
+                logger.info(f"Saved profile photo for user {user_id}")
+                return f"/assets/userprofile/{user_id}.png"
+            elif response.status_code == 404:
+                # No photo available - this is normal
+                logger.debug(f"No profile photo available for user {user_id}")
+                return None
+            else:
+                logger.warning(f"Failed to fetch profile photo: HTTP {response.status_code}")
+                return None
+                
+    except Exception as e:
+        logger.warning(f"Error fetching profile photo: {str(e)}")
+        return None
 
 
 def get_logout_url(oauth_config: Dict, return_to: Optional[str] = None) -> str:

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { DropdownItem } from "../ui/dropdown/DropdownItem";
 import { Dropdown } from "../ui/dropdown/Dropdown";
 import { Link, useNavigate } from "react-router";
@@ -6,11 +6,59 @@ import { useModule } from "../../context/ModuleContext";
 import { useAuth } from "../../context/AuthContext";
 import { ModuleType } from "../../types/menu";
 
+/**
+ * Get initials from a name
+ * Examples:
+ * - "Digiscript Admin" → "DA"
+ * - "Naresh" → "N"
+ * - "Mahesh Budella Tailor" → "MB" (first + second word only)
+ */
+const getInitials = (name: string): string => {
+  if (!name) return "U";
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return "U";
+  if (words.length === 1) return words[0].charAt(0).toUpperCase();
+  // First letter of first word + first letter of second word
+  return (words[0].charAt(0) + words[1].charAt(0)).toUpperCase();
+};
+
+/**
+ * Generate a consistent background color based on the name
+ */
+const getAvatarColor = (name: string): string => {
+  const colors = [
+    "bg-blue-500",
+    "bg-green-500",
+    "bg-purple-500",
+    "bg-pink-500",
+    "bg-indigo-500",
+    "bg-teal-500",
+    "bg-orange-500",
+    "bg-cyan-500",
+  ];
+  // Simple hash to get consistent color for same name
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return colors[Math.abs(hash) % colors.length];
+};
+
 export default function UserDropdown() {
   const [isOpen, setIsOpen] = useState(false);
+  const [imageError, setImageError] = useState(false);
   const { currentModule, setCurrentModule } = useModule();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  
+  // Get initials and color for avatar fallback
+  const initials = useMemo(() => getInitials(user?.name || ""), [user?.name]);
+  const avatarColor = useMemo(() => getAvatarColor(user?.name || "User"), [user?.name]);
+  
+  // Reset image error when user changes
+  useEffect(() => {
+    setImageError(false);
+  }, [user?.id]);
 
   function toggleDropdown() {
     setIsOpen(!isOpen);
@@ -80,15 +128,28 @@ export default function UserDropdown() {
         onClick={toggleDropdown}
         className="flex items-center text-gray-700 dropdown-toggle dark:text-gray-400"
       >
-        <span className="mr-3 overflow-hidden rounded-full h-11 w-11">
-          <img
-            src={user?.id ? `/assets/userprofile/${user.id}.png?time=${Date.now()}` : "/images/user/owner.jpg"}
-            alt="User"
-            onError={(e) => {
-              // Fallback to default image if user profile image doesn't exist
-              (e.target as HTMLImageElement).src = "/images/user/owner.jpg";
-            }}
-          />
+        <span className="mr-3 overflow-hidden rounded-full h-11 w-11 flex-shrink-0">
+          {!imageError && user?.id ? (
+            <img
+              src={
+                // Priority: 1. SSO profile image (from Microsoft Graph)
+                //           2. Local uploaded profile image
+                user?.profile_image 
+                  ? `${user.profile_image}?time=${Date.now()}` 
+                  : `/assets/userprofile/${user.id}.png?time=${Date.now()}`
+              }
+              alt={user?.name || "User"}
+              className="w-full h-full object-cover"
+              onError={() => setImageError(true)}
+            />
+          ) : (
+            <div 
+              className={`w-full h-full flex items-center justify-center text-white font-semibold text-sm ${avatarColor}`}
+              title={user?.name || "User"}
+            >
+              {initials}
+            </div>
+          )}
         </span>
 
         <span className="hidden mr-1 font-medium text-theme-sm lg:block">{userName}</span>

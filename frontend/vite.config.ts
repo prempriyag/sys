@@ -15,4 +15,18 @@ export default defineConfig({
       },
     }),
   ],
+  server: {
+    proxy: {
+      // Proxy /api to backend for API calls
+      "/api": {
+        target: "http://localhost:8000",
+        changeOrigin: true,
+      },
+      // Proxy /assets to backend for user profile images and other assets
+      "/assets": {
+        target: "http://localhost:8000",
+        changeOrigin: true,
+      },
+    },
+  },
 });

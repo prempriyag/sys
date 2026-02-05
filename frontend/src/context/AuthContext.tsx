@@ -24,6 +24,7 @@ interface User {
   ocr_perm: number;
   last_login?: string;
   permissions?: UserPermissions;
+  profile_image?: string; // SSO profile image URL from Microsoft Graph
 }
 
 interface AuthContextType {

@@ -368,6 +368,13 @@ export const collegeMenu: MenuConfig = {
       path: "/college/Help",
       icon: "book",
     },
+    {
+      name: "Profiler",
+      path: "/college/profiler",
+      icon: "gauge",
+      // Access controlled by backend - only KTech users can view
+      // No permission required - page handles its own access control
+    },
   ],
 };
 

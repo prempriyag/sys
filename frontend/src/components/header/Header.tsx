@@ -1,19 +1,53 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { ThemeToggleButton } from "../common/ThemeToggleButton";
 import NotificationDropdown from "./NotificationDropdown";
 import UserDropdown from "./UserDropdown";
 import GlobalSearch from "./GlobalSearch";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { SearchIcon } from "../../icons";
+import { 
+  APP_ENV, 
+  IS_PROD, 
+  SHOW_ENV_BADGE, 
+  isProfilerAllowedEmail,
+  PROFILER_ENABLED,
+  DEBUG_MODE
+} from "../../config/app.config";
+import { useAuth } from "../../context/AuthContext";
 
 // Define the interface for the props
 interface HeaderProps {
   onClick?: () => void; // Optional function that takes no arguments and returns void
   onToggle: () => void;
 }
+
 const Header: React.FC<HeaderProps> = ({ onClick, onToggle }) => {
   const [isApplicationMenuOpen, setApplicationMenuOpen] = useState(false);
   const [isGlobalSearchOpen, setIsGlobalSearchOpen] = useState(false);
+  const navigate = useNavigate();
+  
+  // Get user from AuthContext
+  const { user } = useAuth();
+  
+  // Check if user can access profiler based on their email
+  const showProfiler = useMemo(() => {
+    // Always log for debugging this issue
+    console.log("[Header Debug] PROFILER_ENABLED:", PROFILER_ENABLED);
+    console.log("[Header Debug] User object:", user);
+    console.log("[Header Debug] User email:", user?.email);
+    
+    if (!PROFILER_ENABLED) {
+      console.log("[Header] Profiler disabled via config");
+      return false;
+    }
+    if (!user?.email) {
+      console.log("[Header] No user email found");
+      return false;
+    }
+    const canAccess = isProfilerAllowedEmail(user.email);
+    console.log("[Header] User:", user.email, "Can access profiler:", canAccess);
+    return canAccess;
+  }, [user?.email]);
 
   const toggleApplicationMenu = () => {
     setApplicationMenuOpen(!isApplicationMenuOpen);
@@ -139,6 +173,38 @@ const Header: React.FC<HeaderProps> = ({ onClick, onToggle }) => {
           } items-center justify-between w-full gap-4 px-5 py-4 lg:flex shadow-theme-md lg:justify-end lg:px-0 lg:shadow-none`}
         >
           <div className="flex items-center gap-2 2xsm:gap-3">
+            {/* Profiler Icon - TEMPORARILY FORCED TO SHOW FOR DEBUGGING */}
+            <button
+              onClick={() => navigate("/profiler")}
+              className="flex items-center justify-center w-10 h-10 text-blue-500 rounded-lg hover:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-800 transition-colors"
+              title={`System Profiler (showProfiler=${showProfiler}, user=${user?.email || 'none'})`}
+            >
+              <svg 
+                className="w-5 h-5 animate-pulse" 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round" 
+                  strokeWidth={2} 
+                  d="M13 10V3L4 14h7v7l9-11h-7z" 
+                />
+              </svg>
+            </button>
+            
+            {/* Environment Badge - Show when not PROD (matches CI3 PORTAL__ENV check) */}
+            {SHOW_ENV_BADGE && !IS_PROD && (
+              <span className={`px-2 py-1 text-xs font-semibold rounded ${
+                APP_ENV === "DEV" 
+                  ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200" 
+                  : "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200"
+              }`}>
+                {APP_ENV === "DEV" ? "Development" : "UAT"}
+              </span>
+            )}
+            
             {/* <!-- Dark Mode Toggler --> */}
             <ThemeToggleButton />
             {/* <!-- Dark Mode Toggler --> */}

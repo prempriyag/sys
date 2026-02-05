@@ -103,9 +103,32 @@ export default function SchoolDashboard() {
   }, []);
 
   // Calculate statistics
-  const totalTranscripts = dashboardData.transcriptStatusDonut.series.reduce((a: number, b: number) => a + b, 0);
-  const processedCount = (dashboardData.transcriptStatus.datasets.find((d: any) => d.name === "PROCESSED") as any)?.data?.reduce((a: number, b: number) => a + b, 0) || 0;
-  const failedCount = (dashboardData.transcriptStatus.datasets.find((d: any) => d.name === "FAILED") as any)?.data?.reduce((a: number, b: number) => a + b, 0) || 0;
+  const totalTranscripts = dashboardData.transcriptStatusDonut?.series?.reduce((a: number, b: number) => a + b, 0) || 0;
+  const processedCount = (dashboardData.transcriptStatus?.datasets?.find((d: any) => d.name === "PROCESSED") as any)?.data?.reduce((a: number, b: number) => a + b, 0) || 0;
+  const failedCount = (dashboardData.transcriptStatus?.datasets?.find((d: any) => d.name === "FAILED") as any)?.data?.reduce((a: number, b: number) => a + b, 0) || 0;
+
+  // Helper to check if chart has data
+  const hasChartData = (labels: string[] | undefined, datasets: any[] | undefined) => {
+    return labels && labels.length > 0 && datasets && datasets.length > 0 && datasets.some(d => d?.data?.length > 0);
+  };
+  
+  const hasDonutData = (series: number[] | undefined, labels: string[] | undefined) => {
+    return series && series.length > 0 && labels && labels.length > 0 && series.some(s => s > 0);
+  };
+
+  // No Data Component
+  const NoDataPlaceholder = ({ height = 280 }: { height?: number }) => (
+    <div 
+      className="flex flex-col items-center justify-center text-gray-400 dark:text-gray-500"
+      style={{ height }}
+    >
+      <svg className="w-16 h-16 mb-3 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+      </svg>
+      <p className="text-sm font-medium">No data available</p>
+      <p className="text-xs mt-1">Try adjusting your filters</p>
+    </div>
+  );
 
   // Chart options with glassmorphic styling
   const getBarChartOptions = (categories: string[]): ApexOptions => ({
@@ -463,7 +486,11 @@ export default function SchoolDashboard() {
                     </div>
                   </div>
                   <div className="rounded-lg bg-white/80 p-3 shadow-inner dark:bg-gray-900/50">
-                    <Chart options={getLineChartOptions(dashboardData.transcriptSources.labels)} series={dashboardData.transcriptSources.datasets} type="line" height={280} />
+                    {hasChartData(dashboardData.transcriptSources?.labels, dashboardData.transcriptSources?.datasets) ? (
+                      <Chart options={getLineChartOptions(dashboardData.transcriptSources.labels)} series={dashboardData.transcriptSources.datasets} type="line" height={280} />
+                    ) : (
+                      <NoDataPlaceholder height={280} />
+                    )}
                   </div>
                 </div>
               </div>
@@ -480,29 +507,35 @@ export default function SchoolDashboard() {
                     </div>
                   </div>
                   <div className="rounded-lg bg-white/80 p-3 shadow-inner dark:bg-gray-900/50">
-                    <Chart options={getBarChartOptions(dashboardData.transcriptStatus.labels)} series={dashboardData.transcriptStatus.datasets} type="bar" height={280} />
+                    {hasChartData(dashboardData.transcriptStatus?.labels, dashboardData.transcriptStatus?.datasets) ? (
+                      <Chart options={getBarChartOptions(dashboardData.transcriptStatus.labels)} series={dashboardData.transcriptStatus.datasets} type="bar" height={280} />
+                    ) : (
+                      <NoDataPlaceholder height={280} />
+                    )}
                   </div>
                 </div>
               </div>
 
               {/* Transcripts Processed In Banner */}
-              {dashboardData.transcriptProcessed.labels.length > 0 && (
-                <div className="group relative overflow-hidden rounded-xl border border-gray-200/80 bg-gradient-to-br from-white via-white to-green-50/30 p-5 shadow-lg transition-all duration-300 hover:scale-[1.01] hover:shadow-xl hover:border-green-300 dark:border-gray-700/80 dark:from-gray-800/90 dark:via-gray-800/90 dark:to-green-900/20 dark:hover:border-green-600 lg:col-span-2">
-                  <div className="absolute top-0 right-0 h-20 w-20 bg-green-500/10 rounded-full blur-2xl group-hover:bg-green-500/20 transition-all duration-300"></div>
-                  <div className="relative">
-                    <div className="mb-4 flex items-center justify-between">
-                      <h3 className="text-base font-bold text-gray-800 dark:text-white">Transcripts Processed In Banner</h3>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-gray-500 dark:text-gray-400">Live</span>
-                        <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" title="Live data indicator"></div>
-                      </div>
-                    </div>
-                    <div className="rounded-lg bg-white/80 p-3 shadow-inner dark:bg-gray-900/50">
-                      <Chart options={getLineChartOptions(dashboardData.transcriptProcessed.labels)} series={dashboardData.transcriptProcessed.datasets} type="line" height={280} />
+              <div className="group relative overflow-hidden rounded-xl border border-gray-200/80 bg-gradient-to-br from-white via-white to-green-50/30 p-5 shadow-lg transition-all duration-300 hover:scale-[1.01] hover:shadow-xl hover:border-green-300 dark:border-gray-700/80 dark:from-gray-800/90 dark:via-gray-800/90 dark:to-green-900/20 dark:hover:border-green-600 lg:col-span-2">
+                <div className="absolute top-0 right-0 h-20 w-20 bg-green-500/10 rounded-full blur-2xl group-hover:bg-green-500/20 transition-all duration-300"></div>
+                <div className="relative">
+                  <div className="mb-4 flex items-center justify-between">
+                    <h3 className="text-base font-bold text-gray-800 dark:text-white">Transcripts Processed In Banner</h3>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-500 dark:text-gray-400">Live</span>
+                      <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" title="Live data indicator"></div>
                     </div>
                   </div>
+                  <div className="rounded-lg bg-white/80 p-3 shadow-inner dark:bg-gray-900/50">
+                    {hasChartData(dashboardData.transcriptProcessed?.labels, dashboardData.transcriptProcessed?.datasets) ? (
+                      <Chart options={getLineChartOptions(dashboardData.transcriptProcessed.labels)} series={dashboardData.transcriptProcessed.datasets} type="line" height={280} />
+                    ) : (
+                      <NoDataPlaceholder height={280} />
+                    )}
+                  </div>
                 </div>
-              )}
+              </div>
             </div>
 
             {/* Kickouts Charts - 2 per row */}
@@ -513,7 +546,11 @@ export default function SchoolDashboard() {
                 <div className="relative">
                   <h3 className="mb-4 text-sm font-bold text-gray-800 dark:text-white">Initial Kickouts</h3>
                   <div className="rounded-lg bg-white/80 p-3 shadow-inner dark:bg-gray-900/50">
-                    <Chart options={getBarChartOptions(dashboardData.initialKickouts.labels)} series={dashboardData.initialKickouts.datasets} type="bar" height={250} />
+                    {hasChartData(dashboardData.initialKickouts?.labels, dashboardData.initialKickouts?.datasets) ? (
+                      <Chart options={getBarChartOptions(dashboardData.initialKickouts.labels)} series={dashboardData.initialKickouts.datasets} type="bar" height={250} />
+                    ) : (
+                      <NoDataPlaceholder height={250} />
+                    )}
                   </div>
                 </div>
               </div>
@@ -524,7 +561,11 @@ export default function SchoolDashboard() {
                 <div className="relative">
                   <h3 className="mb-4 text-sm font-bold text-gray-800 dark:text-white">Transcripts Kickouts</h3>
                   <div className="rounded-lg bg-white/80 p-3 shadow-inner dark:bg-gray-900/50">
-                    <Chart options={getBarChartOptions(dashboardData.transcriptKickouts.labels)} series={dashboardData.transcriptKickouts.datasets} type="bar" height={250} />
+                    {hasChartData(dashboardData.transcriptKickouts?.labels, dashboardData.transcriptKickouts?.datasets) ? (
+                      <Chart options={getBarChartOptions(dashboardData.transcriptKickouts.labels)} series={dashboardData.transcriptKickouts.datasets} type="bar" height={250} />
+                    ) : (
+                      <NoDataPlaceholder height={250} />
+                    )}
                   </div>
                 </div>
               </div>
@@ -539,12 +580,16 @@ export default function SchoolDashboard() {
                 <div className="relative">
                   <h3 className="mb-4 text-sm font-bold text-gray-800 dark:text-white">Transcript Status</h3>
                   <div className="rounded-lg bg-white/80 p-3 shadow-inner dark:bg-gray-900/50">
-                    <Chart
-                      options={donutChartOptions(dashboardData.transcriptStatusDonut.labels)}
-                      series={dashboardData.transcriptStatusDonut.series}
-                      type="donut"
-                      height={240}
-                    />
+                    {hasDonutData(dashboardData.transcriptStatusDonut?.series, dashboardData.transcriptStatusDonut?.labels) ? (
+                      <Chart
+                        options={donutChartOptions(dashboardData.transcriptStatusDonut.labels)}
+                        series={dashboardData.transcriptStatusDonut.series}
+                        type="donut"
+                        height={240}
+                      />
+                    ) : (
+                      <NoDataPlaceholder height={240} />
+                    )}
                   </div>
                 </div>
               </div>

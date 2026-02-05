@@ -620,6 +620,20 @@ if school_studentview_controller is not None:
     app.include_router(school_studentview_controller.router)
     print("[MAIN] Successfully registered school studentview_controller router")
 
+# Import profiler controller (for debugging - KTech users only)
+try:
+    from controllers import profiler_controller
+    print("[MAIN] Successfully imported profiler_controller")
+except Exception as e:
+    print(f"[MAIN] ERROR importing profiler_controller: {e}")
+    import traceback
+    traceback.print_exc()
+    profiler_controller = None
+
+if profiler_controller is not None:
+    app.include_router(profiler_controller.router)
+    print("[MAIN] Successfully registered profiler_controller router")
+
 
 @app.get("/")
 async def root():

@@ -4,6 +4,12 @@
 
 :root {
   --color-surface: #ffffff;
+  --gradient-light-1: #f0f4f8;
+  --gradient-light-2: #e8f0f7;
+  --gradient-light-3: #f5f1ff;
+  --gradient-dark-1: #0f172a;
+  --gradient-dark-2: #1e293b;
+  --gradient-dark-3: #1a1a2e;
 }
 
 .dark {
@@ -13,7 +19,7 @@
 /* Global Body Background */
 body, html {
   background-color: var(--color-white, #ffffff);
-  background: linear-gradient(135deg, #f0f4f8 0%, #e8f0f7 50%, #f5f1ff 100%);
+  background: linear-gradient(135deg, var(--gradient-light-1) 0%, var(--gradient-light-2) 50%, var(--gradient-light-3) 100%);
   background-attachment: fixed;
   min-height: 100vh;
   width: 100%;
@@ -23,7 +29,7 @@ body, html {
 
 .dark body, .dark html {
   background-color: var(--color-white, #ffffff);
-  background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #1a1a2e 100%);
+  background: linear-gradient(135deg, var(--gradient-dark-1) 0%, var(--gradient-dark-2) 50%, var(--gradient-dark-3) 100%);
   background-attachment: fixed;
   width: 100%;
   max-width: 100%;
@@ -246,7 +252,7 @@ body, html {
 }
 
 @utility menu-item-active {
-  @apply bg-brand-50 text-brand-500 dark:bg-brand-500/[0.12] dark:text-brand-400;
+  @apply bg-brand-500 text-white dark:bg-gray-900 dark:text-white;
 }
 
 @utility menu-item-inactive {
@@ -258,7 +264,7 @@ body, html {
 }
 
 @utility menu-item-icon-active {
-  @apply text-brand-500 dark:text-brand-400;
+  @apply text-white;
 }
 
 @utility menu-item-icon-size {
@@ -288,7 +294,7 @@ body, html {
 }
 
 @utility menu-dropdown-item-active {
-  @apply bg-brand-50 text-brand-500 dark:bg-brand-500/[0.12] dark:text-brand-400;
+  @apply bg-brand-500 text-white dark:bg-gray-900 dark:text-white;
 }
 
 @utility menu-dropdown-item-inactive {

@@ -22,6 +22,7 @@ import {
   FolderIcon,
   BoxCubeIcon,
   AlertIcon,
+  RefreshIcon,
 } from "../icons";
 
 // Map icon string names to icon components
@@ -37,7 +38,7 @@ export const iconMap: Record<string, React.ComponentType<any>> = {
   database: TaskIcon, // Using TaskIcon as database placeholder
   clock: TimeIcon,
   book: DocsIcon,
-  refresh: BoltIcon,
+  refresh: RefreshIcon,
   calendar: CalenderIcon,
   list: ListIcon,
   table: TableIcon,

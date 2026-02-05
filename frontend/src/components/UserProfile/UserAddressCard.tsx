@@ -4,8 +4,24 @@ import Button from "../ui/button/Button";
 import Input from "../form/input/InputField";
 import Label from "../form/Label";
 
-export default function UserAddressCard() {
+interface UserData {
+  id: number;
+  name: string;
+  email: string;
+  phone?: string;
+  designation?: string;
+  location?: string;
+  bio?: string;
+  avatar?: string;
+}
+
+export default function UserAddressCard({ userData }: { userData?: UserData }) {
   const { isOpen, openModal, closeModal } = useModal();
+  
+  const country = userData?.location?.includes("United States") ? "United States" : userData?.location || "United States";
+  const city = userData?.location || "Phoenix, Arizona";
+  const postalCode = "000000";
+
   const handleSave = () => {
     // Handle save logic here
     console.log("Saving changes...");
@@ -26,7 +42,7 @@ export default function UserAddressCard() {
                   Country
                 </p>
                 <p className="text-sm font-medium text-gray-800 dark:text-white/90">
-                  United States.
+                  {country}
                 </p>
               </div>
 
@@ -35,7 +51,7 @@ export default function UserAddressCard() {
                   City/State
                 </p>
                 <p className="text-sm font-medium text-gray-800 dark:text-white/90">
-                  Phoenix, Arizona, United States.
+                  {city}
                 </p>
               </div>
 
@@ -44,7 +60,7 @@ export default function UserAddressCard() {
                   Postal Code
                 </p>
                 <p className="text-sm font-medium text-gray-800 dark:text-white/90">
-                  ERT 2489
+                  {postalCode}
                 </p>
               </div>
 

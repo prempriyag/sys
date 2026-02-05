@@ -7,16 +7,15 @@ interface RefreshIconProps {
 export const RefreshIcon: React.FC<RefreshIconProps> = ({ className }) => (
   <svg
     className={className}
-    width="16"
-    height="16"
-    viewBox="0 0 16 16"
+    viewBox="0 0 24 24"
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
   >
-    <path
-      d="M8 0C3.58 0 0 3.58 0 8s3.58 8 8 8 8-3.58 8-8h-2c0 3.31-2.69 6-6 6s-6-2.69-6-6 2.69-6 6-6V0l4 4-4 4V6z"
-      fill="currentColor"
-    />
+    <g stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M1 4v6h6" />
+      <path d="M23 20v-6h-6" />
+      <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15" />
+    </g>
   </svg>
 );
 

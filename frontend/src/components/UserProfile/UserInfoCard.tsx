@@ -4,8 +4,27 @@ import Button from "../ui/button/Button";
 import Input from "../form/input/InputField";
 import Label from "../form/Label";
 
-export default function UserInfoCard() {
+interface UserData {
+  id: number;
+  name: string;
+  email: string;
+  phone?: string;
+  designation?: string;
+  location?: string;
+  bio?: string;
+  avatar?: string;
+}
+
+export default function UserInfoCard({ userData }: { userData?: UserData }) {
   const { isOpen, openModal, closeModal } = useModal();
+  
+  // Parse name into first and last name
+  const nameParts = userData?.name?.split(" ") || ["User", ""];
+  const firstName = nameParts[0] || "User";
+  const lastName = nameParts.slice(1).join(" ") || "";
+  const email = userData?.email || "user@example.com";
+  const phone = userData?.phone || "+1 (555) 000-0000";
+
   const handleSave = () => {
     // Handle save logic here
     console.log("Saving changes...");
@@ -25,7 +44,7 @@ export default function UserInfoCard() {
                 First Name
               </p>
               <p className="text-sm font-medium text-gray-800 dark:text-white/90">
-                Musharof
+                {firstName}
               </p>
             </div>
 
@@ -34,7 +53,7 @@ export default function UserInfoCard() {
                 Last Name
               </p>
               <p className="text-sm font-medium text-gray-800 dark:text-white/90">
-                Chowdhury
+                {lastName}
               </p>
             </div>
 
@@ -43,7 +62,7 @@ export default function UserInfoCard() {
                 Email address
               </p>
               <p className="text-sm font-medium text-gray-800 dark:text-white/90">
-                randomuser@pimjo.com
+                {email}
               </p>
             </div>
 
@@ -52,7 +71,7 @@ export default function UserInfoCard() {
                 Phone
               </p>
               <p className="text-sm font-medium text-gray-800 dark:text-white/90">
-                +09 363 398 46
+                {phone}
               </p>
             </div>
 

@@ -4,6 +4,9 @@ import PageMeta from "../../../../components/common/PageMeta";
 import PageContainer, { PageWrapper } from "../../../../components/common/PageContainer";
 import DataTable from "../../../../components/ui/DataTable";
 import Button from "../../../../components/ui/button/Button";
+import { Modal } from "../../../../components/ui/modal";
+import Input from "../../../../components/form/input/InputField";
+import Label from "../../../../components/form/Label";
 import { API_BASE_URL } from "../../../../config/api";
 import { RefreshIcon, PlusIcon, PencilIcon, TrashBinIcon } from "../../../../icons";
 import { useAuth } from "../../../../context/AuthContext";
@@ -124,24 +127,21 @@ export default function DegreeMapping() {
           <h3 className="font-semibold text-gray-800 text-theme-xl dark:text-white/90 sm:text-2xl">
             View Degrees
           </h3>
-          <div className="flex items-center gap-2">
-            <Button
-              onClick={() => setRefreshTrigger((prev) => prev + 1)}
-              variant="outline"
-              startIcon={<RefreshIcon className="w-5 h-5" />}
-            >
-              Refresh Data
-            </Button>
-            {hasAddPermission && (
-              <Button
-                onClick={handleAdd}
-                startIcon={<PlusIcon className="w-5 h-5" />}
-              >
-                Add Degree
-              </Button>
-            )}
-          </div>
+          <Button
+            onClick={() => setRefreshTrigger((prev) => prev + 1)}
+            variant="outline"
+            startIcon={<RefreshIcon className="w-5 h-5" />}
+          >
+            Refresh Data
+          </Button>
         </div>
+        {hasAddPermission && (
+          <div className="mb-4 flex justify-center">
+            <Button onClick={handleAdd}>
+              Add Degree
+            </Button>
+          </div>
+        )}
 
         {message && (
           <div className={`mb-4 p-4 rounded-lg ${
@@ -199,102 +199,96 @@ export default function DegreeMapping() {
         />
 
         {/* Add Modal */}
-        {showAddModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold">Add Degree</h3>
-                <button
-                  onClick={() => setShowAddModal(false)}
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  ×
-                </button>
-              </div>
-              <form onSubmit={(e) => handleSubmit(e, false)}>
-                <div className="mb-4">
-                  <label className="block text-sm font-medium mb-2">Degree Code *</label>
-                  <input
-                    type="text"
-                    value={formData.DEGREE_CD}
-                    onChange={(e) => setFormData({ ...formData, DEGREE_CD: e.target.value })}
-                    required
-                    className="w-full px-4 py-2 border rounded-lg"
-                  />
-                </div>
-                <div className="mb-4">
-                  <label className="block text-sm font-medium mb-2">Degree Name *</label>
-                  <input
-                    type="text"
-                    value={formData.DEGREE_NAME}
-                    onChange={(e) => setFormData({ ...formData, DEGREE_NAME: e.target.value })}
-                    required
-                    className="w-full px-4 py-2 border rounded-lg"
-                  />
-                </div>
-                <div className="flex gap-2 justify-end">
-                  <Button type="submit">Submit</Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setShowAddModal(false)}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </form>
-            </div>
+        <Modal isOpen={showAddModal} onClose={() => setShowAddModal(false)} className="max-w-md">
+          {/* Modal Header */}
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+            <h3 className="text-xl font-semibold text-gray-800 dark:text-white">
+              Add Degree
+            </h3>
           </div>
-        )}
+
+          {/* Modal Body */}
+          <div className="p-6">
+            <form onSubmit={(e) => handleSubmit(e, false)} className="space-y-4">
+              <div>
+                <Label>Degree Code *</Label>
+                <Input
+                  value={formData.DEGREE_CD}
+                  onChange={(e) => setFormData({ ...formData, DEGREE_CD: e.target.value })}
+                  placeholder="Enter Degree Code"
+                />
+              </div>
+              <div>
+                <Label>Degree Name *</Label>
+                <Input
+                  value={formData.DEGREE_NAME}
+                  onChange={(e) => setFormData({ ...formData, DEGREE_NAME: e.target.value })}
+                  placeholder="Enter Degree Name"
+                />
+              </div>
+              <div className="flex gap-4 pt-4">
+                <Button type="submit" className="flex-1">Submit</Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowAddModal(false)}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          </div>
+        </Modal>
 
         {/* Edit Modal */}
-        {showEditModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold">Edit Degree</h3>
-                <button
-                  onClick={() => setShowEditModal(false)}
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  ×
-                </button>
-              </div>
-              <form onSubmit={(e) => handleSubmit(e, true)}>
-                <div className="mb-4">
-                  <label className="block text-sm font-medium mb-2">Degree Code *</label>
-                  <input
-                    type="text"
-                    value={formData.DEGREE_CD}
-                    onChange={(e) => setFormData({ ...formData, DEGREE_CD: e.target.value })}
-                    required
-                    className="w-full px-4 py-2 border rounded-lg"
-                  />
-                </div>
-                <div className="mb-4">
-                  <label className="block text-sm font-medium mb-2">Degree Name *</label>
-                  <input
-                    type="text"
-                    value={formData.DEGREE_NAME}
-                    onChange={(e) => setFormData({ ...formData, DEGREE_NAME: e.target.value })}
-                    required
-                    className="w-full px-4 py-2 border rounded-lg"
-                  />
-                </div>
-                <div className="flex gap-2 justify-end">
-                  <Button type="submit">Update</Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setShowEditModal(false)}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </form>
-            </div>
+        <Modal isOpen={showEditModal} onClose={() => {
+          setShowEditModal(false);
+          setEditingId(null);
+        }} className="max-w-md">
+          {/* Modal Header */}
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+            <h3 className="text-xl font-semibold text-gray-800 dark:text-white">
+              Edit Degree
+            </h3>
           </div>
-        )}
+
+          {/* Modal Body */}
+          <div className="p-6">
+            <form onSubmit={(e) => handleSubmit(e, true)} className="space-y-4">
+              <div>
+                <Label>Degree Code *</Label>
+                <Input
+                  value={formData.DEGREE_CD}
+                  onChange={(e) => setFormData({ ...formData, DEGREE_CD: e.target.value })}
+                  placeholder="Enter Degree Code"
+                />
+              </div>
+              <div>
+                <Label>Degree Name *</Label>
+                <Input
+                  value={formData.DEGREE_NAME}
+                  onChange={(e) => setFormData({ ...formData, DEGREE_NAME: e.target.value })}
+                  placeholder="Enter Degree Name"
+                />
+              </div>
+              <div className="flex gap-4 pt-4">
+                <Button type="submit" className="flex-1">Update</Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setShowEditModal(false);
+                    setEditingId(null);
+                  }}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          </div>
+        </Modal>
       </PageContainer>
     </PageWrapper>
   );

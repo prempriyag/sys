@@ -237,11 +237,13 @@ export default function TermMapping() {
       <PageContainer>
         <div className="mb-3 flex items-center justify-between">
           <h3 className="font-semibold text-gray-800 text-theme-xl dark:text-white/90 sm:text-2xl">View Terms</h3>
-          <div className="flex items-center gap-2">
-            <Button onClick={() => setRefreshTrigger((prev) => prev + 1)} variant="outline" startIcon={<RefreshIcon className="w-5 h-5" />}>Refresh Data</Button>
-            {hasAddPermission && <Button onClick={() => setShowAddModal(true)} startIcon={<PlusIcon className="w-5 h-5" />}>Add Term</Button>}
-          </div>
+          <Button onClick={() => setRefreshTrigger((prev) => prev + 1)} variant="outline" startIcon={<RefreshIcon className="w-5 h-5" />}>Refresh Data</Button>
         </div>
+        {hasAddPermission && (
+          <div className="mb-4 flex justify-center">
+            <Button onClick={() => setShowAddModal(true)}>Add Term</Button>
+          </div>
+        )}
 
         {/* Success/Error Message Banner */}
         {message && (

@@ -39,7 +39,7 @@ export const createTranscriptReportColumns = (
   }
 ): ColumnConfig[] => {
   const { copyToClipboard, getPdfUrl, navigate, handleInlineEdit, validateInstitution, handleActionChange, handleCommentChange, handleScenarioChange, rowChanges } = helpers || {};
-  
+
   const columns: ColumnConfig[] = [
     // Column 0: INSTITUTION_NAME
     {
@@ -49,7 +49,7 @@ export const createTranscriptReportColumns = (
       orderable: true,
       width: "200px",
     },
-    
+
     // Column 1: INSTITUTION_ID - with inline editing support
     {
       data: "INSTITUTION_ID",
@@ -60,21 +60,21 @@ export const createTranscriptReportColumns = (
       render: (data: any, row: any) => {
         const batchId = row.BATCH_ID || "";
         const searchField = row._search_field || "";
-        
+
         // Check if this row has pending changes (action selected)
         const hasPendingChanges = rowChanges?.get?.(batchId);
         const hasActionSelected = hasPendingChanges && (
           (hasPendingChanges.reprocessTranscript && hasPendingChanges.reprocessTranscript !== "0") ||
           (hasPendingChanges.articulationProcess && hasPendingChanges.articulationProcess !== "0")
         );
-        
+
         // Show editable if: has permission AND (Failed/Rerun type OR action is selected)
         const isEditable = hasUpdatePermission && batchId && (
-          searchField === "Failed" || 
-          searchField === "Rerun" || 
+          searchField === "Failed" ||
+          searchField === "Rerun" ||
           hasActionSelected
         );
-        
+
         if (!data || data === "NONE") {
           // Show editable input if empty and editable
           if (isEditable) {
@@ -97,15 +97,16 @@ export const createTranscriptReportColumns = (
           }
           return "-";
         }
-        
+
         // Show with copy icon and inline edit if editable
         return (
           <span className="flex items-center">
-            <CopyIcon 
-              className="w-4 h-4 me-1 cursor-pointer hover:text-brand-500"
-              onClick={() => copyToClipboard(data)}
-              title="Copy to clipboard"
-            />
+            <span title="Copy to clipboard">
+              <CopyIcon
+                className="w-4 h-4 me-1 cursor-pointer hover:text-brand-500"
+                onClick={() => copyToClipboard(data)}
+              />
+            </span>
             {isEditable ? (
               <InlineEdit
                 value={data}
@@ -128,7 +129,7 @@ export const createTranscriptReportColumns = (
         );
       },
     },
-    
+
     // Column 2: EXTERNAL_INSTITUTION_ZIPCODE (notvisible)
     {
       data: "EXTERNAL_INSTITUTION_ZIPCODE",
@@ -137,7 +138,7 @@ export const createTranscriptReportColumns = (
       orderable: true,
       visible: false, // notvisible
     },
-    
+
     // Column 3: STUDENT_ID (text-center) - with inline editing support
     // Matching CI3: Shows edit icon for Failed/Rerun types, link for Processed/equivalenthours
     // When action is selected (Processed/Reprocess), empty IDs become editable
@@ -157,7 +158,7 @@ export const createTranscriptReportColumns = (
           (hasPendingChanges.reprocessTranscript && hasPendingChanges.reprocessTranscript !== "0") ||
           (hasPendingChanges.articulationProcess && hasPendingChanges.articulationProcess !== "0")
         );
-        
+
         return (
           <EditableStudentId
             value={data || ""}
@@ -173,7 +174,7 @@ export const createTranscriptReportColumns = (
         );
       },
     },
-    
+
     // Column 5: STUDENT_FULL_NAME (text-center)
     {
       data: "STUDENT_FULL_NAME",
@@ -183,7 +184,7 @@ export const createTranscriptReportColumns = (
       textCenter: true,
       width: "200px",
     },
-    
+
     // Column 6: STUDENT_FIRST_NAME (notvisible)
     {
       data: "STUDENT_FIRST_NAME",
@@ -192,7 +193,7 @@ export const createTranscriptReportColumns = (
       orderable: true,
       visible: false, // notvisible
     },
-    
+
     // Column 7: STUDENT_LAST_NAME (notvisible)
     {
       data: "STUDENT_LAST_NAME",
@@ -201,7 +202,7 @@ export const createTranscriptReportColumns = (
       orderable: true,
       visible: false, // notvisible
     },
-    
+
     // Column 8: DATE_OF_BIRTH (notvisible)
     {
       data: "DATE_OF_BIRTH",
@@ -210,7 +211,7 @@ export const createTranscriptReportColumns = (
       orderable: true,
       visible: false, // notvisible
     },
-    
+
     // Column 9: SSN (notvisible, text-center)
     {
       data: "SSN",
@@ -220,7 +221,7 @@ export const createTranscriptReportColumns = (
       visible: false, // notvisible
       textCenter: true,
     },
-    
+
     // Column 10: BATCH_ID (text-center)
     {
       data: "BATCH_ID",
@@ -233,13 +234,14 @@ export const createTranscriptReportColumns = (
         if (!data) return "-";
         return (
           <span className="copyinstid" id={data}>
-            <CopyIcon 
-              className="w-4 h-4 me-1 cursor-pointer hover:text-brand-500" 
+            <span title="Copy to clipboard">
+            <CopyIcon
+              className="w-4 h-4 me-1 cursor-pointer hover:text-brand-500"
               onClick={() => copyToClipboard(data)}
               style={{ cursor: "pointer" }}
-              title="Copy to clipboard"
             />
-            <a 
+            </span>
+            <a
               href={`/school/batchdetails/${data}`}
               target="_blank"
               rel="noopener noreferrer"
@@ -252,7 +254,7 @@ export const createTranscriptReportColumns = (
         );
       },
     },
-    
+
     // Column 11: CGPA (notvisible)
     {
       data: "CGPA",
@@ -261,7 +263,7 @@ export const createTranscriptReportColumns = (
       orderable: true,
       visible: false, // notvisible
     },
-    
+
     // Column 12: TOTAL_CREDITS_EARNED (notvisible, text-center)
     {
       data: "TOTAL_CREDITS_EARNED",
@@ -271,7 +273,7 @@ export const createTranscriptReportColumns = (
       visible: false, // notvisible
       textCenter: true,
     },
-    
+
     // Column 13: TOTAL_CREDITS_ATTENDED (notvisible, text-center)
     {
       data: "TOTAL_CREDITS_ATTENDED",
@@ -281,7 +283,7 @@ export const createTranscriptReportColumns = (
       visible: false, // notvisible
       textCenter: true,
     },
-    
+
     // Column 14: DEGREE_CD (notvisible)
     {
       data: "DEGREE_CD",
@@ -290,7 +292,7 @@ export const createTranscriptReportColumns = (
       orderable: true,
       visible: false, // notvisible
     },
-    
+
     // Column 15: DEGREE_RECEIVED_DATE (notvisible)
     {
       data: "DEGREE_RECEIVED_DATE",
@@ -299,7 +301,7 @@ export const createTranscriptReportColumns = (
       orderable: true,
       visible: false, // notvisible
     },
-    
+
     // Column 16: SECOND_DEGREE_CD (notvisible)
     {
       data: "SECOND_DEGREE_CD",
@@ -308,7 +310,7 @@ export const createTranscriptReportColumns = (
       orderable: true,
       visible: false, // notvisible
     },
-    
+
     // Column 17: SECOND_DEGREE_RECEIVED_DATE (notvisible)
     {
       data: "SECOND_DEGREE_RECEIVED_DATE",
@@ -317,7 +319,7 @@ export const createTranscriptReportColumns = (
       orderable: true,
       visible: false, // notvisible
     },
-    
+
     // Column 20: STATUS_BANNER (noorder)
     {
       data: "STATUS_BANNER",
@@ -330,7 +332,7 @@ export const createTranscriptReportColumns = (
         return <StatusBadge status={data} size="sm" />;
       },
     },
-    
+
     // Column 21: STATUS_BDMS
     {
       data: "STATUS_BDMS",
@@ -343,7 +345,7 @@ export const createTranscriptReportColumns = (
         return <StatusBadge status={data} size="sm" />;
       },
     },
-    
+
     // Column 22: SCENARIO (notvisible)
     {
       data: "SCENARIO",
@@ -352,7 +354,7 @@ export const createTranscriptReportColumns = (
       orderable: true,
       visible: false, // notvisible
     },
-    
+
     // Column 23: COMMENTS (notvisible)
     {
       data: "COMMENTS",
@@ -361,7 +363,7 @@ export const createTranscriptReportColumns = (
       orderable: true,
       visible: false, // notvisible
     },
-    
+
     // Column 24: ERROR_REASON
     {
       data: "ERROR_REASON",
@@ -375,7 +377,7 @@ export const createTranscriptReportColumns = (
       },
     },
   ];
-  
+
   // Column 25: ERROR_SCREENSHOT (notexport) - only if not Processed or equivalenthours
   if (type !== "Processed" && type !== "equivalenthours") {
     columns.push({
@@ -408,7 +410,7 @@ export const createTranscriptReportColumns = (
       },
     });
   }
-  
+
   // Column 26: TRANSCRIPT_LINK (notexport)
   columns.push({
     data: "TRANSCRIPT_LINK",
@@ -432,7 +434,7 @@ export const createTranscriptReportColumns = (
       );
     },
   });
-  
+
   // Column 27: SOURCE_TYPE (notvisible)
   columns.push({
     data: "SOURCE_TYPE",
@@ -441,7 +443,7 @@ export const createTranscriptReportColumns = (
     orderable: true,
     visible: false, // notvisible
   });
-  
+
   // Column 28: TRANSCRIPT_STATUS_FLAG
   columns.push({
     data: "TRANSCRIPT_STATUS_FLAG",
@@ -454,17 +456,17 @@ export const createTranscriptReportColumns = (
       return <StatusBadge status={data} size="sm" />;
     },
   });
-  
+
   // Column 30: ACTION (notexport, noorder) - only if not Processed, equivalenthours, or empty
   if (type !== "Processed" && type !== "equivalenthours" && type !== "") {
     // Debug: Check if handlers are provided (helpers are already captured in closure from line 41)
     if (!handleActionChange) {
-      console.error('columnConfig: handleActionChange is missing in helpers!', { 
+      console.error('columnConfig: handleActionChange is missing in helpers!', {
         helpersKeys: helpers ? Object.keys(helpers) : 'helpers is undefined',
-        helpers 
+        helpers
       });
     }
-    
+
     columns.push({
       data: "ACTION",
       name: "Action",
@@ -474,7 +476,7 @@ export const createTranscriptReportColumns = (
       width: "160px",
       render: (_data: any, row: any) => {
         if (!hasUpdatePermission) return "-";
-        
+
         return (
           <RowActions
             row={row}
@@ -483,15 +485,15 @@ export const createTranscriptReportColumns = (
             onActionChange={handleActionChange || ((action: string, batchId: string, data: any) => {
               console.error('RowActions: Using fallback empty handler!', { action, batchId, data });
             })}
-            onCommentChange={handleCommentChange || (() => {})}
-            onScenarioChange={handleScenarioChange || (() => {})}
+            onCommentChange={handleCommentChange || (() => { })}
+            onScenarioChange={handleScenarioChange || (() => { })}
             rowChanges={rowChanges}
           />
         );
       },
     });
   }
-  
+
   // Column 31-32: LETTER_SENT_DATE and TRANSFER_LETTER_FILE_LINK - only for Processed or equivalenthours
   if (type === "Processed" || type === "equivalenthours") {
     columns.push({
@@ -521,7 +523,7 @@ export const createTranscriptReportColumns = (
       },
     });
   }
-  
+
   // Column 33: USER_COMMENTS (noorder) - editable textarea when actions are selected
   columns.push({
     data: "USER_COMMENTS",
@@ -529,22 +531,22 @@ export const createTranscriptReportColumns = (
     searchable: false,
     orderable: false, // noorder
     width: "280px",
-      render: (data: any, row: any) => {
-        const searchField = row._search_field || "";
-        const batchId = row.BATCH_ID || "";
-      
+    render: (data: any, row: any) => {
+      const searchField = row._search_field || "";
+      const batchId = row.BATCH_ID || "";
+
       // For Processed/equivalenthours, show plain text
       if (searchField === "Processed" || searchField === "equivalenthours") {
         return <span>{data || "-"}</span>;
       }
-      
+
       // For other types, show editable textarea if user has permission
       if (hasUpdatePermission && batchId) {
         // Get the current comment value from rowChanges if it exists, otherwise use data
         // If comment is explicitly undefined in rowChanges, it means it was cleared, so use data
         const rowChange = rowChanges?.get?.(batchId);
         let currentComment: string;
-        
+
         if (rowChange && 'comment' in rowChange) {
           // Comment exists in rowChanges - use it (even if empty string, which means cleared)
           currentComment = rowChange.comment !== undefined ? (rowChange.comment || "") : (data || "");
@@ -552,7 +554,7 @@ export const createTranscriptReportColumns = (
           // No comment in rowChanges, use original data
           currentComment = data || "";
         }
-        
+
         return (
           <textarea
             className="usercomment w-full rounded border border-gray-300 px-2 py-1 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white"
@@ -567,11 +569,11 @@ export const createTranscriptReportColumns = (
           />
         );
       }
-      
+
       return <span className="text-sm">{data || "-"}</span>;
     },
   });
-  
+
   // Column 34: LAST_UPDATED_DATETIME (defaultOrderby)
   columns.push({
     data: "LAST_UPDATED_DATETIME",
@@ -580,7 +582,7 @@ export const createTranscriptReportColumns = (
     orderable: true,
     defaultOrder: true, // defaultOrderby
   });
-  
+
   // Column 35: UPDATED_BY
   columns.push({
     data: "UPDATED_BY",
@@ -588,7 +590,7 @@ export const createTranscriptReportColumns = (
     searchable: true,
     orderable: true,
   });
-  
+
   // Column 36: PROCESS_STATUS
   columns.push({
     data: "PROCESS_STATUS",
@@ -600,7 +602,7 @@ export const createTranscriptReportColumns = (
       return <StatusBadge status={data} size="sm" />;
     },
   });
-  
+
   return columns;
 };
 

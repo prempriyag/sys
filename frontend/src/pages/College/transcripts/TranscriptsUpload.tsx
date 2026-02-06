@@ -145,43 +145,58 @@ export default function TranscriptsUpload() {
                 <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Select Source <span className="text-red-500">*</span>
                 </label>
-                <select
-                  value={sourceType}
-                  onChange={(e) => setSourceType(e.target.value)}
-                  required
-                  className="relative w-full appearance-none rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 outline-none focus:border-brand-500 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:focus:border-brand-800"
-                >
-                  <option value="">Select Source</option>
-                  {sources.map(source => (
-                    <option key={source} value={source}>
-                      {source}
-                    </option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <select
+                    value={sourceType}
+                    onChange={(e) => setSourceType(e.target.value)}
+                    required
+                    className="relative w-full appearance-none rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 pr-10 text-sm text-gray-800 outline-none focus:border-brand-500 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:focus:border-brand-800"
+                  >
+                    <option value="">Select Source</option>
+                    {sources.map(source => (
+                      <option key={source} value={source}>
+                        {source}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2">
+                    <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </span>
+                </div>
               </div>
 
               <div>
                 <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                   PDF File <span className="text-red-500">*</span>
                 </label>
-                <input
-                  id="transcript_files"
-                  type="file"
-                  accept="application/pdf"
-                  multiple
-                  onChange={handleFileChange}
-                  required
-                  className="relative w-full appearance-none rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 outline-none focus:border-brand-500 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:focus:border-brand-800"
-                />
-                {selectedFiles.length > 0 && (
-                  <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                    {selectedFiles.length} file(s) selected
-                  </p>
-                )}
+                <div className="flex items-center gap-3">
+                  <label 
+                    htmlFor="transcript_files" 
+                    className="cursor-pointer inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-white/90 dark:hover:bg-gray-700"
+                  >
+                    Choose Files
+                  </label>
+                  <span className="text-sm text-gray-500 dark:text-gray-400">
+                    {selectedFiles.length > 0 
+                      ? `${selectedFiles.length} file(s) selected` 
+                      : "No file chosen"}
+                  </span>
+                  <input
+                    id="transcript_files"
+                    type="file"
+                    accept="application/pdf"
+                    multiple
+                    onChange={handleFileChange}
+                    required
+                    className="hidden"
+                  />
+                </div>
               </div>
             </div>
 
-            <div className="flex gap-4">
+            <div className="flex justify-center">
               <Button
                 type="submit"
                 disabled={uploading}

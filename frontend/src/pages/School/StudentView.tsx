@@ -402,7 +402,7 @@ export default function StudentView() {
                       onChange={(e) => setSearchQuery(e.target.value)}
                       onFocus={() => setIsInputFocused(true)}
                       placeholder={studentId ? getStudentDisplayName() : "Search by Student Name or ID..."}
-                      className="w-full max-w-md rounded-lg border border-blue-500 bg-white px-4 py-2.5 pr-10 text-sm text-gray-800 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                      className="w-full rounded-lg border border-blue-500 bg-white px-4 py-2.5 pr-10 text-sm text-gray-800 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
                     />
                     {studentData && studentData.total_transcripts > 0 && (
                       <span className="absolute right-12 top-1/2 -translate-y-1/2 inline-flex items-center justify-center rounded-full bg-red-500 h-6 w-6 text-xs font-medium text-white">
@@ -426,7 +426,7 @@ export default function StudentView() {
                     {/* Dropdown Results - Show when input is focused and has students to display */}
                     {isInputFocused && filteredStudents.length > 0 && (
                       <div 
-                        className="absolute z-50 mt-1 w-full max-w-md bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-auto"
+                        className="absolute z-50 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-80 overflow-auto"
                       >
                         {filteredStudents.map((student, index) => {
                           const displayText = student.STUDENT_FULL_NAME

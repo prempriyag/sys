@@ -65,7 +65,9 @@ const TableCell: React.FC<TableCellProps> = ({
   style,
 }) => {
   const CellTag = isHeader ? "th" : "td";
-  return <CellTag className={` ${className}`} colSpan={colSpan} style={style}>{children}</CellTag>;
+  // Add border-r for column separators (except last column handled by parent)
+  const borderClass = "border-r border-gray-200 dark:border-gray-700 last:border-r-0";
+  return <CellTag className={`${borderClass} ${className}`} colSpan={colSpan} style={style}>{children}</CellTag>;
 };
 
 export { Table, TableHeader, TableBody, TableRow, TableCell };

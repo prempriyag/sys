@@ -123,11 +123,29 @@ export const ThemeColorProvider: React.FC<{ children: ReactNode }> = ({ children
       950: `rgb(${Math.max(0, r - 100)}, ${Math.max(0, g - 100)}, ${Math.max(0, b - 100)})`,
     };
 
+    // Calculate light gradient colors - much lighter/brighter for light mode
+    const lightGradient1 = `rgb(${Math.min(255, r + 245)}, ${Math.min(255, g + 245)}, ${Math.min(255, b + 245)})`;
+    const lightGradient2 = `rgb(${Math.min(255, r + 240)}, ${Math.min(255, g + 240)}, ${Math.min(255, b + 240)})`;
+    const lightGradient3 = `rgb(${Math.min(255, r + 248)}, ${Math.min(255, g + 248)}, ${Math.min(255, b + 248)})`;
+
+    // Calculate dark gradient colors - keep neutral dark tones to avoid theme tinting
+    const darkGradient1 = "#0f172a";
+    const darkGradient2 = "#1e293b";
+    const darkGradient3 = "#1a1a2e";
+
     // Update CSS variables
     const root = document.documentElement;
     Object.entries(shades).forEach(([shade, value]) => {
       root.style.setProperty(`--color-brand-${shade}`, value);
     });
+
+    // Update gradient colors
+    root.style.setProperty("--gradient-light-1", lightGradient1);
+    root.style.setProperty("--gradient-light-2", lightGradient2);
+    root.style.setProperty("--gradient-light-3", lightGradient3);
+    root.style.setProperty("--gradient-dark-1", darkGradient1);
+    root.style.setProperty("--gradient-dark-2", darkGradient2);
+    root.style.setProperty("--gradient-dark-3", darkGradient3);
     
     // Force browser to recalculate styles by triggering a DOM reflow
     // This is crucial for dark mode to pick up new colors

@@ -4,8 +4,25 @@ import Button from "../ui/button/Button";
 import Input from "../form/input/InputField";
 import Label from "../form/Label";
 
-export default function UserMetaCard() {
+interface UserData {
+  id: number;
+  name: string;
+  email: string;
+  phone?: string;
+  designation?: string;
+  location?: string;
+  bio?: string;
+  avatar?: string;
+}
+
+export default function UserMetaCard({ userData }: { userData?: UserData }) {
   const { isOpen, openModal, closeModal } = useModal();
+  
+  const displayName = userData?.name || "User";
+  const displayDesignation = userData?.designation || "Team Member";
+  const displayLocation = userData?.location || "United States";
+  const displayAvatar = userData?.avatar || "/images/user/owner.jpg";
+
   const handleSave = () => {
     // Handle save logic here
     console.log("Saving changes...");
@@ -17,19 +34,19 @@ export default function UserMetaCard() {
         <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex flex-col items-center w-full gap-6 xl:flex-row">
             <div className="w-20 h-20 overflow-hidden border border-gray-200 rounded-full dark:border-gray-800">
-              <img src="/images/user/owner.jpg" alt="user" />
+              <img src={displayAvatar} alt={displayName} />
             </div>
             <div className="order-3 xl:order-2">
               <h4 className="mb-2 text-lg font-semibold text-center text-gray-800 dark:text-white/90 xl:text-left">
-                Musharof Chowdhury
+                {displayName}
               </h4>
               <div className="flex flex-col items-center gap-1 text-center xl:flex-row xl:gap-3 xl:text-left">
                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Team Manager
+                  {displayDesignation}
                 </p>
                 <div className="hidden h-3.5 w-px bg-gray-300 dark:bg-gray-700 xl:block"></div>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Arizona, United States
+                  {displayLocation}
                 </p>
               </div>
             </div>

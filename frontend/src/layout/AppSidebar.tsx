@@ -107,62 +107,46 @@ const AppSidebar: React.FC = () => {
 
   // Initialize open submenus based on active route
   useEffect(() => {
+    // Reset all submenus first, then only open the ones containing active routes
+    const newOpenSubmenu: Record<string, boolean> = {};
+    
     const checkActiveMenu = (
       items: MenuItem[],
       parentKey: string = ""
-    ): void => {
+    ): boolean => {
+      let hasAnyActive = false;
       items.forEach((item, index) => {
         const key = parentKey ? `${parentKey}-${index}` : `${index}`;
 
         if (item.subItems) {
           // Check if any subitem is active (including nested subitems)
-          const hasActiveSubItem = item.subItems.some((subItem, subIndex) => {
+          let hasActiveSubItem = false;
+          
+          item.subItems.forEach((subItem, subIndex) => {
             if (subItem.subItems && subItem.subItems.length > 0) {
               // Recursively check nested submenus
               const nestedKey = `${key}-${subIndex}`;
-              const hasNestedActive = checkActiveMenuRecursive(
-                subItem,
-                nestedKey
-              );
+              const hasNestedActive = checkActiveMenu([subItem], key);
               if (hasNestedActive) {
-                setOpenSubmenu((prev) => ({ ...prev, [nestedKey]: true }));
+                newOpenSubmenu[nestedKey] = true;
+                hasActiveSubItem = true;
               }
-              return hasNestedActive;
+            } else if (isActive(subItem.path, subItem.activePaths)) {
+              hasActiveSubItem = true;
             }
-            return isActive(subItem.path, subItem.activePaths);
           });
 
           if (hasActiveSubItem) {
-            setOpenSubmenu((prev) => ({ ...prev, [key]: true }));
+            newOpenSubmenu[key] = true;
+            hasAnyActive = true;
           }
-
-          // Recursively process all subitems
-          checkActiveMenu(item.subItems, key);
         }
       });
-    };
-
-    const checkActiveMenuRecursive = (item: MenuItem, key: string): boolean => {
-      if (item.subItems && item.subItems.length > 0) {
-        // Check if any nested subitem is active
-        const hasActive = item.subItems.some((subItem, nestedIndex) => {
-          if (subItem.subItems && subItem.subItems.length > 0) {
-            // Further nested levels - recursively check
-            const nestedKey = `${key}-${nestedIndex}`;
-            const isNestedActive = checkActiveMenuRecursive(subItem, nestedKey);
-            if (isNestedActive) {
-              setOpenSubmenu((prev) => ({ ...prev, [nestedKey]: true }));
-            }
-            return isNestedActive;
-          }
-          return isActive(subItem.path, subItem.activePaths);
-        });
-        return hasActive;
-      }
-      return isActive(item.path, item.activePaths);
+      return hasAnyActive;
     };
 
     checkActiveMenu(filteredMenuConfigItems);
+    setOpenSubmenu(newOpenSubmenu);
   }, [location.pathname, filteredMenuConfigItems, isActive]);
 
   useEffect(() => {

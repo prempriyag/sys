@@ -246,7 +246,7 @@ export default function TranscriptsList() {
             { data: "INSTITUTION_NAME", name: "Institution Name", searchable: true, orderable: true },
             { 
               data: "STATUS", 
-              name: "Status", 
+              name: "Transcript Status", 
               searchable: true, 
               orderable: true,
               render: (data: any) => {

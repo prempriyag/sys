@@ -48,7 +48,7 @@ export const createTranscriptReportColumns = (
       name: "College Name",
       searchable: true,
       orderable: true,
-      width: "200px",
+      width: "250px",
     },
     
     // Column 1: INSTITUTION_ID - with inline editing support
@@ -102,11 +102,12 @@ export const createTranscriptReportColumns = (
         // Show with copy icon and inline edit if editable
         return (
           <span className="flex items-center">
-            <CopyIcon 
-              className="w-4 h-4 me-1 cursor-pointer hover:text-brand-500"
-              onClick={() => copyToClipboard(data)}
-              title="Copy to clipboard"
-            />
+            <span title="Copy to clipboard">
+              <CopyIcon 
+                className="w-4 h-4 me-1 cursor-pointer hover:text-brand-500"
+                onClick={() => copyToClipboard(data)}
+              />
+            </span>
             {isEditable ? (
               <InlineEdit
                 value={data}
@@ -148,6 +149,7 @@ export const createTranscriptReportColumns = (
       searchable: true,
       orderable: true,
       textCenter: true,
+      width: "140px",
       render: (data: any, row: any) => {
         const batchId = row.BATCH_ID || "";
         const studentName = row.STUDENT_FULL_NAME || "";
@@ -260,12 +262,13 @@ export const createTranscriptReportColumns = (
         if (!data) return "-";
         return (
           <span className="copyinstid" id={data}>
+            <span title="Copy to clipboard">
             <CopyIcon 
               className="w-4 h-4 me-1 cursor-pointer hover:text-brand-500" 
               onClick={() => copyToClipboard(data)}
               style={{ cursor: "pointer" }}
-              title="Copy to clipboard"
             />
+            </span>
             <a 
               href={`/college/batchdetails/${data}`}
               target="_blank"
@@ -375,7 +378,7 @@ export const createTranscriptReportColumns = (
     {
       data: "STATUS_BANNER",
       name: "Banner Status",
-      searchable: false,
+      searchable: true,
       orderable: false, // noorder
       width: "140px",
       render: (data: any) => {
@@ -388,7 +391,7 @@ export const createTranscriptReportColumns = (
     {
       data: "STATUS_BDMS",
       name: "Transcript uploaded to BDMS",
-      searchable: false,
+      searchable: true,
       orderable: false,
       width: "220px",
       render: (data: any) => {
@@ -419,7 +422,7 @@ export const createTranscriptReportColumns = (
     {
       data: "ERROR_REASON",
       name: "Error Reason / Action",
-      searchable: false,
+      searchable: true,
       orderable: false,
       width: "400px",
       render: (data: any) => {
@@ -499,7 +502,7 @@ export const createTranscriptReportColumns = (
   columns.push({
     data: "TRANSCRIPT_STATUS_FLAG",
     name: "Transcript Status",
-    searchable: false,
+    searchable: true,
     orderable: false,
     width: "150px",
     render: (data: any) => {
@@ -513,7 +516,7 @@ export const createTranscriptReportColumns = (
     columns.push({
       data: "ARTICULATION_STATUS_FLAG",
       name: "Articulation Status",
-      searchable: false,
+      searchable: true,
       orderable: false,
       width: "170px",
       render: (data: any) => {
@@ -644,9 +647,10 @@ export const createTranscriptReportColumns = (
   columns.push({
     data: "LAST_UPDATED_DATETIME",
     name: "Updated On",
-    searchable: false,
+    searchable: true,
     orderable: true,
     defaultOrder: true, // defaultOrderby
+    width: "180px",
   });
   
   // Column 35: UPDATED_BY
@@ -661,7 +665,7 @@ export const createTranscriptReportColumns = (
   columns.push({
     data: "PROCESS_STATUS",
     name: "Process Status",
-    searchable: false,
+    searchable: true,
     orderable: false,
     render: (data: any) => {
       if (!data) return "-";

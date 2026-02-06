@@ -34,8 +34,8 @@ export default function ActionDropdown({
     { value: "Noaction", label: "No Action Needed", dataType: "" },
     { value: "Rerun", label: "Reprocess this Transcript", dataType: "Rerun" },
     { value: "Rerun", label: "Reprocess for 30 days", dataType: "Rerun15" },
-    { value: "Processed", label: "Processed Manually by OSU-CSC", dataType: "Processed" },
-    { value: "Processed", label: "Processed and Articulated manually by OSU-CSC", dataType: "Articulated" },
+    { value: "Processed", label: "Processed Manually by CSC", dataType: "Processed" },
+    { value: "Processed", label: "Processed and Articulated manually by CSC", dataType: "Articulated" },
   ];
 
   // Articulation reprocess options (matching CI3 lines 519-524)
@@ -43,7 +43,7 @@ export default function ActionDropdown({
     { value: "0", label: "Action Needed", dataType: "" },
     { value: "Noaction", label: "No Action Needed", dataType: "" },
     { value: "Rerun", label: "Reprocess this Transcript", dataType: "" },
-    { value: "Processed", label: "Processed Manually by OSU-CSC", dataType: "" },
+    { value: "Processed", label: "Processed Manually by CSC", dataType: "" },
   ];
 
   const options = type === "transcript" ? transcriptOptions : articulationOptions;

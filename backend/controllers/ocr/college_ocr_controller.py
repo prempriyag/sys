@@ -13,7 +13,13 @@ from pydantic import BaseModel
 
 from database.connection import get_db
 from models.college_verifier_model import CollegeVerifierModel
-from config.constants import TBL_TRANSCRIPTHDROCR, COLLEGE_PROJECT_ID
+from config.constants import (
+    TBL_TRANSCRIPTHDROCR,
+    COLLEGE_PROJECT_ID,
+    TBL_TRANSCRIPT_LINE_OCR_LEFT,
+    TBL_TRANSCRIPT_LINE_OCR_RIGHT,
+    TBL_TRANSCRIPT_LINE_OCR_MIDDLE,
+)
 
 router = APIRouter(prefix="/api/ocrverify", tags=["ocr-college"])
 

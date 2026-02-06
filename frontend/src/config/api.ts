@@ -339,6 +339,25 @@ export const api = {
   },
 
   post: async (endpoint: string, data?: unknown, options?: RequestInit) => {
+    // Handle FormData differently - don't stringify and let browser set Content-Type
+    const isFormData = data instanceof FormData;
+    
+    if (isFormData) {
+      // For FormData, use fetch directly to avoid Content-Type header issues
+      const token = getAuthToken();
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+      // Don't set Content-Type - browser will set it with correct boundary
+      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        method: "POST",
+        headers,
+        body: data as FormData,
+      });
+      return response.json();
+    }
+    
     const response = await apiRequest(endpoint, {
       ...options,
       method: "POST",

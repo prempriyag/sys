@@ -25,12 +25,25 @@ export default function BulkUpdateButton({
   const handleBulkUpdate = async () => {
     // If custom onClick is provided, use it
     if (onClick) {
-      onClick();
+      try {
+        setIsProcessing(true);
+        await onClick();
+      } catch (error: any) {
+        console.error("BulkUpdateButton: Error in onClick handler:", error);
+        alerterror(error?.message || "Error performing update");
+      } finally {
+        setIsProcessing(false);
+      }
       return;
     }
     
     // Otherwise, use the default bulk update logic
-    if (disabled || isProcessing || rows.length === 0) return;
+    if (disabled || isProcessing || rows.length === 0) {
+      if (rows.length === 0) {
+        alerterror("No records selected for update");
+      }
+      return;
+    }
 
     // Validate - check for institution validation errors
     const validationErrors = rows.filter((row) => {
@@ -47,6 +60,7 @@ export default function BulkUpdateButton({
     try {
       let successCount = 0;
       let errorCount = 0;
+      const errors: string[] = [];
 
       // Process each row
       for (const row of rows) {
@@ -68,7 +82,8 @@ export default function BulkUpdateButton({
           (articulationProcess && articulationProcess !== "0")
         ) {
           try {
-            const response = await api.post("/api/transcriptreports/updatechkstatus", {
+            // api.post returns parsed JSON directly
+            const result = await api.post("/api/transcriptreports/updatechkstatus", {
               comment: comment || "",
               batchId,
               reprocessTranscript: reprocessTranscript || "0",
@@ -80,13 +95,18 @@ export default function BulkUpdateButton({
               instid: instid || "",
             });
 
-            if (response.data?.message === "Success" || response.data === "Success") {
+            // Check success - result is the parsed JSON directly
+            if (result?.message === "Success" || result?.success === true) {
               successCount++;
             } else {
+              const errorMsg = result?.message || result?.detail || "Unknown error";
+              errors.push(`Batch ${batchId}: ${errorMsg}`);
               errorCount++;
             }
-          } catch (error) {
+          } catch (error: any) {
             console.error(`Error updating batch ${batchId}:`, error);
+            const errorMsg = error?.detail || error?.message || "Unknown error";
+            errors.push(`Batch ${batchId}: ${errorMsg}`);
             errorCount++;
           }
         }
@@ -97,12 +117,16 @@ export default function BulkUpdateButton({
           `Transcript status updated successfully for ${successCount} record(s)`
         );
         if (onSuccess) onSuccess();
-      } else if (errorCount > 0) {
-        alerterror(`Error updating ${errorCount} record(s)`);
+      }
+      if (errorCount > 0) {
+        alerterror(`Error updating ${errorCount} record(s): ${errors.join('; ')}`);
+      }
+      if (successCount === 0 && errorCount === 0) {
+        alerterror("No valid records to update. Please select an action first.");
       }
     } catch (error: any) {
       console.error("Bulk update error:", error);
-      alerterror("Error performing bulk update");
+      alerterror(error?.message || "Error performing bulk update");
     } finally {
       setIsProcessing(false);
     }

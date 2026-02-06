@@ -323,89 +323,93 @@ class DashboardModel:
         Queries DIGISCRIPT_LOG (TBL_KICKOUT) for STATUS_SOAPCOL, STATUS_SHATAEQ, STATUS_BDMS
         """
         try:
-            status_flags = ['SOAPCOL', 'SHATAEQ', 'BDMS', 'SHATRNS']
+            status_flags = ['SOAPCOL', 'SHATAEQ', 'BDMS']
             college_filter = f" AND (t.INSTITUTION_ID = '{college_name}')" if college_name else ""
             
             first_start_date = fromdate.split()[0]
             last_end_date = todate.split()[0]
             
+            # Build date values for SQL VALUES clause
             if use_daily:
-                # date_ranges is a list of date strings
+                if not date_ranges:
+                    return [{"name": sf, "data": []} for sf in status_flags]
                 date_values = ", ".join([f"('{dr}')" for dr in date_ranges])
             else:
-                # date_ranges is a list of dicts with StartDate
+                if not date_ranges:
+                    return [{"name": sf, "data": []} for sf in status_flags]
                 date_values = ", ".join([f"('{dr['StartDate']}')" for dr in date_ranges])
-                if date_ranges:
-                    first_start_date = date_ranges[0]['StartDate']
-                    last_end_date = date_ranges[-1]['EndDate']
+                first_start_date = date_ranges[0]['StartDate']
+                last_end_date = date_ranges[-1]['EndDate']
 
+            # Build all status columns in one query (matching CI3 approach)
+            sql_cols = ", ".join([
+                f"ISNULL(SUM(CASE WHEN UPPER(t.STATUS_{sf}) = 'PROCESSED' THEN 1 ELSE 0 END), 0) AS {sf}Count"
+                for sf in status_flags
+            ])
+            
+            if use_daily:
+                query = text(f"""
+                    SELECT 
+                        month_data.date AS date,
+                        {sql_cols}
+                    FROM
+                        (VALUES {date_values}) AS month_data(date)
+                    LEFT JOIN
+                        {TBL_KICKOUT} AS t 
+                        ON CAST(t.LAST_UPDATED_DATETIME AS DATE) = month_data.date
+                        AND (t.PROJECT_ID = {COLLEGE_PROJECT_ID} OR ISNULL(t.PROJECT_ID, '') = '')
+                        {college_filter}
+                    GROUP BY 
+                        month_data.date
+                    ORDER BY 
+                        month_data.date
+                """)
+            else:
+                query = text(f"""
+                    SELECT 
+                        LEFT(DATENAME(month, month_data.date), 3) AS month,
+                        YEAR(month_data.date) AS year,
+                        DATEPART(MM, month_data.date) AS mth,
+                        {sql_cols}
+                    FROM 
+                        (VALUES {date_values}) AS month_data(date)
+                    LEFT JOIN 
+                        {TBL_KICKOUT} AS t 
+                        ON MONTH(t.LAST_UPDATED_DATETIME) = MONTH(month_data.date)
+                        AND YEAR(t.LAST_UPDATED_DATETIME) = YEAR(month_data.date)
+                        AND (t.PROJECT_ID = {COLLEGE_PROJECT_ID} OR ISNULL(t.PROJECT_ID, '') = '')
+                        AND CAST(t.LAST_UPDATED_DATETIME AS DATE) BETWEEN '{first_start_date}' AND '{last_end_date}'
+                        {college_filter}
+                    GROUP BY 
+                        DATENAME(month, month_data.date), 
+                        YEAR(month_data.date), 
+                        DATEPART(MM, month_data.date)
+                    ORDER BY 
+                        YEAR(month_data.date), 
+                        DATEPART(MM, month_data.date)
+                """)
+
+            result = db.execute(query).fetchall()
+
+            # Build a map of results by month/date
+            result_map = {}
+            for row in result:
+                row_dict = dict(row._mapping) if hasattr(row, '_mapping') else dict(zip([c.key for c in row._parent.keys], row))
+                if use_daily:
+                    date_val = row_dict.get('date', row[0])
+                    if hasattr(date_val, 'strftime'):
+                        key = date_val.strftime('%Y-%m-%d')
+                    else:
+                        key = str(date_val)[:10]
+                else:
+                    year = row_dict.get('year', row[1])
+                    mth = row_dict.get('mth', row[2])
+                    key = f"{year}-{int(mth):02d}"
+                result_map[key] = row_dict
+
+            # Build datasets for each status flag
             datasets = []
             for status_flag in status_flags:
-                # Build SQL columns for each status flag
-                sql_col = f"ISNULL(SUM(CASE WHEN UPPER(t.STATUS_{status_flag}) = 'PROCESSED' THEN 1 ELSE 0 END), 0) AS {status_flag}Count"
-                
-                if use_daily:
-                    query = text(f"""
-                        SELECT 
-                            month_data.date AS date,
-                            {sql_col}
-                        FROM
-                            (VALUES {date_values}) AS month_data(date)
-                        LEFT JOIN
-                            {TBL_KICKOUT} AS t 
-                            ON CAST(t.LAST_UPDATED_DATETIME AS DATE) = CAST(month_data.date AS DATE)
-                            AND (t.PROJECT_ID = {COLLEGE_PROJECT_ID} OR ISNULL(t.PROJECT_ID, '') = '')
-                            {college_filter}
-                        GROUP BY 
-                            month_data.date
-                        ORDER BY 
-                            month_data.date
-                    """)
-                else:
-                    query = text(f"""
-                        SELECT 
-                            LEFT(DATENAME(month, CAST(month_data.date AS DATE)), 3) AS month,
-                            YEAR(CAST(month_data.date AS DATE)) AS year,
-                            DATEPART(MM, CAST(month_data.date AS DATE)) AS mth,
-                            {sql_col}
-                        FROM 
-                            (VALUES {date_values}) AS month_data(date)
-                        LEFT JOIN 
-                            {TBL_KICKOUT} AS t 
-                            ON MONTH(t.LAST_UPDATED_DATETIME) = MONTH(CAST(month_data.date AS DATE))
-                            AND YEAR(t.LAST_UPDATED_DATETIME) = YEAR(CAST(month_data.date AS DATE))
-                            AND (t.PROJECT_ID = {COLLEGE_PROJECT_ID} OR ISNULL(t.PROJECT_ID, '') = '')
-                            AND CAST(t.LAST_UPDATED_DATETIME AS DATE) BETWEEN '{first_start_date}' AND '{last_end_date}'
-                            {college_filter}
-                        GROUP BY 
-                            DATENAME(month, CAST(month_data.date AS DATE)), 
-                            YEAR(CAST(month_data.date AS DATE)), 
-                            DATEPART(MM, CAST(month_data.date AS DATE)),
-                            month_data.date
-                        ORDER BY 
-                            YEAR(CAST(month_data.date AS DATE)), 
-                            DATEPART(MM, CAST(month_data.date AS DATE))
-                    """)
-
-                result = db.execute(query).fetchall()
-
-                data_map = {}
-                for row in result:
-                    if use_daily:
-                        date_val = row[0] if isinstance(row, tuple) else (row.date if hasattr(row, 'date') else row[0])
-                        if hasattr(date_val, 'strftime'):
-                            key = date_val.strftime('%Y-%m-%d')
-                        else:
-                            key = str(date_val)[:10]  # Take first 10 chars for date
-                    else:
-                        year = row[1] if isinstance(row, tuple) else (row.year if hasattr(row, 'year') else row[1])
-                        mth = row[2] if isinstance(row, tuple) else (row.mth if hasattr(row, 'mth') else row[2])
-                        key = f"{year}-{mth:02d}"
-                    # Get count from the status flag column
-                    count_attr = f"{status_flag}Count"
-                    count = row[-1] if isinstance(row, tuple) else (getattr(row, count_attr, 0) if hasattr(row, count_attr) else row[-1])
-                    data_map[key] = count
-
                 data = []
                 for dr in date_ranges:
                     if use_daily:
@@ -413,7 +417,13 @@ class DashboardModel:
                     else:
                         dt = datetime.strptime(dr['StartDate'], '%Y-%m-%d')
                         key = f"{dt.year}-{dt.month:02d}"
-                    data.append(data_map.get(key, 0))
+                    
+                    count_key = f"{status_flag}Count"
+                    if key in result_map:
+                        count = result_map[key].get(count_key, 0)
+                    else:
+                        count = 0
+                    data.append(count if count else 0)
 
                 datasets.append({
                     "name": status_flag,

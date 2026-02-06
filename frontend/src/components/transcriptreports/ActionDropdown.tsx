@@ -2,6 +2,15 @@
 // Handles transcriptreprocess and articulationreprocess dropdowns
 import { useState, useEffect } from "react";
 
+interface ActionOption {
+  // uniqueValue is used for React state and select value (must be unique)
+  uniqueValue: string;
+  // action is what gets sent to the backend (Rerun, Processed, Noaction, 0)
+  action: string;
+  label: string;
+  dataType: string;
+}
+
 interface ActionDropdownProps {
   batchId: string;
   type: "transcript" | "articulation";
@@ -29,21 +38,22 @@ export default function ActionDropdown({
   }, [currentStatus]);
 
   // Transcript reprocess options (matching CI3 lines 528-535)
-  const transcriptOptions = [
-    { value: "0", label: "Action Needed", dataType: "" },
-    { value: "Noaction", label: "No Action Needed", dataType: "" },
-    { value: "Rerun", label: "Reprocess this Transcript", dataType: "Rerun" },
-    { value: "Rerun", label: "Reprocess for 30 days", dataType: "Rerun15" },
-    { value: "Processed", label: "Processed Manually by CSC", dataType: "Processed" },
-    { value: "Processed", label: "Processed and Articulated manually by CSC", dataType: "Articulated" },
+  // uniqueValue must be unique for React select to work correctly
+  const transcriptOptions: ActionOption[] = [
+    { uniqueValue: "0", action: "0", label: "Action Needed", dataType: "" },
+    { uniqueValue: "Noaction", action: "Noaction", label: "No Action Needed", dataType: "" },
+    { uniqueValue: "Rerun", action: "Rerun", label: "Reprocess this Transcript", dataType: "Rerun" },
+    { uniqueValue: "Rerun15", action: "Rerun", label: "Reprocess for 30 days", dataType: "Rerun15" },
+    { uniqueValue: "Processed", action: "Processed", label: "Processed Manually by CSC", dataType: "Processed" },
+    { uniqueValue: "Processed_Articulated", action: "Processed", label: "Processed and Articulated manually by CSC", dataType: "Articulated" },
   ];
 
   // Articulation reprocess options (matching CI3 lines 519-524)
-  const articulationOptions = [
-    { value: "0", label: "Action Needed", dataType: "" },
-    { value: "Noaction", label: "No Action Needed", dataType: "" },
-    { value: "Rerun", label: "Reprocess this Transcript", dataType: "" },
-    { value: "Processed", label: "Processed Manually by CSC", dataType: "" },
+  const articulationOptions: ActionOption[] = [
+    { uniqueValue: "0", action: "0", label: "Action Needed", dataType: "" },
+    { uniqueValue: "Noaction", action: "Noaction", label: "No Action Needed", dataType: "" },
+    { uniqueValue: "Rerun", action: "Rerun", label: "Reprocess this Transcript", dataType: "" },
+    { uniqueValue: "Processed", action: "Processed", label: "Processed Manually by CSC", dataType: "" },
   ];
 
   const options = type === "transcript" ? transcriptOptions : articulationOptions;
@@ -52,18 +62,22 @@ export default function ActionDropdown({
     : "form-select articulationreprocess slddrb rounded border border-gray-300 bg-white px-2 py-1 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white";
 
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const value = e.target.value;
-    const selectedOption = e.target.selectedOptions[0];
-    const dataType = selectedOption?.getAttribute("data-type") || "";
+    const uniqueValue = e.target.value;
     
-    setSelectedValue(value);
+    // Find the selected option to get action and dataType
+    const selectedOption = options.find(opt => opt.uniqueValue === uniqueValue);
+    const action = selectedOption?.action || "0";
+    const dataType = selectedOption?.dataType || "";
+    
+    setSelectedValue(uniqueValue);
     
     // Always call onActionChange, even for "0" to properly track state and hide button
-    onActionChange(value, batchId, {
+    // Pass the actual action value (not uniqueValue) to the parent
+    onActionChange(action, batchId, {
       type,
       searchField,
       articulationStatus,
-      dataType, // Pass data-type for Processed options
+      dataType, // Pass dataType for Processed/Rerun options
     });
   };
 
@@ -80,11 +94,12 @@ export default function ActionDropdown({
         boxSizing: 'border-box',
       }}
     >
-      {options.map((option, idx) => (
+      {options.map((option) => (
         <option
-          key={idx}
-          value={option.value}
+          key={option.uniqueValue}
+          value={option.uniqueValue}
           data-type={option.dataType || ""}
+          data-action={option.action}
         >
           {option.label}
         </option>

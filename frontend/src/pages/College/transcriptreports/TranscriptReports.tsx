@@ -212,7 +212,8 @@ export default function TranscriptReports(props?: TranscriptReportsProps) {
   // Handle action change (transcriptreprocess, articulationreprocess)
   // Matching CI3 logic: show button when action is Processed, Rerun, or Noaction
   // Hide button when action is "0" or empty
-  const handleActionChange = (batchId: string, action: string, data: any) => {
+  // Note: Parameter order matches RowActions interface: (action, batchId, data)
+  const handleActionChange = (action: string, batchId: string, data: any) => {
     setRowChanges((prevChanges) => {
       const newChanges = new Map(prevChanges);
       const existingChanges = newChanges.get(batchId) || {};
@@ -344,6 +345,7 @@ export default function TranscriptReports(props?: TranscriptReportsProps) {
     
     if (rowChanges.size === 0) {
       console.log('No row changes, returning early');
+      alerterror('No changes to update. Please select an action first.');
       return;
     }
     
@@ -361,90 +363,95 @@ export default function TranscriptReports(props?: TranscriptReportsProps) {
     
     if (rowsToUpdate.length === 0) {
       console.log('No rows with actions or field changes, returning early');
+      alerterror('No valid actions selected. Please select an action to update.');
       return;
     }
     
-    try {
-      let successCount = 0;
-      let errorCount = 0;
-      const errors: Array<{ batchId: string; error: string }> = [];
-      
-      // Process each row's changes sequentially (matching CI3 behavior)
-      for (const [batchId, changes] of rowsToUpdate) {
-        try {
-          const updateData = {
-            batchId,
-            comment: changes.comment || "",
-            reprocessTranscript: changes.reprocessTranscript || "0",
-            articulationProcess: changes.articulationProcess || "0",
-            processTranscript_articulated: changes.processTranscript_articulated || "",
-            osuid: changes.osuid || "",
-            slateid: changes.slateid || "",
-            scenario: changes.scenario || "",
-            instid: changes.instid || "",
-          };
-          
-          console.log(`=== Updating batch ${batchId} ===`);
-          console.log('Update data:', JSON.stringify(updateData, null, 2));
-          
-          const response = await api.post("/api/transcriptreports/updatechkstatus", updateData);
-          
-          console.log(`=== Response for batch ${batchId} ===`);
-          console.log('Response status:', response.status);
-          console.log('Response data:', JSON.stringify(response.data, null, 2));
-          
-          if (response.data?.message === "Success" || response.data === "Success" || response.data?.success === true) {
-            console.log(`✓ Successfully updated batch ${batchId}`);
-            successCount++;
-          } else {
-            const errorMsg = response.data?.message || response.data?.detail || "Unknown error";
-            console.error(`✗ Failed to update batch ${batchId}:`, errorMsg);
-            errors.push({ batchId, error: errorMsg });
-            errorCount++;
-          }
-        } catch (error: any) {
-          console.error(`=== Error updating batch ${batchId} ===`);
-          console.error('Error object:', error);
-          console.error('Error message:', error?.message);
-          console.error('Error response:', error?.response);
-          console.error('Error response data:', error?.response?.data);
-          console.error('Error response status:', error?.response?.status);
-          console.error('Error stack:', error?.stack);
-          
-          const errorMsg = error.response?.data?.detail || error.response?.data?.message || error.message || "Unknown error";
+    let successCount = 0;
+    let errorCount = 0;
+    const errors: Array<{ batchId: string; error: string }> = [];
+    
+    // Process each row's changes sequentially (matching CI3 behavior)
+    for (const [batchId, changes] of rowsToUpdate) {
+      try {
+        const updateData = {
+          batchId,
+          comment: changes.comment || "",
+          reprocessTranscript: changes.reprocessTranscript || "0",
+          articulationProcess: changes.articulationProcess || "0",
+          processTranscript_articulated: changes.processTranscript_articulated || "",
+          osuid: changes.osuid || "",
+          slateid: changes.slateid || "",
+          scenario: changes.scenario || "",
+          instid: changes.instid || "",
+        };
+        
+        console.log(`=== Updating batch ${batchId} ===`);
+        console.log('Update data:', JSON.stringify(updateData, null, 2));
+        
+        // api.post returns parsed JSON directly (not wrapped in response.data)
+        const result = await api.post("/api/transcriptreports/updatechkstatus", updateData);
+        
+        console.log(`=== Response for batch ${batchId} ===`);
+        console.log('Result:', JSON.stringify(result, null, 2));
+        
+        // Check success - result is the parsed JSON directly
+        if (result?.message === "Success" || result?.success === true) {
+          console.log(`✓ Successfully updated batch ${batchId}`);
+          successCount++;
+        } else {
+          const errorMsg = result?.message || result?.detail || result?.error || "Update failed - unknown response";
+          console.error(`✗ Failed to update batch ${batchId}:`, errorMsg);
           errors.push({ batchId, error: errorMsg });
           errorCount++;
         }
+      } catch (error: any) {
+        console.error(`=== Error updating batch ${batchId} ===`);
+        console.error('Error object:', error);
+        console.error('Error message:', error?.message);
+        console.error('Error stack:', error?.stack);
+        
+        // Handle different error formats
+        let errorMsg = "Unknown error occurred";
+        if (error?.detail) {
+          errorMsg = error.detail;
+        } else if (error?.message) {
+          errorMsg = error.message;
+        } else if (typeof error === 'string') {
+          errorMsg = error;
+        }
+        
+        errors.push({ batchId, error: errorMsg });
+        errorCount++;
       }
-      
-      console.log('=== Bulk Update Summary ===');
-      console.log('Success count:', successCount);
-      console.log('Error count:', errorCount);
-      console.log('Errors:', errors);
-      
-      // Show success/error messages
-      if (successCount > 0) {
-        alertsuccess(`Transcript status updated successfully for ${successCount} record(s)`);
-      }
-      if (errorCount > 0) {
-        const errorDetails = errors.map(e => `Batch ${e.batchId}: ${e.error}`).join('; ');
-        console.error('Bulk update errors:', errorDetails);
-        alerterror(`Error updating ${errorCount} record(s). ${errorDetails}`);
-      }
-      
-      // Clear changes and refresh table
-      setRowChanges(new Map());
-      if (tableRef.current) {
-        tableRef.current.refresh();
-      } else {
-        setRefreshTrigger((prev) => prev + 1);
-      }
-    } catch (error: any) {
-      console.error("=== handleBulkUpdate: General Error ===");
-      console.error("Error:", error);
-      console.error("Error stack:", error.stack);
-      console.error("Error response:", error.response);
-      alerterror(error.response?.data?.detail || error.message || "Error updating records. Please try again.");
+    }
+    
+    console.log('=== Bulk Update Summary ===');
+    console.log('Success count:', successCount);
+    console.log('Error count:', errorCount);
+    console.log('Errors:', errors);
+    
+    // Show success/error messages
+    if (successCount > 0) {
+      alertsuccess(`Transcript status updated successfully for ${successCount} record(s)`);
+    }
+    if (errorCount > 0) {
+      const errorDetails = errors.map(e => `Batch ${e.batchId}: ${e.error}`).join('; ');
+      console.error('Bulk update errors:', errorDetails);
+      alerterror(`Error updating ${errorCount} record(s): ${errorDetails}`);
+    }
+    
+    // If no success and no errors counted, show a generic message
+    if (successCount === 0 && errorCount === 0) {
+      alerterror('No records were updated. Please check the console for details.');
+    }
+    
+    // Clear changes and refresh table
+    setRowChanges(new Map());
+    if (tableRef.current) {
+      tableRef.current.refresh();
+    } else {
+      setRefreshTrigger((prev) => prev + 1);
     }
     
     console.log('=== handleBulkUpdate END ===');

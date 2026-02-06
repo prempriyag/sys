@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { api } from "../../../../config/api";
 import PageContainer from "../../../../components/common/PageContainer";
+import SearchableMultiSelect from "../../../../components/form/SearchableMultiSelect";
 
 interface SystemSettings {
   system_name: string;
@@ -252,11 +253,7 @@ const MasterSettings: React.FC = () => {
         formData.append('SMALL_LOGO', logoFiles.SMALL_LOGO);
       }
       
-      const response = await api.post("/api/settings/logo/update", formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      const response = await api.post("/api/settings/logo/update", formData);
       
       if (response.status === 1) {
         setMessage({ type: 'success', text: response.message });
@@ -604,25 +601,15 @@ const MasterSettings: React.FC = () => {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Two Way Authentication Except Roles
-                      </label>
-                      <div className="border border-gray-300 dark:border-gray-600 rounded-md p-2 max-h-40 overflow-y-auto">
-                        {roles.map(role => (
-                          <div key={role.ROLE_KEY} className="flex items-center mb-2">
-                            <input
-                              type="checkbox"
-                              id={`role-${role.ROLE_KEY}`}
-                              checked={selectedAuthRoles.includes(role.ROLE_KEY)}
-                              onChange={() => handleRoleToggle(role.ROLE_KEY)}
-                              className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                            />
-                            <label htmlFor={`role-${role.ROLE_KEY}`} className="ml-2 text-sm text-gray-700 dark:text-gray-300">
-                              {role.ROLE_NAME}
-                            </label>
-                          </div>
-                        ))}
-                      </div>
+                      <SearchableMultiSelect
+                        label="Two Way Authentication Except Roles"
+                        options={roles.map(role => ({ value: role.ROLE_KEY, label: role.ROLE_NAME }))}
+                        value={selectedAuthRoles}
+                        onChange={setSelectedAuthRoles}
+                        placeholder="Select roles to exclude..."
+                        searchPlaceholder="Search roles..."
+                        maxHeight="200px"
+                      />
                     </div>
 
                     <div>

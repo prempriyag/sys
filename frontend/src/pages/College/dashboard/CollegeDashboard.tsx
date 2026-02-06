@@ -10,6 +10,7 @@ import { RefreshIcon } from "../../../icons";
 import { ApexOptions } from "apexcharts";
 import { colorThemes } from "../../../config/colorConfig";
 import ThemedLoader from "../../../components/common/ThemedLoader";
+import SearchableMultiSelect from "../../../components/form/SearchableMultiSelect";
 
 type ChartDataset = { name: string; data: number[] };
 type ChartData = { labels: string[]; datasets: ChartDataset[] };
@@ -47,7 +48,7 @@ export default function CollegeDashboard() {
   const [loading, setLoading] = useState(false);
   const [collegesList, setCollegesList] = useState<CollegeOption[]>([]);
   const [filters, setFilters] = useState({
-    college_name: "",
+    college_name: [] as string[],
     fromdate: new Date(Date.now() - 120 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
     todate: new Date().toISOString().split("T")[0],
   });
@@ -93,7 +94,7 @@ export default function CollegeDashboard() {
 
   const handleClear = () => {
     setFilters({
-      college_name: "",
+      college_name: [],
       fromdate: new Date(Date.now() - 120 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
       todate: new Date().toISOString().split("T")[0],
     });
@@ -579,20 +580,19 @@ export default function CollegeDashboard() {
           }}
         >
           <div className="flex flex-wrap items-end gap-4">
-            <div className="flex flex-col flex-1 min-w-[200px]">
+            <div className="flex flex-col flex-1 min-w-[280px]">
               <label className="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">College Name</label>
-              <select
+              <SearchableMultiSelect
+                options={collegesList.map((c) => ({
+                  value: c.INSTITUTION_ID,
+                  label: c.INSTITUTION_NAME || c.INSTITUTION_ID,
+                }))}
                 value={filters.college_name}
-                onChange={(e) => handleFilterChange("college_name", e.target.value)}
-                className="w-full rounded-xl border border-gray-300 bg-white/50 px-4 py-2.5 text-sm text-gray-800 backdrop-blur-sm transition-all duration-200 placeholder:text-gray-400 focus:border-brand-500 focus:bg-white/70 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-gray-600 dark:bg-gray-800/50 dark:text-white/90 dark:placeholder:text-gray-500 dark:focus:border-brand-400 dark:focus:bg-gray-800/70"
-              >
-                <option value="">All Colleges</option>
-                {collegesList.map((c) => (
-                  <option key={c.INSTITUTION_ID} value={c.INSTITUTION_ID}>
-                    {c.INSTITUTION_NAME || c.INSTITUTION_ID}
-                  </option>
-                ))}
-              </select> 
+                onChange={(selected) => setFilters((prev) => ({ ...prev, college_name: selected }))}
+                placeholder="All Colleges"
+                searchPlaceholder="Search colleges..."
+                maxHeight="250px"
+              />
             </div>
             <div className="flex flex-col flex-1 min-w-[150px]">
               <DatePicker

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSearchParams, Link } from "react-router";
 import { API_BASE_URL, api, API_ENDPOINTS } from "../../config/api";
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
@@ -61,19 +61,37 @@ export default function CollegeOCRBatch() {
   const [newRows, setNewRows] = useState<LineRow[]>([]);
   const [selectedLineIds, setSelectedLineIds] = useState<Set<number>>(new Set());
   const [bulkEditMode, setBulkEditMode] = useState(false);
+  const newRowIdCounter = useRef(0);
 
   useEffect(() => {
     if (batchId) fetchBatch();
     else setBatch(null);
   }, [batchId]);
 
+  // Clear new rows when switching tabs
+  useEffect(() => {
+    setNewRows([]);
+    setSelectedLineIds(new Set());
+    setBulkEditMode(false);
+  }, [activeTab]);
+
   const fetchBatch = async () => {
     if (!batchId) return;
     try {
       setLoading(true);
       setError(null);
+      setNewRows([]);
+      setSelectedLineIds(new Set());
       const url = `${API_ENDPOINTS.OCR_COLLEGE_OCR_BATCH}?batch_id=${encodeURIComponent(batchId)}`;
+      console.log('[CollegeOCRBatch] Fetching batch:', url);
       const response = await api.get(url);
+      console.log('[CollegeOCRBatch] Response:', response);
+      
+      // Check if response indicates an error
+      if (response?.detail) {
+        throw new Error(response.detail);
+      }
+      
       setBatch({
         batch_id: response.batch_id ?? batchId,
         hdr_data: response.hdr_data ?? null,
@@ -83,7 +101,17 @@ export default function CollegeOCRBatch() {
         error_msg: response.error_msg === true,
       });
     } catch (err: unknown) {
-      const msg = err && typeof err === "object" && "message" in err ? String((err as { message: string }).message) : "Error loading batch";
+      console.error('[CollegeOCRBatch] Error fetching batch:', err);
+      let msg = "Error loading batch";
+      if (err && typeof err === "object") {
+        if ("detail" in err) {
+          msg = String((err as { detail: string }).detail);
+        } else if ("message" in err) {
+          msg = String((err as { message: string }).message);
+        }
+      } else if (typeof err === "string") {
+        msg = err;
+      }
       setError(msg);
       setBatch(null);
     } finally {
@@ -199,6 +227,28 @@ export default function CollegeOCRBatch() {
   ) => {
     if (!batchId) return;
     const v = getValues();
+    
+    // Validate required fields for new rows (matching CI3 behavior)
+    const isNewRow = row.AUTO_SEQNO == null;
+    if (isNewRow) {
+      const requiredFields = [
+        { key: "SUBJECT", label: "Subject" },
+        { key: "COURSE_ID", label: "Course ID" },
+        { key: "COURSE_TITLE", label: "Course Title" },
+        { key: "START_TERM", label: "Start Term" },
+        { key: "END_TERM", label: "End Term" },
+        { key: "CREDIT_HOURS_EARNED", label: "Credit Hours" },
+        { key: "GRADE", label: "Grade" },
+        { key: "PAGE_NBR", label: "Page Number" },
+      ];
+      for (const field of requiredFields) {
+        if (!v[field.key]?.trim()) {
+          showMessage("error", `${field.label} is required for new rows`);
+          return;
+        }
+      }
+    }
+
     try {
       const res = await api.post(API_ENDPOINTS.OCR_UPDATE_BATCH_DATA_LINE, {
         BATCH_ID: batchId,
@@ -308,7 +358,12 @@ export default function CollegeOCRBatch() {
   };
 
   const handleAddRow = () => {
-    setNewRows((prev) => [...prev, {}]);
+    newRowIdCounter.current += 1;
+    setNewRows((prev) => [...prev, { _tempId: newRowIdCounter.current } as any]);
+  };
+
+  const handleCancelNewRow = (idx: number) => {
+    setNewRows((prev) => prev.filter((_, i) => i !== idx));
   };
 
   const handleAddRowsFromModal = async (numRows: number, values: Record<string, string>) => {
@@ -720,27 +775,33 @@ export default function CollegeOCRBatch() {
                     <td colSpan={bulkEditMode ? 11 : 12} className="p-4 text-center text-gray-500">No line data.</td>
                   </tr>
                 ) : (
-                  displayLineData().map((line, idx) => (
-                    <LineRowEditor
-                      key={`${activeTab}-${line.AUTO_SEQNO ?? `new-${idx}`}`}
-                      type={activeTab}
-                      line={line}
-                      bulkEditMode={bulkEditMode}
-                      selected={line.AUTO_SEQNO != null && selectedLineIds.has(line.AUTO_SEQNO)}
-                      onToggleSelect={() => {
-                        if (line.AUTO_SEQNO == null) return;
-                        setSelectedLineIds((prev) => {
-                          const next = new Set(prev);
-                          if (next.has(line.AUTO_SEQNO!)) next.delete(line.AUTO_SEQNO!);
-                          else next.add(line.AUTO_SEQNO!);
-                          return next;
-                        });
-                      }}
-                      onSave={handleSaveLine}
-                      onDelete={handleDeleteLine}
-                      onBotViewMore={setBotModalContent}
-                    />
-                  ))
+                  displayLineData().map((line, idx) => {
+                    // Calculate the new row index (for cancel functionality)
+                    const existingCount = getLineData().length;
+                    const newRowIdx = idx >= existingCount ? idx - existingCount : -1;
+                    return (
+                      <LineRowEditor
+                        key={`${activeTab}-${line.AUTO_SEQNO ?? `new-${(line as any)._tempId ?? idx}`}`}
+                        type={activeTab}
+                        line={line}
+                        bulkEditMode={bulkEditMode}
+                        selected={line.AUTO_SEQNO != null && selectedLineIds.has(line.AUTO_SEQNO)}
+                        onToggleSelect={() => {
+                          if (line.AUTO_SEQNO == null) return;
+                          setSelectedLineIds((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(line.AUTO_SEQNO!)) next.delete(line.AUTO_SEQNO!);
+                            else next.add(line.AUTO_SEQNO!);
+                            return next;
+                          });
+                        }}
+                        onSave={handleSaveLine}
+                        onDelete={handleDeleteLine}
+                        onBotViewMore={setBotModalContent}
+                        onCancelNew={newRowIdx >= 0 ? () => handleCancelNewRow(newRowIdx) : undefined}
+                      />
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -787,7 +848,7 @@ function AddRowsModal({
 }: {
   activeTab: TabType;
   onClose: () => void;
-  onApply: (numRows: number, values: Record<string, string>) => void;
+  onApply: (numRows: number, values: Record<string, string>) => Promise<void>;
 }) {
   const [numRows, setNumRows] = useState(1);
   const [subject, setSubject] = useState("");
@@ -799,20 +860,26 @@ function AddRowsModal({
   const [creditHours, setCreditHours] = useState("");
   const [grade, setGrade] = useState("");
   const [pageNbr, setPageNbr] = useState("1");
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleApply = () => {
+  const handleApply = async () => {
     const n = Math.min(20, Math.max(1, numRows));
-    onApply(n, {
-      SUBJECT: subject,
-      COURSE_ID: courseId,
-      COURSE_TITLE: courseTitle,
-      START_TERM: startTerm,
-      END_TERM: endTerm,
-      EXTERNAL_INSTITUTION_NAME: extInst,
-      CREDIT_HOURS_EARNED: creditHours,
-      GRADE: grade,
-      PAGE_NBR: pageNbr,
-    });
+    setSubmitting(true);
+    try {
+      await onApply(n, {
+        SUBJECT: subject,
+        COURSE_ID: courseId,
+        COURSE_TITLE: courseTitle,
+        START_TERM: startTerm,
+        END_TERM: endTerm,
+        EXTERNAL_INSTITUTION_NAME: extInst,
+        CREDIT_HOURS_EARNED: creditHours,
+        GRADE: grade,
+        PAGE_NBR: pageNbr,
+      });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -862,8 +929,10 @@ function AddRowsModal({
           </div>
         </div>
         <div className="flex gap-2 justify-end">
-          <Button variant="outline" onClick={onClose}>Close</Button>
-          <Button onClick={handleApply}>Add Rows</Button>
+          <Button variant="outline" onClick={onClose} disabled={submitting}>Close</Button>
+          <Button onClick={handleApply} disabled={submitting}>
+            {submitting ? "Adding..." : "Add Rows"}
+          </Button>
         </div>
       </div>
     </div>
@@ -879,6 +948,7 @@ function LineRowEditor({
   onSave,
   onDelete,
   onBotViewMore,
+  onCancelNew,
 }: {
   type: TabType;
   line: LineRow;
@@ -888,9 +958,19 @@ function LineRowEditor({
   onSave: (tab: TabType, row: LineRow, getValues: () => Record<string, string>) => void;
   onDelete: (tab: TabType, autoSeqno: number) => void;
   onBotViewMore: (text: string) => void;
+  onCancelNew?: () => void;
 }) {
+  // New rows (no AUTO_SEQNO) should automatically be in edit mode
+  const isNewRow = line.AUTO_SEQNO == null;
   const [editing, setEditing] = useState(false);
-  const id = line.AUTO_SEQNO ?? "new";
+  const id = line.AUTO_SEQNO ?? `new-${(line as any)._tempId ?? "x"}`;
+
+  // Auto-enable editing for new rows
+  useEffect(() => {
+    if (isNewRow) {
+      setEditing(true);
+    }
+  }, [isNewRow]);
   const botVer = (line.BOT_Verification ?? "").toUpperCase();
   const rowClass = botVer === "TOBEVERIFIED" ? "bg-amber-50 dark:bg-amber-900/20" : botVer === "VERIFIED" ? "bg-green-50 dark:bg-green-900/20" : "";
 
@@ -987,7 +1067,13 @@ function LineRowEditor({
         </td>
         <td className="p-2">
           <button type="button" onClick={() => { onSave(type, line, getValues); setEditing(false); }} className="text-green-600 hover:underline mr-2">Save</button>
-          <button type="button" onClick={() => setEditing(false)} className="text-gray-600 hover:underline">Cancel</button>
+          <button type="button" onClick={() => { 
+            if (isNewRow && onCancelNew) {
+              onCancelNew();
+            } else {
+              setEditing(false);
+            }
+          }} className="text-gray-600 hover:underline">Cancel</button>
         </td>
       </tr>
     );
@@ -1000,7 +1086,7 @@ function LineRowEditor({
           <input type="checkbox" checked={selected} onChange={onToggleSelect} className="rounded border-gray-300" />
         )}
       </td>
-      <td className="p-2">{line.AUTO_SEQNO ?? ""}</td>
+      <td className="p-2">{line.AUTO_SEQNO ?? <span className="text-gray-400 italic">New</span>}</td>
       <td className="p-2 text-left">
         {botShort}
         {botText.length > 30 && (

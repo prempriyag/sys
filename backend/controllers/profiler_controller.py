@@ -33,6 +33,7 @@ async def get_profiler_data(
     """
     Get profiler data for current session.
     Only available for KTech users (matches CI3 checkemailktech()).
+    Returns data from the last request made by this user.
     
     Args:
         type: 'page' or 'ajax' - type of profiler data to retrieve
@@ -47,18 +48,29 @@ async def get_profiler_data(
     is_ajax = type == "ajax"
     session_id = str(current_user.id)  # Use user ID as session identifier
     
-    data = get_stored_profiler_data(session_id, is_ajax)
+    # Get page data (most recent non-ajax request)
+    page_data = get_stored_profiler_data(session_id, is_ajax=False)
+    # Get ajax data (most recent ajax request)
+    ajax_data = get_stored_profiler_data(session_id, is_ajax=True)
+    
+    # Return the requested type
+    data = ajax_data if is_ajax else page_data
     
     if not data:
         return {
             "enabled": True,
             "data": None,
-            "message": "No profiler data available for this session"
+            "message": f"No {'AJAX' if is_ajax else 'page'} profiler data available. Make a request first, then check profiler.",
+            "has_page_data": page_data is not None,
+            "has_ajax_data": ajax_data is not None
         }
     
     return {
         "enabled": True,
-        "data": data
+        "data": data,
+        "type": "ajax" if is_ajax else "page",
+        "has_page_data": page_data is not None,
+        "has_ajax_data": ajax_data is not None
     }
 
 

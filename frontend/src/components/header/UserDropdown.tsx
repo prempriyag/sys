@@ -129,15 +129,9 @@ export default function UserDropdown() {
         className="flex items-center text-gray-700 dropdown-toggle dark:text-gray-400"
       >
         <span className="mr-3 overflow-hidden rounded-full h-11 w-11 flex-shrink-0">
-          {!imageError && user?.id ? (
+          {!imageError && user?.profile_image ? (
             <img
-              src={
-                // Priority: 1. SSO profile image (from Microsoft Graph)
-                //           2. Local uploaded profile image
-                user?.profile_image 
-                  ? `${user.profile_image}?time=${Date.now()}` 
-                  : `/assets/userprofile/${user.id}.png?time=${Date.now()}`
-              }
+              src={`${user.profile_image}?time=${Date.now()}`}
               alt={user?.name || "User"}
               className="w-full h-full object-cover"
               onError={() => setImageError(true)}

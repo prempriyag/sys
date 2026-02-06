@@ -7,7 +7,7 @@ Provides comprehensive dashboard analytics and metrics
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime, timedelta
 import logging
 
@@ -25,9 +25,12 @@ router = APIRouter(
 
 
 class DashboardRequest(BaseModel):
-    college_name: Optional[str] = ""
+    college_name: Optional[List[str]] = []  # Array of college IDs from multi-select
     fromdate: Optional[str] = None
     todate: Optional[str] = None
+    
+    class Config:
+        extra = "ignore"
 
 
 @router.post("/data")
@@ -63,9 +66,12 @@ async def get_dashboard_data(
         use_daily = date_diff > 0 and date_diff < max_days
 
         # Get dashboard data
+        # Convert college_name list to comma-separated string for SQL query
+        college_name_str = ",".join(request.college_name) if request.college_name else ""
+        
         dashboard_data = SchoolDashboardModel.get_dashboard_data(
             db=db,
-            college_name=request.college_name or "",
+            college_name=college_name_str,
             fromdate=fromdate_str,
             todate=todate_str,
             use_daily=use_daily,

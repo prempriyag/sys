@@ -1,6 +1,6 @@
-import { useEffect, useRef, useMemo } from "react";
+import { useEffect, useRef, useMemo, useState } from "react";
 
-import { Link, useNavigate } from "react-router";
+import { Link } from "react-router";
 import { useSidebar } from "../context/SidebarContext";
 import { useThemeColor } from "../context/ThemeColorContext";
 import { useMenuLayout } from "../context/MenuLayoutContext";
@@ -11,6 +11,7 @@ import NotificationDropdown from "../components/header/NotificationDropdown";
 import UserDropdown from "../components/header/UserDropdown";
 import FullscreenToggle from "../components/header/FullscreenToggle";
 import MenuLayoutToggle from "../components/header/MenuLayoutToggle";
+import ProfilerModal from "../components/header/ProfilerModal";
 import { 
   APP_ENV, 
   IS_PROD, 
@@ -26,7 +27,9 @@ const AppHeader: React.FC = () => {
   const { currentModule } = useModule();
   const { logoLightUrl, logoDarkUrl } = useThemeColor();
   const { user } = useAuth();
-  const navigate = useNavigate();
+  
+  // Profiler modal state
+  const [isProfilerOpen, setIsProfilerOpen] = useState(false);
 
   // Check if user can access profiler based on their email
   const showProfiler = useMemo(() => {
@@ -158,7 +161,7 @@ const AppHeader: React.FC = () => {
         {/* Right side: Search (desktop only) + Actions */}
         <div className="flex items-center gap-2 sm:gap-3">
           {/* Search - Desktop only */}
-          <div className="hidden lg:block">
+          {/* <div className="hidden lg:block">
             <form>
               <div className="relative">
                 <span className="absolute -translate-y-1/2 pointer-events-none left-4 top-1/2">
@@ -191,14 +194,14 @@ const AppHeader: React.FC = () => {
                 </button>
               </div>
             </form>
-          </div>
+          </div> */}
 
           {/* Action buttons - All in one row */}
           <div className="flex items-center gap-2 2xsm:gap-3">
             {/* Profiler Icon - Only for allowed users (configurable via VITE_PROFILER_ALLOWED_DOMAINS) */}
             {showProfiler && (
               <button
-                onClick={() => navigate("/profiler")}
+                onClick={() => setIsProfilerOpen(true)}
                 className="flex items-center justify-center w-10 h-10 text-blue-500 rounded-lg hover:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-900/50 transition-colors"
                 title="System Profiler"
               >
@@ -240,12 +243,15 @@ const AppHeader: React.FC = () => {
             {/* Dark Mode Toggler - Always visible */}
             <ThemeToggleButton />
             {/* Notification - Always visible */}
-            <NotificationDropdown />
+            {/* <NotificationDropdown /> */}
             {/* User Dropdown - Always visible */}
             <UserDropdown />
           </div>
         </div>
       </div>
+      
+      {/* Profiler Modal */}
+      <ProfilerModal isOpen={isProfilerOpen} onClose={() => setIsProfilerOpen(false)} />
     </header>
   );
 };

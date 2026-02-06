@@ -318,61 +318,120 @@ class SchoolDashboardModel:
         db: Session, college_name: str, fromdate: str, todate: str,
         date_ranges: List, use_daily: bool
     ) -> List[Dict[str, Any]]:
-        """Get transcripts processed in Banner - queries KICKOUT table for PROCESSED transcripts"""
+        """Get transcripts processed in Banner
+        Matches CI3 transcript_SAAADMS_dashboard() method for school
+        Queries DIGISCRIPT_LOG for STATUS_SOAHSCH, STATUS_SOATEST, STATUS_SOAHOLD, STATUS_BDMS
+        """
         try:
-            college_filter = f" AND INSTITUTION_ID = '{college_name}'" if college_name else ""
+            # School uses different status flags than college
+            status_flags = ['SOAHSCH', 'SOATEST', 'SOAHOLD', 'BDMS']
+            college_filter = f" AND (t.INSTITUTION_ID = '{college_name}')" if college_name else ""
+            
+            first_start_date = fromdate.split()[0]
+            last_end_date = todate.split()[0]
+            
+            # Build date values for SQL VALUES clause
+            if use_daily:
+                if not date_ranges:
+                    return [{"name": sf, "data": []} for sf in status_flags]
+                date_values = ", ".join([f"('{dr}')" for dr in date_ranges])
+            else:
+                if not date_ranges:
+                    return [{"name": sf, "data": []} for sf in status_flags]
+                date_values = ", ".join([f"('{dr['StartDate']}')" for dr in date_ranges])
+                first_start_date = date_ranges[0]['StartDate']
+                last_end_date = date_ranges[-1]['EndDate']
+
+            # Build all status columns in one query (matching CI3 approach)
+            sql_cols = ", ".join([
+                f"ISNULL(SUM(CASE WHEN UPPER(t.STATUS_{sf}) = 'PROCESSED' THEN 1 ELSE 0 END), 0) AS {sf}Count"
+                for sf in status_flags
+            ])
             
             if use_daily:
                 query = text(f"""
-                    SELECT CAST(LAST_UPDATED_DATETIME AS DATE) as date, COUNT(*) as count
-                    FROM {TBL_KICKOUT}
-                    WHERE (PROJECT_ID = {SCHOOL_PROJECT_ID})
-                    AND UPPER(TRANSCRIPT_STATUS_FLAG) = 'PROCESSED'
-                    AND CAST(LAST_UPDATED_DATETIME AS DATE) >= :fromdate
-                    AND CAST(LAST_UPDATED_DATETIME AS DATE) <= :todate
-                    {college_filter}
-                    GROUP BY CAST(LAST_UPDATED_DATETIME AS DATE)
-                    ORDER BY CAST(LAST_UPDATED_DATETIME AS DATE)
+                    SELECT 
+                        month_data.date AS date,
+                        {sql_cols}
+                    FROM
+                        (VALUES {date_values}) AS month_data(date)
+                    LEFT JOIN
+                        {TBL_KICKOUT} AS t 
+                        ON CAST(t.LAST_UPDATED_DATETIME AS DATE) = month_data.date
+                        AND (t.PROJECT_ID = {SCHOOL_PROJECT_ID})
+                        {college_filter}
+                    GROUP BY 
+                        month_data.date
+                    ORDER BY 
+                        month_data.date
                 """)
             else:
                 query = text(f"""
-                    SELECT YEAR(LAST_UPDATED_DATETIME) as year, MONTH(LAST_UPDATED_DATETIME) as month, COUNT(*) as count
-                    FROM {TBL_KICKOUT}
-                    WHERE (PROJECT_ID = {SCHOOL_PROJECT_ID})
-                    AND UPPER(TRANSCRIPT_STATUS_FLAG) = 'PROCESSED'
-                    AND CAST(LAST_UPDATED_DATETIME AS DATE) >= :fromdate
-                    AND CAST(LAST_UPDATED_DATETIME AS DATE) <= :todate
-                    {college_filter}
-                    GROUP BY YEAR(LAST_UPDATED_DATETIME), MONTH(LAST_UPDATED_DATETIME)
-                    ORDER BY YEAR(LAST_UPDATED_DATETIME), MONTH(LAST_UPDATED_DATETIME)
+                    SELECT 
+                        LEFT(DATENAME(month, month_data.date), 3) AS month,
+                        YEAR(month_data.date) AS year,
+                        DATEPART(MM, month_data.date) AS mth,
+                        {sql_cols}
+                    FROM 
+                        (VALUES {date_values}) AS month_data(date)
+                    LEFT JOIN 
+                        {TBL_KICKOUT} AS t 
+                        ON MONTH(t.LAST_UPDATED_DATETIME) = MONTH(month_data.date)
+                        AND YEAR(t.LAST_UPDATED_DATETIME) = YEAR(month_data.date)
+                        AND (t.PROJECT_ID = {SCHOOL_PROJECT_ID})
+                        AND CAST(t.LAST_UPDATED_DATETIME AS DATE) BETWEEN '{first_start_date}' AND '{last_end_date}'
+                        {college_filter}
+                    GROUP BY 
+                        DATENAME(month, month_data.date), 
+                        YEAR(month_data.date), 
+                        DATEPART(MM, month_data.date)
+                    ORDER BY 
+                        YEAR(month_data.date), 
+                        DATEPART(MM, month_data.date)
                 """)
-            
-            result = db.execute(query, {
-                "fromdate": fromdate.split()[0],
-                "todate": todate.split()[0]
-            }).fetchall()
-            
-            data_map = {}
+
+            result = db.execute(query).fetchall()
+
+            # Build a map of results by month/date
+            result_map = {}
             for row in result:
+                row_dict = dict(row._mapping) if hasattr(row, '_mapping') else dict(zip([c.key for c in row._parent.keys], row))
                 if use_daily:
-                    key = row.date.strftime('%Y-%m-%d')
+                    date_val = row_dict.get('date', row[0])
+                    if hasattr(date_val, 'strftime'):
+                        key = date_val.strftime('%Y-%m-%d')
+                    else:
+                        key = str(date_val)[:10]
                 else:
-                    key = f"{row.year}-{row.month:02d}"
-                data_map[key] = row.count
-            
-            data = []
-            for dr in date_ranges:
-                if use_daily:
-                    key = dr
-                else:
-                    dt = datetime.strptime(dr['StartDate'], '%Y-%m-%d')
-                    key = f"{dt.year}-{dt.month:02d}"
-                data.append(data_map.get(key, 0))
-            
-            return [{
-                "name": "PROCESSED",
-                "data": data
-            }]
+                    year = row_dict.get('year', row[1])
+                    mth = row_dict.get('mth', row[2])
+                    key = f"{year}-{int(mth):02d}"
+                result_map[key] = row_dict
+
+            # Build datasets for each status flag
+            datasets = []
+            for status_flag in status_flags:
+                data = []
+                for dr in date_ranges:
+                    if use_daily:
+                        key = dr[:10] if len(dr) > 10 else dr
+                    else:
+                        dt = datetime.strptime(dr['StartDate'], '%Y-%m-%d')
+                        key = f"{dt.year}-{dt.month:02d}"
+                    
+                    count_key = f"{status_flag}Count"
+                    if key in result_map:
+                        count = result_map[key].get(count_key, 0)
+                    else:
+                        count = 0
+                    data.append(count if count else 0)
+
+                datasets.append({
+                    "name": status_flag,
+                    "data": data
+                })
+
+            return datasets
         except Exception as e:
             logger.exception("Error in get_transcript_processed_data")
             return []

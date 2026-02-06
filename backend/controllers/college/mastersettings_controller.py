@@ -2,6 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
+from typing import Optional
 import logging
 from database.connection import get_db
 from models.master_settings_model import MasterSettingsModel
@@ -10,28 +11,31 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/mastersettings", tags=["mastersettings"])
 
 class SystemSettingsRequest(BaseModel):
-    system_name: str = None
-    system_title: str = None
-    address: str = None
-    mobile: str = None
-    system_email: str = None
-    email_password: str = None
-    terms: str = None
-    facebook: str = None
-    twiter: str = None
-    youtube: str = None
-    skype: str = None
-    pinterest: str = None
-    privacy: str = None
-    two_way_auth: str = None
-    two_way_auth_exept: str = None
-    trigger_update: str = None
-    trigger_update_mail: str = None
-    ktech_SSO_client_secret: str = None
-    ktech_SSO_clientId: str = None
-    ktech_SSO_tenantId: str = None
-    bot_process_name: str = None
-    Develper_mail: str = None
+    system_name: Optional[str] = None
+    system_title: Optional[str] = None
+    address: Optional[str] = None
+    mobile: Optional[str] = None
+    system_email: Optional[str] = None
+    email_password: Optional[str] = None
+    terms: Optional[str] = None
+    facebook: Optional[str] = None
+    twiter: Optional[str] = None
+    youtube: Optional[str] = None
+    skype: Optional[str] = None
+    pinterest: Optional[str] = None
+    privacy: Optional[str] = None
+    two_way_auth: Optional[str] = None
+    two_way_auth_exept: Optional[str] = None
+    trigger_update: Optional[str] = None
+    trigger_update_mail: Optional[str] = None
+    ktech_SSO_client_secret: Optional[str] = None
+    ktech_SSO_clientId: Optional[str] = None
+    ktech_SSO_tenantId: Optional[str] = None
+    bot_process_name: Optional[str] = None
+    Develper_mail: Optional[str] = None
+    
+    class Config:
+        extra = "ignore"  # Ignore extra fields from frontend
 
 @router.get("/get", response_model=dict)
 async def get_settings(db: Session = Depends(get_db)):

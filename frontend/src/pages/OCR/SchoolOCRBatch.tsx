@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSearchParams, Link } from "react-router";
 import { API_BASE_URL, api, API_ENDPOINTS } from "../../config/api";
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
@@ -50,6 +50,7 @@ export default function SchoolOCRBatch() {
   const [newRows, setNewRows] = useState<TestScoreRow[]>([]);
   const [selectedLineIds, setSelectedLineIds] = useState<Set<number>>(new Set());
   const [bulkEditMode, setBulkEditMode] = useState(false);
+  const newRowIdCounter = useRef(0);
 
   useEffect(() => {
     if (batchId) fetchBatch();
@@ -61,6 +62,8 @@ export default function SchoolOCRBatch() {
     try {
       setLoading(true);
       setError(null);
+      setNewRows([]);
+      setSelectedLineIds(new Set());
       const url = `${API_ENDPOINTS.OCR_SCHOOL_OCR_BATCH}?batch_id=${encodeURIComponent(batchId)}`;
       const response = await api.get(url);
       setBatch({
@@ -185,6 +188,25 @@ export default function SchoolOCRBatch() {
   const handleSaveLine = async (row: TestScoreRow, getValues: () => Record<string, string>) => {
     if (!batchId) return;
     const v = getValues();
+    
+    // Validate required fields for new rows
+    const isNewRow = row.AUTO_SEQNO == null;
+    if (isNewRow) {
+      const requiredFields = [
+        { key: "TEST_TYPE", label: "Test Type" },
+        { key: "TEST_DATE", label: "Test Date" },
+        { key: "SUBJECT", label: "Subject" },
+        { key: "SCORE", label: "Score" },
+        { key: "PAGE_NBR", label: "Page Number" },
+      ];
+      for (const field of requiredFields) {
+        if (!v[field.key]?.trim()) {
+          showMessage("error", `${field.label} is required for new rows`);
+          return;
+        }
+      }
+    }
+
     try {
       await api.post(API_ENDPOINTS.OCR_SCHOOL_OCR_UPDATE_BATCH_LINE, {
         BATCH_ID: batchId,
@@ -283,7 +305,12 @@ export default function SchoolOCRBatch() {
   };
 
   const handleAddRow = () => {
-    setNewRows((prev) => [...prev, {}]);
+    newRowIdCounter.current += 1;
+    setNewRows((prev) => [...prev, { _tempId: newRowIdCounter.current } as any]);
+  };
+
+  const handleCancelNewRow = (idx: number) => {
+    setNewRows((prev) => prev.filter((_, i) => i !== idx));
   };
 
   const handleAddRowsFromModal = async (numRows: number, values: Record<string, string>) => {
@@ -710,25 +737,30 @@ export default function SchoolOCRBatch() {
                     <td colSpan={bulkEditMode ? 6 : 7} className="p-4 text-center text-gray-500">No test score data.</td>
                   </tr>
                 ) : (
-                  displayLineData().map((line, idx) => (
-                    <SchoolLineRowEditor
-                      key={line.AUTO_SEQNO ?? `new-${idx}`}
-                      line={line}
-                      bulkEditMode={bulkEditMode}
-                      selected={line.AUTO_SEQNO != null && selectedLineIds.has(line.AUTO_SEQNO)}
-                      onToggleSelect={() => {
-                        if (line.AUTO_SEQNO == null) return;
-                        setSelectedLineIds((prev) => {
-                          const next = new Set(prev);
-                          if (next.has(line.AUTO_SEQNO!)) next.delete(line.AUTO_SEQNO!);
-                          else next.add(line.AUTO_SEQNO!);
-                          return next;
-                        });
-                      }}
-                      onSave={handleSaveLine}
-                      onDelete={handleDeleteLine}
-                    />
-                  ))
+                  displayLineData().map((line, idx) => {
+                    const existingCount = (batch?.line_data ?? []).length;
+                    const newRowIdx = idx >= existingCount ? idx - existingCount : -1;
+                    return (
+                      <SchoolLineRowEditor
+                        key={line.AUTO_SEQNO ?? `new-${(line as any)._tempId ?? idx}`}
+                        line={line}
+                        bulkEditMode={bulkEditMode}
+                        selected={line.AUTO_SEQNO != null && selectedLineIds.has(line.AUTO_SEQNO)}
+                        onToggleSelect={() => {
+                          if (line.AUTO_SEQNO == null) return;
+                          setSelectedLineIds((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(line.AUTO_SEQNO!)) next.delete(line.AUTO_SEQNO!);
+                            else next.add(line.AUTO_SEQNO!);
+                            return next;
+                          });
+                        }}
+                        onSave={handleSaveLine}
+                        onDelete={handleDeleteLine}
+                        onCancelNew={newRowIdx >= 0 ? () => handleCancelNewRow(newRowIdx) : undefined}
+                      />
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -770,7 +802,7 @@ function SchoolAddRowsModal({
   onApply,
 }: {
   onClose: () => void;
-  onApply: (numRows: number, values: Record<string, string>) => void;
+  onApply: (numRows: number, values: Record<string, string>) => Promise<void>;
 }) {
   const [numRows, setNumRows] = useState(1);
   const [testType, setTestType] = useState("");
@@ -778,10 +810,16 @@ function SchoolAddRowsModal({
   const [subject, setSubject] = useState("");
   const [score, setScore] = useState("");
   const [pageNbr, setPageNbr] = useState("1");
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleApply = () => {
+  const handleApply = async () => {
     const n = Math.min(20, Math.max(1, numRows));
-    onApply(n, { TEST_TYPE: testType, TEST_DATE: testDate, SUBJECT: subject, SCORE: score, PAGE_NBR: pageNbr });
+    setSubmitting(true);
+    try {
+      await onApply(n, { TEST_TYPE: testType, TEST_DATE: testDate, SUBJECT: subject, SCORE: score, PAGE_NBR: pageNbr });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -815,8 +853,10 @@ function SchoolAddRowsModal({
           </div>
         </div>
         <div className="flex gap-2 justify-end">
-          <Button variant="outline" onClick={onClose}>Close</Button>
-          <Button onClick={handleApply}>Add Rows</Button>
+          <Button variant="outline" onClick={onClose} disabled={submitting}>Close</Button>
+          <Button onClick={handleApply} disabled={submitting}>
+            {submitting ? "Adding..." : "Add Rows"}
+          </Button>
         </div>
       </div>
     </div>
@@ -830,6 +870,7 @@ function SchoolLineRowEditor({
   onToggleSelect,
   onSave,
   onDelete,
+  onCancelNew,
 }: {
   line: TestScoreRow;
   bulkEditMode?: boolean;
@@ -837,9 +878,18 @@ function SchoolLineRowEditor({
   onToggleSelect?: () => void;
   onSave: (row: TestScoreRow, getValues: () => Record<string, string>) => void;
   onDelete: (autoSeqno: number) => void;
+  onCancelNew?: () => void;
 }) {
+  const isNewRow = line.AUTO_SEQNO == null;
   const [editing, setEditing] = useState(false);
-  const id = line.AUTO_SEQNO ?? "new";
+  const id = line.AUTO_SEQNO ?? `new-${(line as any)._tempId ?? "x"}`;
+
+  // Auto-enable editing for new rows
+  useEffect(() => {
+    if (isNewRow) {
+      setEditing(true);
+    }
+  }, [isNewRow]);
 
   const getValues = (): Record<string, string> => ({
     TEST_TYPE: (document.getElementById(`TEST_TYPE_${id}`) as HTMLInputElement)?.value ?? "",
@@ -901,7 +951,13 @@ function SchoolLineRowEditor({
         </td>
         <td className="p-2">
           <button type="button" onClick={() => { onSave(line, getValues); setEditing(false); }} className="text-green-600 hover:underline mr-2">Save</button>
-          <button type="button" onClick={() => setEditing(false)} className="text-gray-600 hover:underline">Cancel</button>
+          <button type="button" onClick={() => {
+            if (isNewRow && onCancelNew) {
+              onCancelNew();
+            } else {
+              setEditing(false);
+            }
+          }} className="text-gray-600 hover:underline">Cancel</button>
         </td>
       </tr>
     );

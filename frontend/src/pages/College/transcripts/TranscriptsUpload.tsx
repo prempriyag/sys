@@ -165,6 +165,15 @@ export default function TranscriptsUpload() {
                     </svg>
                   </span>
                 </div>
+
+                <div className="mt-4">
+                  <Button
+                    type="submit"
+                    disabled={uploading}
+                  >
+                    {uploading ? "Uploading..." : "Submit"}
+                  </Button>
+                </div>
               </div>
 
               <div>
@@ -195,38 +204,26 @@ export default function TranscriptsUpload() {
                 </div>
               </div>
             </div>
-
-            <div className="flex justify-center">
-              <Button
-                type="submit"
-                disabled={uploading}
-                startIcon={<ArrowUpIcon className="w-5 h-5" />}
-              >
-                {uploading ? "Uploading..." : "Submit"}
-              </Button>
-            </div>
           </form>
 
-          {sourceType === "Scanned" && (
-            <div className="mt-8 p-6 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
-              <h4 className="font-semibold mb-4 text-gray-800 dark:text-white">
-                GUIDELINES TO BE FOLLOWED WHILE UPLOADING TRANSCRIPTS
-              </h4>
-              <ul className="list-disc list-inside space-y-2 text-sm text-gray-700 dark:text-gray-300">
-                <li>Only PDF documents should be uploaded</li>
-                <li>Upload all the pages of a transcript in one single pdf document</li>
-                <li>Upload a properly scanned file with all the borders of the Transcript visible. For e.g. No borders should be trimmed which have College name printed</li>
-                <li>Only upload unofficial transcripts under the ScannedUnofficial source.</li>
-                <li>DigiScript will only accept files up to 20 pages. Files that exceed this limit will be automatically trimmed to 20 pages.</li>
-                <li>If any file has restricted permissions, please save it using the "Print as pdf" and then upload the file. It will have "PRINTED COPY" printed everywhere on the transcript</li>
-                <li>Transcript scanned should not be skewed. The lines should be horizontally and vertically aligned</li>
-                <li>Ensure that the institution name and other identifying marks are not missed during the scanning process</li>
-                <li>Do not compress the size of the pdf after scanning. Upload it without compressing</li>
-                <li>Please upload no more than 10 transcript files in a single batch.</li>
-                <li>Ensure that the transcript filename does not contain any special characters.</li>
-              </ul>
-            </div>
-          )}
+          <div className="mt-8 p-6 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
+            <h4 className="font-semibold mb-4 text-gray-800 dark:text-white">
+              GUIDELINES TO BE FOLLOWED WHILE UPLOADING TRANSCRIPTS
+            </h4>
+            <ul className="list-disc list-inside space-y-2 text-sm text-gray-700 dark:text-gray-300">
+              <li>Only PDF documents should be uploaded</li>
+              <li>Upload all the pages of a transcript in one single pdf document</li>
+              <li>Upload a properly scanned file with all the borders of the Transcript visible. For e.g. No borders should be trimmed which have College name printed</li>
+              <li>Only upload unofficial transcripts under the ScannedUnofficial source.</li>
+              <li>DigiScript will only accept files up to 20 pages. Files that exceed this limit will be automatically trimmed to 20 pages.</li>
+              <li>If any file has restricted permissions, please save it using the "Print as pdf" and then upload the file. It will have "PRINTED COPY" printed everywhere on the transcript</li>
+              <li>Transcript scanned should not be skewed. The lines should be horizontally and vertically aligned</li>
+              <li>Ensure that the institution name and other identifying marks are not missed during the scanning process</li>
+              <li>Do not compress the size of the pdf after scanning. Upload it without compressing</li>
+              <li>Please upload no more than 10 transcript files in a single batch.</li>
+              <li>Ensure that the transcript filename does not contain any special characters.</li>
+            </ul>
+          </div>
         </div>
       </PageContainer>
     </PageWrapper>

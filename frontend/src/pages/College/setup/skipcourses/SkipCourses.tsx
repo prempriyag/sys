@@ -200,7 +200,7 @@ export default function SkipCourses() {
       <PageBreadcrumb pageTitle="Skip/Exclude Courses" />
       <PageContainer>
         <div className="mb-3 flex items-center justify-between">
-          <h3 className="font-semibold text-gray-800 text-theme-xl dark:text-white/90 sm:text-2xl">View Skip Courses</h3>
+          <h3 className="font-semibold text-gray-800 text-theme-xl dark:text-white/90 sm:text-2xl">View Skip/Exclude Courses</h3>
           <div className="flex items-center gap-2">
             {hasAddPermission && (
               <Button onClick={handleAdd}>Add Course</Button>
@@ -234,7 +234,7 @@ export default function SkipCourses() {
           columns={[
             { 
               data: "INSTITUTION_ID", 
-              name: "Institution ID", 
+              name: "Banner Institution ID", 
               searchable: true, 
               orderable: true,
               render: (data: any) => {
@@ -251,10 +251,9 @@ export default function SkipCourses() {
                 );
               }
             },
-            { data: "INSTITUTION_NAME", name: "Institution Name", searchable: true, orderable: true },
-            { data: "CATEGORY", name: "Category", searchable: true, orderable: true },
-            { data: "EXTERNAL_SUBJECT", name: "External Subject", searchable: true, orderable: true },
-            { data: "EXTERNAL_COURSE_ID", name: "External Course ID", searchable: true, orderable: true },
+            { data: "INSTITUTION_NAME", name: "Banner Institution Name", searchable: true, orderable: true },
+            { data: "EXTERNAL_SUBJECT", name: "Subject", searchable: true, orderable: true },
+            { data: "EXTERNAL_COURSE_ID", name: "Course ID", searchable: true, orderable: true },
             { data: "UPDATED_BY", name: "Updated By", searchable: true, orderable: true },
             { data: "LAST_UPDATED_DATETIME", name: "Updated On", searchable: false, orderable: true },
             ...(hasUpdatePermission || hasDeletePermission ? [{
@@ -286,12 +285,12 @@ export default function SkipCourses() {
           <div className="p-6">
             <form onSubmit={(e) => handleSubmit(e, false)} className="space-y-4">
               <div>
-                <Label>Institution ID *</Label>
+                <Label>Banner Institution ID *</Label>
                 <Input
                   value={formData.INSTITUTION_ID}
                   onChange={(e) => handleFieldChange("INSTITUTION_ID", e.target.value)}
                   onBlur={(e) => handleBlur("INSTITUTION_ID", e.target.value)}
-                  placeholder="Enter Institution ID"
+                  placeholder="Enter Banner Institution ID"
                   error={!!errors.INSTITUTION_ID}
                 />
                 {errors.INSTITUTION_ID && (
@@ -299,12 +298,12 @@ export default function SkipCourses() {
                 )}
               </div>
               <div>
-                <Label>External Subject *</Label>
+                <Label>Subject *</Label>
                 <Input
                   value={formData.EXTERNAL_SUBJECT}
                   onChange={(e) => handleFieldChange("EXTERNAL_SUBJECT", e.target.value)}
                   onBlur={(e) => handleBlur("EXTERNAL_SUBJECT", e.target.value)}
-                  placeholder="Enter External Subject"
+                  placeholder="Enter Subject"
                   error={!!errors.EXTERNAL_SUBJECT}
                 />
                 {errors.EXTERNAL_SUBJECT && (
@@ -312,12 +311,12 @@ export default function SkipCourses() {
                 )}
               </div>
               <div>
-                <Label>External Course ID *</Label>
+                <Label>Course ID *</Label>
                 <Input
                   value={formData.EXTERNAL_COURSE_ID}
                   onChange={(e) => handleFieldChange("EXTERNAL_COURSE_ID", e.target.value)}
                   onBlur={(e) => handleBlur("EXTERNAL_COURSE_ID", e.target.value)}
-                  placeholder="Enter External Course ID"
+                  placeholder="Enter Course ID"
                   error={!!errors.EXTERNAL_COURSE_ID}
                 />
                 {errors.EXTERNAL_COURSE_ID && (
@@ -374,12 +373,12 @@ export default function SkipCourses() {
           <div className="p-6">
             <form onSubmit={(e) => handleSubmit(e, true)} className="space-y-4">
               <div>
-                <Label>Institution ID *</Label>
+                <Label>Banner Institution ID *</Label>
                 <Input
                   value={formData.INSTITUTION_ID}
                   onChange={(e) => handleFieldChange("INSTITUTION_ID", e.target.value)}
                   onBlur={(e) => handleBlur("INSTITUTION_ID", e.target.value)}
-                  placeholder="Enter Institution ID"
+                  placeholder="Enter Banner Institution ID"
                   error={!!errors.INSTITUTION_ID}
                 />
                 {errors.INSTITUTION_ID && (
@@ -387,12 +386,12 @@ export default function SkipCourses() {
                 )}
               </div>
               <div>
-                <Label>External Subject *</Label>
+                <Label>Subject *</Label>
                 <Input
                   value={formData.EXTERNAL_SUBJECT}
                   onChange={(e) => handleFieldChange("EXTERNAL_SUBJECT", e.target.value)}
                   onBlur={(e) => handleBlur("EXTERNAL_SUBJECT", e.target.value)}
-                  placeholder="Enter External Subject"
+                  placeholder="Enter Subject"
                   error={!!errors.EXTERNAL_SUBJECT}
                 />
                 {errors.EXTERNAL_SUBJECT && (
@@ -400,12 +399,12 @@ export default function SkipCourses() {
                 )}
               </div>
               <div>
-                <Label>External Course ID *</Label>
+                <Label>Course ID *</Label>
                 <Input
                   value={formData.EXTERNAL_COURSE_ID}
                   onChange={(e) => handleFieldChange("EXTERNAL_COURSE_ID", e.target.value)}
                   onBlur={(e) => handleBlur("EXTERNAL_COURSE_ID", e.target.value)}
-                  placeholder="Enter External Course ID"
+                  placeholder="Enter Course ID"
                   error={!!errors.EXTERNAL_COURSE_ID}
                 />
                 {errors.EXTERNAL_COURSE_ID && (

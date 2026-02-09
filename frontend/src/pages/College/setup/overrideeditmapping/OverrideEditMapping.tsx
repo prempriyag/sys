@@ -274,7 +274,6 @@ export default function OverrideEditMapping() {
             { data: "COURSE", name: "Course", searchable: true, orderable: true },
             { data: "EQV_SUBJECT", name: "Equivalent Subject", searchable: true, orderable: true },
             { data: "EQV_COURSE", name: "Equivalent Course", searchable: true, orderable: true },
-            { data: "COURSE_ATTRIBUTE", name: "Course Attribute", searchable: true, orderable: true },
             { data: "UPDATED_BY", name: "Updated By", searchable: true, orderable: true },
             { data: "UPDATED_ON", name: "Updated On", searchable: false, orderable: true },
             ...(hasUpdatePermission || hasDeletePermission ? [{
@@ -372,14 +371,6 @@ export default function OverrideEditMapping() {
                     value={formData.EQV_COURSE}
                     onChange={(e) => handleFieldChange("EQV_COURSE", e.target.value)}
                     placeholder="Enter Equivalent Course"
-                  />
-                </div>
-                <div>
-                  <Label>Course Attribute</Label>
-                  <Input
-                    value={formData.COURSE_ATTRIBUTE}
-                    onChange={(e) => handleFieldChange("COURSE_ATTRIBUTE", e.target.value)}
-                    placeholder="Enter Course Attribute"
                   />
                 </div>
               </div>
@@ -499,14 +490,6 @@ export default function OverrideEditMapping() {
                     value={formData.EQV_COURSE}
                     onChange={(e) => handleFieldChange("EQV_COURSE", e.target.value)}
                     placeholder="Enter Equivalent Course"
-                  />
-                </div>
-                <div>
-                  <Label>Course Attribute</Label>
-                  <Input
-                    value={formData.COURSE_ATTRIBUTE}
-                    onChange={(e) => handleFieldChange("COURSE_ATTRIBUTE", e.target.value)}
-                    placeholder="Enter Course Attribute"
                   />
                 </div>
               </div>

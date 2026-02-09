@@ -133,8 +133,8 @@ export const createTranscriptReportColumns = (
     // Column 2: EXTERNAL_INSTITUTION_ZIPCODE (notvisible)
     {
       data: "EXTERNAL_INSTITUTION_ZIPCODE",
-      name: "EXTERNAL INSTITUTION ZIPCODE",
-      searchable: false,
+      name: "External Institution Zipcode",
+      searchable: true,
       orderable: true,
       visible: false, // notvisible
     },
@@ -189,7 +189,7 @@ export const createTranscriptReportColumns = (
     {
       data: "STUDENT_FIRST_NAME",
       name: "Student First Name",
-      searchable: false,
+      searchable: true,
       orderable: true,
       visible: false, // notvisible
     },
@@ -198,7 +198,7 @@ export const createTranscriptReportColumns = (
     {
       data: "STUDENT_LAST_NAME",
       name: "Student Last Name",
-      searchable: false,
+      searchable: true,
       orderable: true,
       visible: false, // notvisible
     },
@@ -206,8 +206,8 @@ export const createTranscriptReportColumns = (
     // Column 8: DATE_OF_BIRTH (notvisible)
     {
       data: "DATE_OF_BIRTH",
-      name: "Date Of Birth",
-      searchable: false,
+      name: "Date of Birth",
+      searchable: true,
       orderable: true,
       visible: false, // notvisible
     },
@@ -216,7 +216,7 @@ export const createTranscriptReportColumns = (
     {
       data: "SSN",
       name: "SSN",
-      searchable: false,
+      searchable: true,
       orderable: true,
       visible: false, // notvisible
       textCenter: true,
@@ -259,7 +259,7 @@ export const createTranscriptReportColumns = (
     {
       data: "CGPA",
       name: "CGPA",
-      searchable: false,
+      searchable: true,
       orderable: true,
       visible: false, // notvisible
     },
@@ -268,7 +268,7 @@ export const createTranscriptReportColumns = (
     {
       data: "TOTAL_CREDITS_EARNED",
       name: "Total Credits Earned",
-      searchable: false,
+      searchable: true,
       orderable: true,
       visible: false, // notvisible
       textCenter: true,
@@ -278,46 +278,10 @@ export const createTranscriptReportColumns = (
     {
       data: "TOTAL_CREDITS_ATTENDED",
       name: "Total Credits Attended",
-      searchable: false,
+      searchable: true,
       orderable: true,
       visible: false, // notvisible
       textCenter: true,
-    },
-
-    // Column 14: DEGREE_CD (notvisible)
-    {
-      data: "DEGREE_CD",
-      name: "Degree CD",
-      searchable: false,
-      orderable: true,
-      visible: false, // notvisible
-    },
-
-    // Column 15: DEGREE_RECEIVED_DATE (notvisible)
-    {
-      data: "DEGREE_RECEIVED_DATE",
-      name: "Degree Received Date",
-      searchable: false,
-      orderable: true,
-      visible: false, // notvisible
-    },
-
-    // Column 16: SECOND_DEGREE_CD (notvisible)
-    {
-      data: "SECOND_DEGREE_CD",
-      name: "Second Degree",
-      searchable: false,
-      orderable: true,
-      visible: false, // notvisible
-    },
-
-    // Column 17: SECOND_DEGREE_RECEIVED_DATE (notvisible)
-    {
-      data: "SECOND_DEGREE_RECEIVED_DATE",
-      name: "Second Degree Received Date",
-      searchable: false,
-      orderable: true,
-      visible: false, // notvisible
     },
 
     // Column 20: STATUS_BANNER (noorder)
@@ -350,7 +314,7 @@ export const createTranscriptReportColumns = (
     {
       data: "SCENARIO",
       name: "Scenario",
-      searchable: false,
+      searchable: true,
       orderable: true,
       visible: false, // notvisible
     },
@@ -359,7 +323,7 @@ export const createTranscriptReportColumns = (
     {
       data: "COMMENTS",
       name: "Comment",
-      searchable: false,
+      searchable: true,
       orderable: true,
       visible: false, // notvisible
     },
@@ -439,7 +403,7 @@ export const createTranscriptReportColumns = (
   columns.push({
     data: "SOURCE_TYPE",
     name: "Source Type",
-    searchable: false,
+    searchable: true,
     orderable: true,
     visible: false, // notvisible
   });
@@ -457,8 +421,8 @@ export const createTranscriptReportColumns = (
     },
   });
 
-  // Column 30: ACTION (notexport, noorder) - only if not Processed, equivalenthours, or empty
-  if (type !== "Processed" && type !== "equivalenthours" && type !== "") {
+  // Column 30: ACTION (notexport, noorder) - HS: show for all types including Processed (except equivalenthours and empty)
+  if (type !== "equivalenthours" && type !== "") {
     // Debug: Check if handlers are provided (helpers are already captured in closure from line 41)
     if (!handleActionChange) {
       console.error('columnConfig: handleActionChange is missing in helpers!', {
@@ -488,37 +452,8 @@ export const createTranscriptReportColumns = (
             onCommentChange={handleCommentChange || (() => { })}
             onScenarioChange={handleScenarioChange || (() => { })}
             rowChanges={rowChanges}
+            module="school"
           />
-        );
-      },
-    });
-  }
-
-  // Column 31-32: LETTER_SENT_DATE and TRANSFER_LETTER_FILE_LINK - only for Processed or equivalenthours
-  if (type === "Processed" || type === "equivalenthours") {
-    columns.push({
-      data: "LETTER_SENT_DATE",
-      name: "Letter Sent Date",
-      searchable: false,
-      orderable: false,
-    });
-    columns.push({
-      data: "TRANSFER_LETTER_FILE_LINK",
-      name: "Transfer Letter File Link",
-      searchable: false,
-      orderable: false,
-      render: (data: any) => {
-        if (!data || data === "" || data === null || data === undefined) {
-          return "-";
-        }
-        const pdfUrl = getPdfUrl(data, "articulation");
-        if (!pdfUrl || pdfUrl === "") {
-          return "-";
-        }
-        return (
-          <a href={pdfUrl} target="_blank" rel="noopener noreferrer" className="text-brand-500 hover:underline">
-            <span className="fa fa-link"></span>
-          </a>
         );
       },
     });

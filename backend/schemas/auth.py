@@ -2,7 +2,7 @@
 Authentication schemas for request/response validation
 """
 from pydantic import BaseModel, EmailStr, Field
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 
 
@@ -14,7 +14,13 @@ class LoginRequest(BaseModel):
 
 class VerifyCodeRequest(BaseModel):
     """Two-way verification code request schema"""
+    temp_token: str = Field(..., min_length=1)
     verifycode: str = Field(..., min_length=1, max_length=10)
+
+
+class ResendCodeRequest(BaseModel):
+    """Resend two-way verification code request schema"""
+    temp_token: str = Field(..., min_length=1)
 
 
 class UserResponse(BaseModel):
@@ -40,6 +46,17 @@ class LoginResponse(BaseModel):
     token_type: str = "bearer"
     user: UserResponse
     permissions: Optional[dict] = None  # User permissions for frontend
+    # Two-way auth fields (only present when 2FA is required)
+    requires_verification: bool = False
+
+
+class TwoWayAuthResponse(BaseModel):
+    """Response when two-way verification is required"""
+    requires_verification: bool = True
+    temp_token: str  # Temporary token to identify this verification session
+    verify_data: List[int]  # 3 random numbers for the user to choose from
+    email_masked: str  # Masked email for display
+    message: str = "Two-way verification required. Verification code sent to email."
 
 
 class MessageResponse(BaseModel):

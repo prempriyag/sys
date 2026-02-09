@@ -24,28 +24,40 @@ def get_smtp_config(db: Session) -> Optional[dict]:
         smtp_username = get_setting(db, 'smtp_username')
         smtp_password = get_setting(db, 'smtp_password')
         
+        print(f"[SMTP DEBUG] Settings: host='{smtp_host}', port='{smtp_port}', username='{smtp_username}', password={'***' if smtp_password else 'EMPTY'}")
+        
         if smtp_host and str(smtp_host).strip():
-            return {
+            config = {
                 "host": str(smtp_host).strip(),
                 "port": int(smtp_port) if smtp_port else 587,
                 "username": str(smtp_username or "").strip(),
                 "password": str(smtp_password or ""),
             }
+            print(f"[SMTP DEBUG] Using settings config: host={config['host']}, port={config['port']}")
+            return config
         
         # Fallback to PORTAL_SMTP table
+        print(f"[SMTP DEBUG] No settings config, falling back to {TBL_SMTP} table")
         query = text(f"SELECT TOP 1 host, username, password, port FROM {TBL_SMTP} WITH(NOLOCK) ORDER BY id")
         result = db.execute(query).fetchone()
         if result:
             row = dict(result._mapping)
+            print(f"[SMTP DEBUG] PORTAL_SMTP row: host='{row.get('host')}', port='{row.get('port')}', username='{row.get('username')}'")
             if row.get("host") and str(row.get("host", "")).strip():
-                return {
+                config = {
                     "host": str(row.get("host", "")).strip(),
                     "port": int(row.get("port")) if row.get("port") not in (None, "") else 587,
                     "username": str(row.get("username", "")).strip(),
                     "password": str(row.get("password", "") or ""),
                 }
+                print(f"[SMTP DEBUG] Using PORTAL_SMTP config: host={config['host']}, port={config['port']}")
+                return config
+        else:
+            print(f"[SMTP DEBUG] No rows found in {TBL_SMTP}")
     except Exception as e:
+        print(f"[SMTP DEBUG] Error getting SMTP config: {e}")
         logger.exception("Error getting SMTP config: %s", e)
+    print("[SMTP DEBUG] No SMTP config found - returning None")
     return None
 
 
@@ -64,6 +76,7 @@ def send_email(db: Session, to: Union[str, List[str]], subject: str, html_body: 
     """
     config = get_smtp_config(db)
     if not config:
+        print(f"[EMAIL] SMTP not configured - cannot send email to {to}")
         logger.warning("SMTP not configured - cannot send email")
         return False
     
@@ -74,6 +87,7 @@ def send_email(db: Session, to: Union[str, List[str]], subject: str, html_body: 
         recipients = to
     
     try:
+        print(f"[EMAIL] Preparing email to {recipients}, subject='{subject}'")
         msg = MIMEMultipart("alternative")
         msg["Subject"] = subject
         msg["From"] = config["username"]
@@ -81,15 +95,19 @@ def send_email(db: Session, to: Union[str, List[str]], subject: str, html_body: 
         part = MIMEText(html_body, "html")
         msg.attach(part)
         
+        print(f"[EMAIL] Connecting to SMTP: {config['host']}:{config['port']}")
         with smtplib.SMTP(config["host"], config["port"]) as server:
             server.starttls()
             if config.get("username") and config.get("password"):
+                print(f"[EMAIL] Logging in as {config['username']}")
                 server.login(config["username"], config["password"])
             server.sendmail(config["username"], recipients, msg.as_string())
         
+        print(f"[EMAIL] Email sent successfully to {recipients}")
         logger.info(f"Email sent successfully to {recipients}")
         return True
     except Exception as e:
+        print(f"[EMAIL] Error sending email: {type(e).__name__}: {e}")
         logger.exception("Error sending email: %s", e)
         return False
 

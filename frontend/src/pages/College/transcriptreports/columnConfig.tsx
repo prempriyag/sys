@@ -134,8 +134,8 @@ export const createTranscriptReportColumns = (
     // Column 2: EXTERNAL_INSTITUTION_ZIPCODE (notvisible)
     {
       data: "EXTERNAL_INSTITUTION_ZIPCODE",
-      name: "EXTERNAL INSTITUTION ZIPCODE",
-      searchable: false,
+      name: "External Institution Zipcode",
+      searchable: true,
       orderable: true,
       visible: false, // notvisible
     },
@@ -217,7 +217,7 @@ export const createTranscriptReportColumns = (
     {
       data: "STUDENT_FIRST_NAME",
       name: "Student First Name",
-      searchable: false,
+      searchable: true,
       orderable: true,
       visible: false, // notvisible
     },
@@ -226,7 +226,7 @@ export const createTranscriptReportColumns = (
     {
       data: "STUDENT_LAST_NAME",
       name: "Student Last Name",
-      searchable: false,
+      searchable: true,
       orderable: true,
       visible: false, // notvisible
     },
@@ -234,8 +234,8 @@ export const createTranscriptReportColumns = (
     // Column 8: DATE_OF_BIRTH (notvisible)
     {
       data: "DATE_OF_BIRTH",
-      name: "Date Of Birth",
-      searchable: false,
+      name: "Date of Birth",
+      searchable: true,
       orderable: true,
       visible: false, // notvisible
     },
@@ -244,7 +244,7 @@ export const createTranscriptReportColumns = (
     {
       data: "SSN",
       name: "SSN",
-      searchable: false,
+      searchable: true,
       orderable: true,
       visible: false, // notvisible
       textCenter: true,
@@ -287,7 +287,7 @@ export const createTranscriptReportColumns = (
     {
       data: "CGPA",
       name: "CGPA",
-      searchable: false,
+      searchable: true,
       orderable: true,
       visible: false, // notvisible
     },
@@ -296,7 +296,7 @@ export const createTranscriptReportColumns = (
     {
       data: "TOTAL_CREDITS_EARNED",
       name: "Total Credits Earned",
-      searchable: false,
+      searchable: true,
       orderable: true,
       visible: false, // notvisible
       textCenter: true,
@@ -306,7 +306,7 @@ export const createTranscriptReportColumns = (
     {
       data: "TOTAL_CREDITS_ATTENDED",
       name: "Total Credits Attended",
-      searchable: false,
+      searchable: true,
       orderable: true,
       visible: false, // notvisible
       textCenter: true,
@@ -316,7 +316,7 @@ export const createTranscriptReportColumns = (
     {
       data: "DEGREE_CD",
       name: "Degree CD",
-      searchable: false,
+      searchable: true,
       orderable: true,
       visible: false, // notvisible
     },
@@ -325,7 +325,7 @@ export const createTranscriptReportColumns = (
     {
       data: "DEGREE_RECEIVED_DATE",
       name: "Degree Received Date",
-      searchable: false,
+      searchable: true,
       orderable: true,
       visible: false, // notvisible
     },
@@ -334,7 +334,7 @@ export const createTranscriptReportColumns = (
     {
       data: "SECOND_DEGREE_CD",
       name: "Second Degree",
-      searchable: false,
+      searchable: true,
       orderable: true,
       visible: false, // notvisible
     },
@@ -343,7 +343,7 @@ export const createTranscriptReportColumns = (
     {
       data: "SECOND_DEGREE_RECEIVED_DATE",
       name: "Second Degree Received Date",
-      searchable: false,
+      searchable: true,
       orderable: true,
       visible: false, // notvisible
     },
@@ -404,7 +404,7 @@ export const createTranscriptReportColumns = (
     {
       data: "SCENARIO",
       name: "Scenario",
-      searchable: false,
+      searchable: true,
       orderable: true,
       visible: false, // notvisible
     },
@@ -413,7 +413,7 @@ export const createTranscriptReportColumns = (
     {
       data: "COMMENTS",
       name: "Comment",
-      searchable: false,
+      searchable: true,
       orderable: true,
       visible: false, // notvisible
     },
@@ -493,7 +493,7 @@ export const createTranscriptReportColumns = (
   columns.push({
     data: "SOURCE_TYPE",
     name: "Source Type",
-    searchable: false,
+    searchable: true,
     orderable: true,
     visible: false, // notvisible
   });

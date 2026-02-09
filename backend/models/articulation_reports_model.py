@@ -66,6 +66,38 @@ class ArticulationReportsModel:
                 lower(k.UPDATED_BY) like'%{search_lower}%' or
                 lower(k.USER_COMMENTS) like'%{search_lower}%') """)
 
+        # Column-specific search (individual column search boxes)
+        columns = request_data.get("columns", [])
+        if columns:
+            for col in columns:
+                col_search = col.get("search", {})
+                col_search_value = col_search.get("value", "").strip() if col_search else ""
+                
+                if col_search_value:
+                    col_data = col.get("data", "")
+                    col_search_safe = check_special_name(col_search_value)
+                    col_search_lower = check_special_name(col_search_value.lower())
+                    
+                    # Map column data names to database fields
+                    if col_data == "INSTITUTION_NAME":
+                        search_conditions.append(
+                            f"lower((SELECT TOP 1 INSTITUTION_NAME FROM {TBL_INSTITUTION_MAPPING} as m WHERE m.INSTITUTION_ID = k.INSTITUTION_ID)) LIKE '%{col_search_lower}%'"
+                        )
+                    elif col_data == "INSTITUTION_ID":
+                        search_conditions.append(f"k.INSTITUTION_ID like '%{col_search_safe}%'")
+                    elif col_data == "STUDENT_ID":
+                        search_conditions.append(f"k.STUDENT_ID like '%{col_search_safe}%'")
+                    elif col_data == "STUDENT_FULL_NAME":
+                        search_conditions.append(f"lower(d.STUDENT_FULL_NAME) like '%{col_search_lower}%'")
+                    elif col_data == "BATCH_ID":
+                        search_conditions.append(f"k.BATCH_ID like '%{col_search_safe}%'")
+                    elif col_data == "ARTICULATION_STATUS_FLAG":
+                        search_conditions.append(f"lower(k.ARTICULATION_STATUS_FLAG) like '%{col_search_lower}%'")
+                    elif col_data == "LAST_UPDATED_DATETIME":
+                        search_conditions.append(f"k.LAST_UPDATED_DATETIME like '%{col_search_safe}%'")
+                    elif col_data == "UPDATED_BY":
+                        search_conditions.append(f"lower(k.UPDATED_BY) like '%{col_search_lower}%'")
+
         # Search_Field filters (matches CI3 lines 58-71)
         search_field = request_data.get("Search_Field", "")
 

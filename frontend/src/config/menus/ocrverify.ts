@@ -105,6 +105,7 @@ export const ocrverifyMenu: MenuConfig = {
           name: "Transfer Grades",
           path: "/ocrverify/transfergrademapping",
           permission: "transfer_grade_mapping",
+          icon: "arrow-right",
         },
         {
           name: "Year Mapping",

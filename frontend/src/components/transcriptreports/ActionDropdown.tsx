@@ -19,6 +19,7 @@ interface ActionDropdownProps {
   articulationStatus?: string;
   onActionChange: (action: string, batchId: string, data: any) => void;
   disabled?: boolean;
+  module?: "college" | "school";
 }
 
 export default function ActionDropdown({
@@ -29,6 +30,7 @@ export default function ActionDropdown({
   articulationStatus,
   onActionChange,
   disabled = false,
+  module = "college",
 }: ActionDropdownProps) {
   const [selectedValue, setSelectedValue] = useState<string>("0");
 
@@ -45,7 +47,10 @@ export default function ActionDropdown({
     { uniqueValue: "Rerun", action: "Rerun", label: "Reprocess this Transcript", dataType: "Rerun" },
     { uniqueValue: "Rerun15", action: "Rerun", label: "Reprocess for 30 days", dataType: "Rerun15" },
     { uniqueValue: "Processed", action: "Processed", label: "Processed Manually by CSC", dataType: "Processed" },
-    { uniqueValue: "Processed_Articulated", action: "Processed", label: "Processed and Articulated manually by CSC", dataType: "Articulated" },
+    // "Processed and Articulated" is only applicable for College transcripts, not HS
+    ...(module !== "school" ? [
+      { uniqueValue: "Processed_Articulated", action: "Processed", label: "Processed and Articulated manually by CSC", dataType: "Articulated" },
+    ] : []),
   ];
 
   // Articulation reprocess options (matching CI3 lines 519-524)

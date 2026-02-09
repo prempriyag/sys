@@ -92,6 +92,7 @@ export const schoolMenu: MenuConfig = {
         },
         {
           name: "Student to Transcripts",
+          icon: "arrow-right",
           path: "/school/Studentview",
           permission: "student_view",
         },

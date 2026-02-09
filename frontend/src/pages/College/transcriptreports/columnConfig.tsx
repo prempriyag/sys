@@ -19,6 +19,7 @@ export interface ColumnConfig {
   textCenter?: boolean; // true for text-center columns
   defaultOrder?: boolean; // true for defaultOrderby column
   width?: string; // column width e.g. "200px"
+  wrapText?: boolean; // enable text wrapping
   render?: (data: any, row: any, helpers?: any) => React.ReactNode;
 }
 
@@ -48,7 +49,8 @@ export const createTranscriptReportColumns = (
       name: "College Name",
       searchable: true,
       orderable: true,
-      width: "250px",
+      width: "200px",
+      wrapText: true,
     },
     
     // Column 1: INSTITUTION_ID - with inline editing support
@@ -211,6 +213,7 @@ export const createTranscriptReportColumns = (
       orderable: true,
       textCenter: true,
       width: "200px",
+      wrapText: true,
     },
     
     // Column 6: STUDENT_FIRST_NAME (notvisible)
@@ -263,11 +266,11 @@ export const createTranscriptReportColumns = (
         return (
           <span className="copyinstid" id={data}>
             <span title="Copy to clipboard">
-            <CopyIcon 
-              className="w-4 h-4 me-1 cursor-pointer hover:text-brand-500" 
-              onClick={() => copyToClipboard(data)}
-              style={{ cursor: "pointer" }}
-            />
+              <CopyIcon 
+                className="w-4 h-4 me-1 cursor-pointer hover:text-brand-500" 
+                onClick={() => copyToClipboard(data)}
+                style={{ cursor: "pointer" }}
+              />
             </span>
             <a 
               href={`/college/batchdetails/${data}`}
@@ -450,16 +453,17 @@ export const createTranscriptReportColumns = (
           return "-";
         }
         return (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              navigate(`/college/errorscreenshot/${batchId}`);
-            }}
-            className="text-brand-500 hover:text-brand-700 inline-flex items-center"
-            title="View Error Screenshot"
-          >
-            <EyeIcon className="w-4 h-4 fill-current" />
-          </button>
+          <span title="View Error Screenshot">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/college/errorscreenshot/${batchId}`);
+              }}
+              className="text-brand-500 hover:text-brand-700 inline-flex items-center"
+            >
+              <EyeIcon className="w-4 h-4 fill-current" />
+            </button>
+          </span>
         );
       },
     });

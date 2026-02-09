@@ -5,9 +5,11 @@ import PageMeta from "../../components/common/PageMeta";
 import PageContainer, { PageWrapper } from "../../components/common/PageContainer";
 import TranscriptReports from "./transcriptreports/TranscriptReports";
 import ArticulationReports from "./articulationreports/ArticulationReports";
+import HorizontalTree from "../../components/common/HorizontalTree";
 import { API_ENDPOINTS } from "../../config/api";
 import { api } from "../../config/api";
 import { useToast } from "../../context/ToastContext";
+import ThemedLoader from "../../components/common/ThemedLoader";
 
 interface Student {
   STUDENT_ID: string;
@@ -69,6 +71,7 @@ export default function StudentView() {
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [isInputFocused, setIsInputFocused] = useState<boolean>(false);
   const [isAccordionOpen, setIsAccordionOpen] = useState<boolean>(true);
+  const [isRootExpanded, setIsRootExpanded] = useState<boolean>(true);
   const { alerterror } = useToast();
   const selectRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -361,6 +364,142 @@ export default function StudentView() {
     return menuWithBatch;
   };
 
+  // Document icon component
+  const DocumentIcon = () => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+      <polyline points="14 2 14 8 20 8"></polyline>
+      <line x1="16" y1="13" x2="8" y2="13"></line>
+      <line x1="16" y1="17" x2="8" y2="17"></line>
+      <polyline points="10 9 9 9 8 9"></polyline>
+    </svg>
+  );
+
+  // Convert student data to tree structure for HorizontalTree
+  const convertToTreeStructure = () => {
+    if (!studentData || !studentData.institution_name.length) return null;
+
+    // Get student display name
+    const studentName = getStudentDisplayName();
+    
+    // Count total batches for badge
+    const totalBatches = Object.values(studentData.batch_details).reduce((sum, batches) => sum + batches.length, 0);
+
+    // Process all institutions and batches
+    const batchChildren = studentData.institution_name.flatMap((institution) => {
+      const batches = studentData.batch_details[institution.INSTITUTION_ID] || [];
+      
+      return batches.map((batchId) => {
+        const menuWithBatch = getMenuItems(institution.INSTITUTION_ID, batchId);
+        const batchMeta = studentData.batch_metadata?.[institution.INSTITUTION_ID]?.[batchId];
+        const ocrDate = formatDate(batchMeta?.OCR_EXTRACTED_DATE);
+        const batchTitle = ocrDate 
+          ? `${institution.INSTITUTION_NAME} - ${institution.INSTITUTION_ID} - ${batchId} - ${ocrDate}`
+          : `${institution.INSTITUTION_NAME} - ${institution.INSTITUTION_ID} - ${batchId}`;
+        
+        const key = `${institution.INSTITUTION_ID}-${batchId}`;
+        const isExpanded = expandedBatches.has(key);
+
+        // Build level 3 children (action items)
+        const actionChildren = [];
+
+        // Transcript Status Items
+        if (menuWithBatch["Failed"] > 0) {
+          actionChildren.push({
+            id: `failed-${key}`,
+            label: "Transcript Kickouts",
+            icon: <DocumentIcon />,
+            badge: menuWithBatch["Failed"] > 1 ? menuWithBatch["Failed"] : undefined,
+            onClick: () => handleViewPageLoad(studentId, "Failed", institution.INSTITUTION_ID, batchId, "transcript"),
+          });
+        }
+
+        if (menuWithBatch["Articulation-Kickouts"] > 0 && !menuWithBatch["articulation_Failed"]) {
+          actionChildren.push({
+            id: `articulation-kickouts-${key}`,
+            label: "Articulation-Kickouts",
+            icon: <DocumentIcon />,
+            badge: menuWithBatch["Articulation-Kickouts"] > 1 ? menuWithBatch["Articulation-Kickouts"] : undefined,
+            onClick: () => handleViewPageLoad(studentId, "Articulation-Kickouts", institution.INSTITUTION_ID, batchId, "transcript"),
+          });
+        }
+
+        if (menuWithBatch["Articulation-Kickouts"] === 0 && menuWithBatch["Processed"] > 0) {
+          const processedLabel = batchMeta?.LAST_UPDATED_DATETIME 
+            ? `Transcript Processed - ${formatDate(batchMeta.LAST_UPDATED_DATETIME)}${batchMeta?.OCR_EXTRACTED_DATE && batchMeta?.LAST_UPDATED_DATETIME ? ` (${calculateDays(batchMeta.OCR_EXTRACTED_DATE, batchMeta.LAST_UPDATED_DATETIME)} days)` : ''}`
+            : "Transcript Processed";
+          actionChildren.push({
+            id: `processed-${key}`,
+            label: processedLabel,
+            icon: <DocumentIcon />,
+            badge: menuWithBatch["Processed"] > 1 ? menuWithBatch["Processed"] : undefined,
+            onClick: () => handleViewPageLoad(studentId, "Processed", institution.INSTITUTION_ID, batchId, "transcript"),
+          });
+        }
+
+        if (menuWithBatch["Rerun"] > 0) {
+          actionChildren.push({
+            id: `rerun-${key}`,
+            label: "Transcript Rerun",
+            icon: <DocumentIcon />,
+            badge: menuWithBatch["Rerun"] > 1 ? menuWithBatch["Rerun"] : undefined,
+            onClick: () => handleViewPageLoad(studentId, "Rerun", institution.INSTITUTION_ID, batchId, "transcript"),
+          });
+        }
+
+        // Articulation Status Items
+        if (menuWithBatch["articulation_Failed"] > 0) {
+          actionChildren.push({
+            id: `articulation-failed-${key}`,
+            label: "Articulation Course Kickouts",
+            icon: <DocumentIcon />,
+            badge: menuWithBatch["articulation_Failed"],
+            onClick: () => handleViewPageLoad(studentId, "Failed", institution.INSTITUTION_ID, batchId, "articulation"),
+          });
+        }
+
+        if (menuWithBatch["articulation_Processed"] > 0) {
+          actionChildren.push({
+            id: `articulation-processed-${key}`,
+            label: "Articulation Course Processed",
+            icon: <DocumentIcon />,
+            badge: menuWithBatch["articulation_Processed"],
+            onClick: () => handleViewPageLoad(studentId, "Processed", institution.INSTITUTION_ID, batchId, "articulation"),
+          });
+        }
+
+        if (menuWithBatch["articulation_Rerun"] > 0) {
+          actionChildren.push({
+            id: `articulation-rerun-${key}`,
+            label: "Articulation Course Rerun",
+            icon: <DocumentIcon />,
+            badge: menuWithBatch["articulation_Rerun"],
+            onClick: () => handleViewPageLoad(studentId, "Rerun", institution.INSTITUTION_ID, batchId, "articulation"),
+          });
+        }
+
+        return {
+          id: key,
+          label: batchTitle,
+          icon: undefined, // Will use default folder icon
+          badge: undefined,
+          children: actionChildren.length > 0 ? actionChildren : undefined,
+          onClick: () => toggleBatch(institution.INSTITUTION_ID, batchId),
+          isExpanded: isExpanded,
+        };
+      });
+    });
+
+    return {
+      id: "student-root",
+      label: studentName,
+      badge: totalBatches > 0 ? totalBatches : undefined,
+      children: batchChildren.length > 0 ? batchChildren : undefined,
+      onClick: () => setIsRootExpanded(!isRootExpanded), // Root node click handler
+      isExpanded: isRootExpanded,
+    };
+  };
+
   return (
     <PageWrapper>
       <PageMeta
@@ -479,122 +618,33 @@ export default function StudentView() {
 
                 {/* Tree View Structure - matching CI3 horizontal tree layout */}
                 {loading ? (
-                  <div className="mt-4 flex items-center justify-center py-8">
-                    <div className="text-center">
-                      <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-brand-500 border-r-transparent"></div>
-                      <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Loading...</p>
-                    </div>
+                  <div className="mt-4 py-8">
+                    <ThemedLoader 
+                      title="Loading tree structure..." 
+                      description="" 
+                      showProgress={false} 
+                      size={60} 
+                    />
                   </div>
                 ) : studentData && studentData.institution_name.length > 0 ? (
-                  <div className="mt-4 overflow-x-auto">
-                    {studentData.institution_name.map((institution, instIndex) => {
-                      const batches = studentData.batch_details[institution.INSTITUTION_ID] || [];
-                      
-                      return batches.map((batchId, batchIndex) => {
-                        const menuWithBatch = getMenuItems(institution.INSTITUTION_ID, batchId);
-                        const batchMeta = studentData.batch_metadata?.[institution.INSTITUTION_ID]?.[batchId];
-                        const ocrDate = formatDate(batchMeta?.OCR_EXTRACTED_DATE);
-                        const batchTitle = ocrDate 
-                          ? `${institution.INSTITUTION_NAME} - ${institution.INSTITUTION_ID} - ${batchId} - ${ocrDate}`
-                          : `${institution.INSTITUTION_NAME} - ${institution.INSTITUTION_ID} - ${batchId}`;
-                        const uniqueBatchKey = `${institution.INSTITUTION_ID}-${batchId}-${batchIndex}`;
-                        const animationDelay = (instIndex * 50) + (batchIndex * 30);
-
-                        // Collect status items to render
-                        const statusItems: Array<{
-                          key: string;
-                          label: string;
-                          count: number;
-                          type: string;
-                          pageType: "transcript" | "articulation";
-                          icon: "document" | "folder";
-                        }> = [];
-
-                        if (menuWithBatch["Failed"] > 0) {
-                          statusItems.push({ key: "Failed-t", label: "Transcript Kickouts", count: menuWithBatch["Failed"], type: "Failed", pageType: "transcript", icon: "document" });
-                        }
-                        if (menuWithBatch["Articulation-Kickouts"] > 0 && !menuWithBatch["articulation_Failed"]) {
-                          statusItems.push({ key: "ArtKick-t", label: "Articulation-Kickouts", count: menuWithBatch["Articulation-Kickouts"], type: "Articulation-Kickouts", pageType: "transcript", icon: "document" });
-                        }
-                        if (menuWithBatch["Processed"] > 0) {
-                          const processedLabel = `Transcript Processed${batchMeta?.LAST_UPDATED_DATETIME ? ` - ${formatDate(batchMeta.LAST_UPDATED_DATETIME)}` : ""}${batchMeta?.OCR_EXTRACTED_DATE && batchMeta?.LAST_UPDATED_DATETIME ? `  (${calculateDays(batchMeta.OCR_EXTRACTED_DATE, batchMeta.LAST_UPDATED_DATETIME)} Days)` : ""}`;
-                          statusItems.push({ key: "Processed-t", label: processedLabel, count: menuWithBatch["Processed"], type: "Processed", pageType: "transcript", icon: "document" });
-                        }
-                        if (menuWithBatch["Rerun"] > 0) {
-                          statusItems.push({ key: "Rerun-t", label: "Transcript Rerun", count: menuWithBatch["Rerun"], type: "Rerun", pageType: "transcript", icon: "document" });
-                        }
-                        if (menuWithBatch["articulation_Failed"] > 0) {
-                          statusItems.push({ key: "Failed-a", label: "Articulation Course Kickouts", count: menuWithBatch["articulation_Failed"], type: "Failed", pageType: "articulation", icon: "document" });
-                        }
-                        if (menuWithBatch["articulation_Processed"] > 0) {
-                          statusItems.push({ key: "Processed-a", label: "Articulation Course Processed", count: menuWithBatch["articulation_Processed"], type: "Processed", pageType: "articulation", icon: "document" });
-                        }
-                        if (menuWithBatch["articulation_Rerun"] > 0) {
-                          statusItems.push({ key: "Rerun-a", label: "Articulation Course Rerun", count: menuWithBatch["articulation_Rerun"], type: "Rerun", pageType: "articulation", icon: "document" });
-                        }
-
-                        return (
-                          <div 
-                            key={uniqueBatchKey} 
-                            className="htree-wrapper mb-6"
-                            style={{ animation: `fadeInUp 0.4s ease-out ${animationDelay}ms both` }}
-                          >
-                            {/* Horizontal Tree */}
-                            <div className="htree">
-                              {/* Parent Node - Institution/Batch */}
-                              <div className="htree-parent">
-                                <div className="htree-node htree-node-parent">
-                                  <svg className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                                    <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
-                                  </svg>
-                                  <span className="htree-node-text">{batchTitle}</span>
-                                </div>
-                              </div>
-
-                              {/* Children Nodes - Status Items */}
-                              {statusItems.length > 0 && (
-                                <div className="htree-children">
-                                  <div className="htree-connector"></div>
-                                  <div className="htree-children-list">
-                                    {statusItems.map((item) => {
-                                      const isActiveItem = isActive(item.type, institution.INSTITUTION_ID, batchId, item.pageType);
-                                      return (
-                                        <div key={item.key} className="htree-child">
-                                          <div className="htree-child-connector"></div>
-                                          <button
-                                            className={`htree-node htree-node-child ${isActiveItem ? 'htree-node-active' : ''}`}
-                                            onClick={(e) => {
-                                              e.preventDefault();
-                                              handleViewPageLoad(
-                                                studentId,
-                                                item.type,
-                                                institution.INSTITUTION_ID,
-                                                batchId,
-                                                item.pageType
-                                              );
-                                            }}
-                                          >
-                                            <svg className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                            </svg>
-                                            <span className="htree-node-text">{item.label}</span>
-                                            {item.count > 0 && (
-                                              <span className="htree-badge">
-                                                {item.count}
-                                              </span>
-                                            )}
-                                          </button>
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          </div>
+                  <div className="mt-4 student-tree">
+                    {(() => {
+                      const treeData = convertToTreeStructure();
+                      if (!treeData) {
+                              return (
+                          <div className="text-center text-gray-500 dark:text-gray-400 py-8">
+                            No data available
+                                          </div>
                         );
-                      });
-                    })}
+                      }
+                      return (
+                        <HorizontalTree
+                          rootNode={treeData}
+                          headerTitle={getStudentDisplayName()}
+                          className="mb-4"
+                        />
+                      );
+                    })()}
                   </div>
                 ) : studentData ? (
                   <div className="mt-4 text-center text-gray-500 dark:text-gray-400">

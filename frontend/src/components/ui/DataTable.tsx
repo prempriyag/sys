@@ -15,6 +15,7 @@ interface Column {
   defaultOrder?: boolean; // Whether this column should be used for default ordering
   textCenter?: boolean; // Whether text should be center-aligned
   width?: string; // Column width (e.g., "200px") - if provided, enables fixed table layout
+  wrapText?: boolean; // Whether text should wrap instead of using ellipsis
 }
 
 interface DataTableProps {
@@ -735,27 +736,23 @@ const DataTableComponent = (props: DataTableProps, ref: React.ForwardedRef<DataT
                     const originalIndex = columns.indexOf(column);
                     // Apply text-center class if textCenter is true
                     const cellClassName = `px-4 py-3 text-sm text-gray-800 dark:text-gray-200 ${column.textCenter ? 'text-center' : ''}`;
-                    // For wide columns (Error Reason, Comments), allow text wrapping
-                    const isWideColumn = column.width && (parseInt(column.width) > 250);
+                    // For all text columns, default to wrapping unless it's the Action column
                     const isActionColumn = column.data === "ACTION";
-                    const cellStyle: React.CSSProperties = hasExplicitWidths ? (isWideColumn ? {
+                    const shouldWrap = !isActionColumn;
+                    const cellStyle: React.CSSProperties = hasExplicitWidths ? (shouldWrap ? {
                       wordWrap: 'break-word',
                       whiteSpace: 'normal',
                       overflow: 'visible',
                       maxWidth: column.width || '150px',
                       width: column.width || '150px',
-                    } : isActionColumn ? {
-                      // Action column needs strict width control to prevent overflow
-                      overflow: 'hidden',
-                      maxWidth: column.width || '160px',
-                      width: column.width || '160px',
-                      minWidth: column.width || '160px',
                     } : {
+                      // Action column or explicitly truncated columns
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap',
                       maxWidth: column.width || '150px',
                       width: column.width || '150px',
+                      minWidth: column.width || '150px',
                     }) : {};
                     return (
                       <TableCell
@@ -763,7 +760,7 @@ const DataTableComponent = (props: DataTableProps, ref: React.ForwardedRef<DataT
                         className={cellClassName}
                         style={cellStyle}
                       >
-                        <div style={hasExplicitWidths ? { width: '100%', maxWidth: '100%', minWidth: 0, overflow: 'hidden' } : {}}>
+                        <div style={hasExplicitWidths ? { width: '100%', maxWidth: '100%', minWidth: 0, overflow: shouldWrap ? 'visible' : 'hidden' } : {}}>
                           {column.render
                             ? column.render(row[column.data], row)
                             : (() => {

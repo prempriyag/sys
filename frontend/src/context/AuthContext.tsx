@@ -27,6 +27,13 @@ interface User {
   profile_image?: string; // SSO profile image URL from Microsoft Graph
 }
 
+// Two-way auth pending state
+export interface TwoWayAuthPending {
+  temp_token: string;
+  verify_data: number[];
+  email_masked: string;
+}
+
 interface AuthContextType {
   user: User | null;
   permissions: UserPermissions | null;
@@ -36,6 +43,10 @@ interface AuthContextType {
   isAuthenticated: boolean;
   hasPermission: (permission: string, action?: string) => boolean;
   hasAnyPermission: (permissions: string[], action?: string) => boolean;
+  twoWayPending: TwoWayAuthPending | null;
+  verifyTwoWayCode: (code: string) => Promise<void>;
+  resendTwoWayCode: () => Promise<number[]>;
+  cancelTwoWay: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -52,6 +63,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [user, setUser] = useState<User | null>(null);
   const [permissions, setPermissions] = useState<UserPermissions | null>(null);
   const [loading, setLoading] = useState(true);
+  const [twoWayPending, setTwoWayPending] = useState<TwoWayAuthPending | null>(null);
   const navigate = useNavigate();
 
   // Check if user is already logged in and verify session
@@ -108,6 +120,33 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     verifySession();
   }, [navigate]);
 
+  const _handleLoginSuccess = (response: any) => {
+    setAuthToken(response.access_token);
+
+    const userPermissions = response.permissions || response.user?.permissions || {};
+    const userWithPermissions = {
+      ...response.user,
+      permissions: userPermissions,
+    };
+
+    localStorage.setItem("user", JSON.stringify(userWithPermissions));
+    localStorage.setItem("user_permissions", JSON.stringify(userPermissions));
+    setUser(userWithPermissions);
+    setPermissions(userPermissions);
+    setTwoWayPending(null);
+
+    // Redirect based on permissions
+    if (response.user.college_perm === 1) {
+      navigate("/college/dashboard");
+    } else if (response.user.hs_perm === 1) {
+      navigate("/school/dashboard");
+    } else if (response.user.ocr_perm === 1) {
+      navigate("/ocrverify/dashboard");
+    } else {
+      throw new Error("You don't have proper permissions to login.");
+    }
+  };
+
   const login = async (email: string, password: string) => {
     try {
       const response = await api.post(API_ENDPOINTS.LOGIN, {
@@ -115,42 +154,85 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         password,
       });
 
-      if (response.access_token) {
-        setAuthToken(response.access_token);
-        
-        // Store permissions in localStorage (similar to PHP session)
-        // API returns permissions as both user.permissions and top-level permissions
-        // Prefer top-level permissions, fallback to user.permissions
-        const userPermissions = response.permissions || response.user?.permissions || {};
-        
-        // Attach permissions to user object for easy access
-        const userWithPermissions = {
-          ...response.user,
-          permissions: userPermissions,
-        };
-        
-        localStorage.setItem("user", JSON.stringify(userWithPermissions));
-        localStorage.setItem("user_permissions", JSON.stringify(userPermissions));
-        setUser(userWithPermissions);
-        setPermissions(userPermissions);
+      console.log("[LOGIN] Response from /api/login:", JSON.stringify(response, null, 2));
 
-        // Redirect based on permissions
-        if (response.user.college_perm === 1) {
-          navigate("/college/dashboard");
-        } else if (response.user.hs_perm === 1) {
-          navigate("/school/dashboard");
-        } else if (response.user.ocr_perm === 1) {
-          navigate("/ocrverify/dashboard");
-        } else {
-          throw new Error("You don't have proper permissions to login.");
-        }
+      // Check if two-way verification is required
+      if (response.requires_verification && response.temp_token) {
+        console.log("[LOGIN] 2FA required - redirecting to /verify");
+        setTwoWayPending({
+          temp_token: response.temp_token,
+          verify_data: response.verify_data || [],
+          email_masked: response.email_masked || "",
+        });
+        navigate("/verify");
+        return;
+      }
+
+      if (response.access_token) {
+        console.log("[LOGIN] Direct login - access_token received");
+        _handleLoginSuccess(response);
+      } else {
+        console.log("[LOGIN] No access_token and no requires_verification - unexpected response");
       }
     } catch (error: unknown) {
+      console.error("[LOGIN] Login error:", error);
       if (error instanceof Error) {
         throw error;
       }
       throw new Error("Login failed. Please try again.");
     }
+  };
+
+  const verifyTwoWayCode = async (code: string) => {
+    if (!twoWayPending) {
+      throw new Error("No verification session active. Please login again.");
+    }
+    try {
+      const response = await api.post(API_ENDPOINTS.VERIFY, {
+        temp_token: twoWayPending.temp_token,
+        verifycode: code,
+      });
+
+      if (response.access_token) {
+        _handleLoginSuccess(response);
+      } else {
+        throw new Error("Verification failed. Please try again.");
+      }
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error("Verification failed. Please try again.");
+    }
+  };
+
+  const resendTwoWayCode = async (): Promise<number[]> => {
+    if (!twoWayPending) {
+      throw new Error("No verification session active. Please login again.");
+    }
+    try {
+      const response = await api.post(API_ENDPOINTS.VERIFY_RESEND, {
+        temp_token: twoWayPending.temp_token,
+      });
+
+      if (response.verify_data) {
+        setTwoWayPending((prev) =>
+          prev ? { ...prev, verify_data: response.verify_data } : null
+        );
+        return response.verify_data;
+      }
+      return twoWayPending.verify_data;
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error("Failed to resend code. Please try again.");
+    }
+  };
+
+  const cancelTwoWay = () => {
+    setTwoWayPending(null);
+    navigate("/login");
   };
 
   const logout = useCallback(() => {
@@ -327,6 +409,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         isAuthenticated: !!user,
         hasPermission,
         hasAnyPermission,
+        twoWayPending,
+        verifyTwoWayCode,
+        resendTwoWayCode,
+        cancelTwoWay,
       }}
     >
       {children}

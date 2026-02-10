@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from pydantic import BaseModel
+from typing import Optional
 import logging
 from datetime import datetime
 from database.connection import get_db
@@ -22,11 +23,19 @@ class DataTableRequest(BaseModel):
     columns: list
 
 class GpaPickRequest(BaseModel):
-    GPA_PICK: str
+    GPA_SCALE: Optional[str] = ""
+    WEIGHTED_GPA: Optional[str] = ""
+    UNWEIGHTED_GPA: Optional[str] = ""
+    CGPA: Optional[str] = ""
+    PREFERRED_GPA: Optional[str] = ""
 
 class GpaPickUpdateRequest(BaseModel):
     Id: int
-    GPA_PICK: str
+    GPA_SCALE: Optional[str] = ""
+    WEIGHTED_GPA: Optional[str] = ""
+    UNWEIGHTED_GPA: Optional[str] = ""
+    CGPA: Optional[str] = ""
+    PREFERRED_GPA: Optional[str] = ""
 
 class DeleteRequest(BaseModel):
     id: int
@@ -51,16 +60,18 @@ async def ajaxlist(request: DataTableRequest, db: Session = Depends(get_db)):
 @router.post("/insert", response_model=dict)
 async def insert(request: GpaPickRequest, http_request: Request, db: Session = Depends(get_db)):
     try:
-        if not request.GPA_PICK or not request.GPA_PICK.strip():
-            return {"status": 0, "message": "Please Enter GPA Pick", "refresh": False, "modal_close": False}
         insert_query = text(f"""
-            INSERT INTO {TBL_GPA_PICK_MAPPING} (GPA_PICK, UPDATED_BY, LAST_UPDATED_DATETIME)
-            VALUES (:gpa_pick, :updated_by, :last_updated_datetime)
+            INSERT INTO {TBL_GPA_PICK_MAPPING} (GPA_SCALE, WEIGHTED_GPA, UNWEIGHTED_GPA, CGPA, PREFERRED_GPA, CREATED_BY, CREATED_DATE)
+            VALUES (:gpa_scale, :weighted_gpa, :unweighted_gpa, :cgpa, :preferred_gpa, :created_by, :created_date)
         """)
         db.execute(insert_query, {
-            "gpa_pick": request.GPA_PICK.strip(),
-            "updated_by": get_username_from_token(http_request),
-            "last_updated_datetime": datetime.now().strftime('%Y-%m-%d %H:%M:%S.000')
+            "gpa_scale": request.GPA_SCALE.strip() if request.GPA_SCALE else "",
+            "weighted_gpa": request.WEIGHTED_GPA.strip() if request.WEIGHTED_GPA else "",
+            "unweighted_gpa": request.UNWEIGHTED_GPA.strip() if request.UNWEIGHTED_GPA else "",
+            "cgpa": request.CGPA.strip() if request.CGPA else "",
+            "preferred_gpa": request.PREFERRED_GPA.strip() if request.PREFERRED_GPA else "",
+            "created_by": get_username_from_token(http_request),
+            "created_date": datetime.now().strftime('%Y-%m-%d %H:%M:%S.000')
         })
         db.commit()
         return {"status": 1, "message": "Successfully added", "refresh": False, "modal_close": True}
@@ -72,11 +83,19 @@ async def insert(request: GpaPickRequest, http_request: Request, db: Session = D
 @router.post("/get", response_model=dict)
 async def get_gpa_pick(request: DeleteRequest, db: Session = Depends(get_db)):
     try:
-        query = text(f"SELECT ID, GPA_PICK FROM {TBL_GPA_PICK_MAPPING} WHERE ID = :id")
+        query = text(f"SELECT id, GPA_SCALE, WEIGHTED_GPA, UNWEIGHTED_GPA, CGPA, PREFERRED_GPA FROM {TBL_GPA_PICK_MAPPING} WHERE id = :id")
         result = db.execute(query, {"id": request.id}).fetchone()
         if not result:
-            raise HTTPException(status_code=404, detail="GPA Pick not found")
-        return {"Id": result.ID if hasattr(result, 'ID') else result[0], "GPA_PICK": result.GPA_PICK if hasattr(result, 'GPA_PICK') else result[1]}
+            raise HTTPException(status_code=404, detail="GPA Pick Mapping not found")
+        record = dict(result._mapping)
+        return {
+            "Id": record.get("id") or record.get("Id") or record.get("ID"),
+            "GPA_SCALE": record.get("GPA_SCALE", ""),
+            "WEIGHTED_GPA": record.get("WEIGHTED_GPA", ""),
+            "UNWEIGHTED_GPA": record.get("UNWEIGHTED_GPA", ""),
+            "CGPA": record.get("CGPA", ""),
+            "PREFERRED_GPA": record.get("PREFERRED_GPA", ""),
+        }
     except HTTPException:
         raise
     except Exception as e:
@@ -86,19 +105,26 @@ async def get_gpa_pick(request: DeleteRequest, db: Session = Depends(get_db)):
 @router.post("/update", response_model=dict)
 async def update(request: GpaPickUpdateRequest, http_request: Request, db: Session = Depends(get_db)):
     try:
-        if not request.GPA_PICK or not request.GPA_PICK.strip():
-            return {"status": 0, "message": "Please Enter GPA Pick", "refresh": False, "modal_close": False}
         update_query = text(f"""
             UPDATE {TBL_GPA_PICK_MAPPING}
-            SET GPA_PICK = :gpa_pick,
-                UPDATED_BY = :updated_by, LAST_UPDATED_DATETIME = :last_updated_datetime
-            WHERE ID = :id
+            SET GPA_SCALE = :gpa_scale,
+                WEIGHTED_GPA = :weighted_gpa,
+                UNWEIGHTED_GPA = :unweighted_gpa,
+                CGPA = :cgpa,
+                PREFERRED_GPA = :preferred_gpa,
+                CREATED_BY = :created_by,
+                CREATED_DATE = :created_date
+            WHERE id = :id
         """)
         result = db.execute(update_query, {
             "id": request.Id,
-            "gpa_pick": request.GPA_PICK.strip(),
-            "updated_by": get_username_from_token(http_request),
-            "last_updated_datetime": datetime.now().strftime('%Y-%m-%d %H:%M:%S.000')
+            "gpa_scale": request.GPA_SCALE.strip() if request.GPA_SCALE else "",
+            "weighted_gpa": request.WEIGHTED_GPA.strip() if request.WEIGHTED_GPA else "",
+            "unweighted_gpa": request.UNWEIGHTED_GPA.strip() if request.UNWEIGHTED_GPA else "",
+            "cgpa": request.CGPA.strip() if request.CGPA else "",
+            "preferred_gpa": request.PREFERRED_GPA.strip() if request.PREFERRED_GPA else "",
+            "created_by": get_username_from_token(http_request),
+            "created_date": datetime.now().strftime('%Y-%m-%d %H:%M:%S.000')
         })
         db.commit()
         return {"status": 1, "message": "Successfully updated.", "refresh": False, "modal_close": True} if result.rowcount > 0 else {"status": 0, "message": "Sorry record not updated please try again.", "refresh": False, "modal_close": True}
@@ -118,4 +144,3 @@ async def delete(request: DeleteRequest, db: Session = Depends(get_db)):
         logger.exception("GPA Pick mapping delete error")
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
-

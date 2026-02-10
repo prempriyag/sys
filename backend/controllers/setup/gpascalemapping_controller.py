@@ -22,11 +22,13 @@ class DataTableRequest(BaseModel):
     columns: list
 
 class GpaScaleRequest(BaseModel):
-    GPA_SCALE: str
+    PERCENTAGE: str
+    GPA: str
 
 class GpaScaleUpdateRequest(BaseModel):
     Id: int
-    GPA_SCALE: str
+    PERCENTAGE: str
+    GPA: str
 
 class DeleteRequest(BaseModel):
     id: int
@@ -51,16 +53,19 @@ async def ajaxlist(request: DataTableRequest, db: Session = Depends(get_db)):
 @router.post("/insert", response_model=dict)
 async def insert(request: GpaScaleRequest, http_request: Request, db: Session = Depends(get_db)):
     try:
-        if not request.GPA_SCALE or not request.GPA_SCALE.strip():
-            return {"status": 0, "message": "Please Enter GPA Scale", "refresh": False, "modal_close": False}
+        if not request.PERCENTAGE or not request.PERCENTAGE.strip():
+            return {"status": 0, "message": "Please Enter Percentage", "refresh": False, "modal_close": False}
+        if not request.GPA or not request.GPA.strip():
+            return {"status": 0, "message": "Please Enter GPA", "refresh": False, "modal_close": False}
         insert_query = text(f"""
-            INSERT INTO {TBL_GPA_SCALE_MAPPING} (GPA_SCALE, UPDATED_BY, LAST_UPDATED_DATETIME)
-            VALUES (:gpa_scale, :updated_by, :last_updated_datetime)
+            INSERT INTO {TBL_GPA_SCALE_MAPPING} (PERCENTAGE, GPA, UPDATED_BY, UPDATED_DATE)
+            VALUES (:percentage, :gpa, :updated_by, :updated_date)
         """)
         db.execute(insert_query, {
-            "gpa_scale": request.GPA_SCALE.strip(),
+            "percentage": request.PERCENTAGE.strip(),
+            "gpa": request.GPA.strip(),
             "updated_by": get_username_from_token(http_request),
-            "last_updated_datetime": datetime.now().strftime('%Y-%m-%d %H:%M:%S.000')
+            "updated_date": datetime.now().strftime('%Y-%m-%d %H:%M:%S.000')
         })
         db.commit()
         return {"status": 1, "message": "Successfully added", "refresh": False, "modal_close": True}
@@ -72,11 +77,16 @@ async def insert(request: GpaScaleRequest, http_request: Request, db: Session = 
 @router.post("/get", response_model=dict)
 async def get_gpa_scale(request: DeleteRequest, db: Session = Depends(get_db)):
     try:
-        query = text(f"SELECT ID, GPA_SCALE FROM {TBL_GPA_SCALE_MAPPING} WHERE ID = :id")
+        query = text(f"SELECT Id, PERCENTAGE, GPA FROM {TBL_GPA_SCALE_MAPPING} WHERE Id = :id")
         result = db.execute(query, {"id": request.id}).fetchone()
         if not result:
-            raise HTTPException(status_code=404, detail="GPA Scale not found")
-        return {"Id": result.ID if hasattr(result, 'ID') else result[0], "GPA_SCALE": result.GPA_SCALE if hasattr(result, 'GPA_SCALE') else result[1]}
+            raise HTTPException(status_code=404, detail="GPA Scale Mapping not found")
+        record = dict(result._mapping)
+        return {
+            "Id": record.get("Id") or record.get("id") or record.get("ID"),
+            "PERCENTAGE": record.get("PERCENTAGE", ""),
+            "GPA": record.get("GPA", ""),
+        }
     except HTTPException:
         raise
     except Exception as e:
@@ -86,19 +96,24 @@ async def get_gpa_scale(request: DeleteRequest, db: Session = Depends(get_db)):
 @router.post("/update", response_model=dict)
 async def update(request: GpaScaleUpdateRequest, http_request: Request, db: Session = Depends(get_db)):
     try:
-        if not request.GPA_SCALE or not request.GPA_SCALE.strip():
-            return {"status": 0, "message": "Please Enter GPA Scale", "refresh": False, "modal_close": False}
+        if not request.PERCENTAGE or not request.PERCENTAGE.strip():
+            return {"status": 0, "message": "Please Enter Percentage", "refresh": False, "modal_close": False}
+        if not request.GPA or not request.GPA.strip():
+            return {"status": 0, "message": "Please Enter GPA", "refresh": False, "modal_close": False}
         update_query = text(f"""
             UPDATE {TBL_GPA_SCALE_MAPPING}
-            SET GPA_SCALE = :gpa_scale,
-                UPDATED_BY = :updated_by, LAST_UPDATED_DATETIME = :last_updated_datetime
-            WHERE ID = :id
+            SET PERCENTAGE = :percentage,
+                GPA = :gpa,
+                UPDATED_BY = :updated_by,
+                UPDATED_DATE = :updated_date
+            WHERE Id = :id
         """)
         result = db.execute(update_query, {
             "id": request.Id,
-            "gpa_scale": request.GPA_SCALE.strip(),
+            "percentage": request.PERCENTAGE.strip(),
+            "gpa": request.GPA.strip(),
             "updated_by": get_username_from_token(http_request),
-            "last_updated_datetime": datetime.now().strftime('%Y-%m-%d %H:%M:%S.000')
+            "updated_date": datetime.now().strftime('%Y-%m-%d %H:%M:%S.000')
         })
         db.commit()
         return {"status": 1, "message": "Successfully updated.", "refresh": False, "modal_close": True} if result.rowcount > 0 else {"status": 0, "message": "Sorry record not updated please try again.", "refresh": False, "modal_close": True}
@@ -118,4 +133,3 @@ async def delete(request: DeleteRequest, db: Session = Depends(get_db)):
         logger.exception("GPA Scale mapping delete error")
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
-

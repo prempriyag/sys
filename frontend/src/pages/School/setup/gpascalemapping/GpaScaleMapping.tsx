@@ -8,10 +8,20 @@ import { Modal } from "../../../../components/ui/modal";
 import Input from "../../../../components/form/input/InputField";
 import Label from "../../../../components/form/Label";
 import { api } from "../../../../config/api";
-import { RefreshIcon, PlusIcon, PencilIcon, TrashBinIcon } from "../../../../icons";
+import { RefreshIcon, PencilIcon, TrashBinIcon } from "../../../../icons";
 import { useAuth } from "../../../../context/AuthContext";
 import ConfirmationModal from "../../../../components/common/ConfirmationModal";
 import { alertsuccess, alerterror } from "../../../../utils/toast";
+
+interface GpaScaleFormData {
+  PERCENTAGE: string;
+  GPA: string;
+}
+
+const INITIAL_FORM_DATA: GpaScaleFormData = {
+  PERCENTAGE: "",
+  GPA: "",
+};
 
 export default function GpaScaleMapping() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -21,7 +31,7 @@ export default function GpaScaleMapping() {
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [gpaScaleToDelete, setGpaScaleToDelete] = useState<number | null>(null);
-  const [formData, setFormData] = useState({ GPA_SCALE: "" });
+  const [formData, setFormData] = useState<GpaScaleFormData>({ ...INITIAL_FORM_DATA });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -31,7 +41,7 @@ export default function GpaScaleMapping() {
   const hasDeletePermission = hasPermission("gpa_scale_mapping", "DELETE");
 
   const handleAdd = () => {
-    setFormData({ GPA_SCALE: "" });
+    setFormData({ ...INITIAL_FORM_DATA });
     setErrors({});
     setShowAddModal(true);
   };
@@ -41,7 +51,10 @@ export default function GpaScaleMapping() {
       const response = await api.post("/api/gpascalemapping/get", { id });
       const data = response;
       if (data.Id) {
-        setFormData({ GPA_SCALE: data.GPA_SCALE || "" });
+        setFormData({
+          PERCENTAGE: data.PERCENTAGE || "",
+          GPA: data.GPA || "",
+        });
         setErrors({});
         setEditingId(data.Id);
         setShowEditModal(true);
@@ -62,9 +75,9 @@ export default function GpaScaleMapping() {
     setIsDeleting(true);
     try {
       const response = await api.post("/api/gpascalemapping/delete", { id: gpaScaleToDelete });
-      
+
       const success = response.status === 1 || response.success || response.status === "Success" || response.message?.toLowerCase().includes("success");
-      const messageText = response.message || "GPA Scale deleted successfully";
+      const messageText = response.message || "GPA Scale Mapping deleted successfully";
 
       if (success) {
         alertsuccess(messageText);
@@ -78,7 +91,7 @@ export default function GpaScaleMapping() {
       }
     } catch (error: any) {
       console.error("Delete GPA Scale error:", error);
-      alerterror(error.response?.data?.detail || error.message || "Error deleting GPA Scale");
+      alerterror(error.response?.data?.detail || error.message || "Error deleting GPA Scale Mapping");
       setShowDeleteConfirmModal(false);
       setGpaScaleToDelete(null);
     } finally {
@@ -89,10 +102,11 @@ export default function GpaScaleMapping() {
   // Field validation
   const validateField = (name: string, value: string): string => {
     switch (name) {
-      case "GPA_SCALE":
-        if (!value || value.trim() === "") {
-          return "GPA Scale is required";
-        }
+      case "PERCENTAGE":
+        if (!value || value.trim() === "") return "Percentage is required";
+        return "";
+      case "GPA":
+        if (!value || value.trim() === "") return "GPA is required";
         return "";
       default:
         return "";
@@ -101,7 +115,6 @@ export default function GpaScaleMapping() {
 
   const handleFieldChange = (name: string, value: string) => {
     setFormData((prev) => ({ ...prev, [name]: value }));
-    // Clear error for this field when user starts typing
     if (errors[name]) {
       setErrors((prev) => {
         const newErrors = { ...prev };
@@ -124,9 +137,9 @@ export default function GpaScaleMapping() {
 
     // Validate all fields
     const newErrors: Record<string, string> = {};
-    newErrors.GPA_SCALE = validateField("GPA_SCALE", formData.GPA_SCALE);
+    newErrors.PERCENTAGE = validateField("PERCENTAGE", formData.PERCENTAGE);
+    newErrors.GPA = validateField("GPA", formData.GPA);
 
-    // If there are errors, set them and return
     const hasErrors = Object.values(newErrors).some((error) => error !== "");
     if (hasErrors) {
       setErrors(newErrors);
@@ -144,25 +157,57 @@ export default function GpaScaleMapping() {
       const response = await api.post(endpoint, body);
 
       const success = response.status === 1 || response.success || response.message?.toLowerCase().includes("success");
-      const messageText = response.message || (isEdit ? "GPA Scale updated successfully" : "GPA Scale added successfully");
+      const messageText = response.message || (isEdit ? "GPA Scale Mapping updated successfully" : "GPA Scale Mapping added successfully");
 
       if (success) {
         alertsuccess(messageText);
         setShowAddModal(false);
         setShowEditModal(false);
-        setFormData({ GPA_SCALE: "" });
+        setFormData({ ...INITIAL_FORM_DATA });
         setEditingId(null);
         setRefreshTrigger((prev) => prev + 1);
       } else {
-        alerterror(messageText || "Error saving GPA Scale");
+        alerterror(messageText || "Error saving GPA Scale Mapping");
       }
     } catch (error: any) {
       console.error("Save GPA Scale error:", error);
-      alerterror(error.response?.data?.detail || error.message || "Error saving GPA Scale");
+      alerterror(error.response?.data?.detail || error.message || "Error saving GPA Scale Mapping");
     } finally {
       setLoading(false);
     }
   };
+
+  // Form content shared between Add and Edit modals
+  const FormFields = () => (
+    <>
+      <div>
+        <Label>Percentage *</Label>
+        <Input
+          value={formData.PERCENTAGE}
+          onChange={(e) => handleFieldChange("PERCENTAGE", e.target.value)}
+          onBlur={(e) => handleBlur("PERCENTAGE", e.target.value)}
+          placeholder="Enter Percentage"
+          error={!!errors.PERCENTAGE}
+        />
+        {errors.PERCENTAGE && (
+          <p className="mt-1 text-xs text-red-500">{errors.PERCENTAGE}</p>
+        )}
+      </div>
+      <div>
+        <Label>GPA *</Label>
+        <Input
+          value={formData.GPA}
+          onChange={(e) => handleFieldChange("GPA", e.target.value)}
+          onBlur={(e) => handleBlur("GPA", e.target.value)}
+          placeholder="Enter GPA"
+          error={!!errors.GPA}
+        />
+        {errors.GPA && (
+          <p className="mt-1 text-xs text-red-500">{errors.GPA}</p>
+        )}
+      </div>
+    </>
+  );
 
   return (
     <PageWrapper>
@@ -170,10 +215,10 @@ export default function GpaScaleMapping() {
       <PageBreadcrumb pageTitle="GPA Scale Mapping" />
       <PageContainer>
         <div className="mb-3 flex items-center justify-between">
-          <h3 className="font-semibold text-gray-800 text-theme-xl dark:text-white/90 sm:text-2xl">View GPA Scale</h3>
+          <h3 className="font-semibold text-gray-800 text-theme-xl dark:text-white/90 sm:text-2xl">View GPA Scale Mapping</h3>
           <div className="flex items-center gap-2">
             {hasAddPermission && (
-              <Button onClick={handleAdd}>Add GPA Scale</Button>
+              <Button onClick={handleAdd}>Add GPA Scale Mapping</Button>
             )}
             <Button onClick={() => setRefreshTrigger((prev) => prev + 1)} variant="outline" startIcon={<RefreshIcon className="w-5 h-5" />}>Refresh Data</Button>
           </div>
@@ -183,12 +228,13 @@ export default function GpaScaleMapping() {
           refreshTrigger={refreshTrigger}
           ajaxUrl="/api/gpascalemapping/ajaxlist"
           columns={[
-            { data: "GPA_SCALE", name: "GPA Scale", searchable: true, orderable: true },
+            { data: "PERCENTAGE", name: "Percentage", searchable: true, orderable: true, textCenter: true },
+            { data: "GPA", name: "GPA", searchable: true, orderable: true, textCenter: true },
             { data: "UPDATED_BY", name: "Updated By", searchable: true, orderable: true },
-            { data: "LAST_UPDATED_DATETIME", name: "Updated On", searchable: false, orderable: true },
+            { data: "UPDATED_DATE", name: "Updated On", searchable: false, orderable: true },
             ...(hasUpdatePermission || hasDeletePermission ? [{
               data: "actions", name: "Action", searchable: false, orderable: false,
-              render: (data: any, row: any) => (
+              render: (_data: any, row: any) => (
                 <div className="flex items-center gap-2">
                   {hasUpdatePermission && <button onClick={() => handleEdit(row.Id)} className="text-brand-500 hover:text-brand-700" title="Edit"><PencilIcon className="w-5 h-5" /></button>}
                   {hasDeletePermission && <button onClick={() => handleDeleteClick(row.Id)} className="text-red-500 hover:text-red-700" title="Delete"><TrashBinIcon className="w-5 h-5" /></button>}
@@ -199,33 +245,13 @@ export default function GpaScaleMapping() {
         />
 
         {/* Add Modal */}
-        <Modal isOpen={showAddModal} onClose={() => {
-          setShowAddModal(false);
-          setErrors({});
-        }} className="max-w-md">
-          {/* Modal Header */}
+        <Modal isOpen={showAddModal} onClose={() => { setShowAddModal(false); setErrors({}); }} className="max-w-md">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-            <h3 className="text-xl font-semibold text-gray-800 dark:text-white">
-              Add GPA Scale
-            </h3>
+            <h3 className="text-xl font-semibold text-gray-800 dark:text-white">Add GPA Scale Mapping</h3>
           </div>
-
-          {/* Modal Body */}
           <div className="p-6">
             <form onSubmit={(e) => handleSubmit(e, false)} className="space-y-4">
-              <div>
-                <Label>GPA Scale *</Label>
-                <Input
-                  value={formData.GPA_SCALE}
-                  onChange={(e) => handleFieldChange("GPA_SCALE", e.target.value)}
-                  onBlur={(e) => handleBlur("GPA_SCALE", e.target.value)}
-                  placeholder="Enter GPA Scale"
-                  error={!!errors.GPA_SCALE}
-                />
-                {errors.GPA_SCALE && (
-                  <p className="mt-1 text-xs text-red-500">{errors.GPA_SCALE}</p>
-                )}
-              </div>
+              <FormFields />
               <div className="flex gap-4 pt-4">
                 <button
                   type="submit"
@@ -241,15 +267,7 @@ export default function GpaScaleMapping() {
                     "Submit"
                   )}
                 </button>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setShowAddModal(false);
-                    setErrors({});
-                  }}
-                  className="flex-1"
-                  disabled={loading}
-                >
+                <Button variant="outline" onClick={() => { setShowAddModal(false); setErrors({}); }} className="flex-1" disabled={loading}>
                   Cancel
                 </Button>
               </div>
@@ -258,34 +276,13 @@ export default function GpaScaleMapping() {
         </Modal>
 
         {/* Edit Modal */}
-        <Modal isOpen={showEditModal} onClose={() => {
-          setShowEditModal(false);
-          setEditingId(null);
-          setErrors({});
-        }} className="max-w-md">
-          {/* Modal Header */}
+        <Modal isOpen={showEditModal} onClose={() => { setShowEditModal(false); setEditingId(null); setErrors({}); }} className="max-w-md">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-            <h3 className="text-xl font-semibold text-gray-800 dark:text-white">
-              Edit GPA Scale
-            </h3>
+            <h3 className="text-xl font-semibold text-gray-800 dark:text-white">Edit GPA Scale Mapping</h3>
           </div>
-
-          {/* Modal Body */}
           <div className="p-6">
             <form onSubmit={(e) => handleSubmit(e, true)} className="space-y-4">
-              <div>
-                <Label>GPA Scale *</Label>
-                <Input
-                  value={formData.GPA_SCALE}
-                  onChange={(e) => handleFieldChange("GPA_SCALE", e.target.value)}
-                  onBlur={(e) => handleBlur("GPA_SCALE", e.target.value)}
-                  placeholder="Enter GPA Scale"
-                  error={!!errors.GPA_SCALE}
-                />
-                {errors.GPA_SCALE && (
-                  <p className="mt-1 text-xs text-red-500">{errors.GPA_SCALE}</p>
-                )}
-              </div>
+              <FormFields />
               <div className="flex gap-4 pt-4">
                 <button
                   type="submit"
@@ -301,16 +298,7 @@ export default function GpaScaleMapping() {
                     "Update"
                   )}
                 </button>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setShowEditModal(false);
-                    setEditingId(null);
-                    setErrors({});
-                  }}
-                  className="flex-1"
-                  disabled={loading}
-                >
+                <Button variant="outline" onClick={() => { setShowEditModal(false); setEditingId(null); setErrors({}); }} className="flex-1" disabled={loading}>
                   Cancel
                 </Button>
               </div>
@@ -329,7 +317,7 @@ export default function GpaScaleMapping() {
           }}
           onConfirm={handleDelete}
           title="Confirm Delete"
-          message="Are you sure you want to delete this GPA Scale? This action cannot be undone."
+          message="Are you sure you want to delete this GPA Scale Mapping? This action cannot be undone."
           confirmText="Delete"
           cancelText="Cancel"
           confirmVariant="danger"
@@ -339,4 +327,3 @@ export default function GpaScaleMapping() {
     </PageWrapper>
   );
 }
-

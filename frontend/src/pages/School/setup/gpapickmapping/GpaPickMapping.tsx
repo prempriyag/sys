@@ -5,13 +5,43 @@ import PageContainer, { PageWrapper } from "../../../../components/common/PageCo
 import DataTable from "../../../../components/ui/DataTable";
 import Button from "../../../../components/ui/button/Button";
 import { Modal } from "../../../../components/ui/modal";
-import Input from "../../../../components/form/input/InputField";
 import Label from "../../../../components/form/Label";
 import { api } from "../../../../config/api";
-import { RefreshIcon, PlusIcon, PencilIcon, TrashBinIcon } from "../../../../icons";
+import { RefreshIcon, PencilIcon, TrashBinIcon } from "../../../../icons";
 import { useAuth } from "../../../../context/AuthContext";
 import ConfirmationModal from "../../../../components/common/ConfirmationModal";
 import { alertsuccess, alerterror } from "../../../../utils/toast";
+
+interface GpaPickFormData {
+  GPA_SCALE: string;
+  WEIGHTED_GPA: string;
+  UNWEIGHTED_GPA: string;
+  CGPA: string;
+  PREFERRED_GPA: string;
+}
+
+const INITIAL_FORM_DATA: GpaPickFormData = {
+  GPA_SCALE: "",
+  WEIGHTED_GPA: "",
+  UNWEIGHTED_GPA: "",
+  CGPA: "",
+  PREFERRED_GPA: "",
+};
+
+// Options for GPA_SCALE, WEIGHTED_GPA, UNWEIGHTED_GPA, CGPA (matching CI3)
+const GPA_OPTIONS = [
+  { value: "", label: "Please Select" },
+  { value: "X", label: "X" },
+];
+
+// Options for PREFERRED_GPA (matching CI3)
+const PREFERRED_GPA_OPTIONS = [
+  { value: "", label: "Please Select" },
+  { value: "GPA_SCALE", label: "GPA Scale" },
+  { value: "WEIGHTED_GPA", label: "Weighted GPA" },
+  { value: "UNWEIGHTED_GPA", label: "Unweighted GPA" },
+  { value: "CGPA", label: "CGPA" },
+];
 
 export default function GpaPickMapping() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -21,8 +51,7 @@ export default function GpaPickMapping() {
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [gpaPickToDelete, setGpaPickToDelete] = useState<number | null>(null);
-  const [formData, setFormData] = useState({ GPA_PICK: "" });
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [formData, setFormData] = useState<GpaPickFormData>({ ...INITIAL_FORM_DATA });
   const [loading, setLoading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -31,8 +60,7 @@ export default function GpaPickMapping() {
   const hasDeletePermission = hasPermission("gpa_pick_mapping", "DELETE");
 
   const handleAdd = () => {
-    setFormData({ GPA_PICK: "" });
-    setErrors({});
+    setFormData({ ...INITIAL_FORM_DATA });
     setShowAddModal(true);
   };
 
@@ -41,8 +69,13 @@ export default function GpaPickMapping() {
       const response = await api.post("/api/gpapickmapping/get", { id });
       const data = response;
       if (data.Id) {
-        setFormData({ GPA_PICK: data.GPA_PICK || "" });
-        setErrors({});
+        setFormData({
+          GPA_SCALE: data.GPA_SCALE || "",
+          WEIGHTED_GPA: data.WEIGHTED_GPA || "",
+          UNWEIGHTED_GPA: data.UNWEIGHTED_GPA || "",
+          CGPA: data.CGPA || "",
+          PREFERRED_GPA: data.PREFERRED_GPA || "",
+        });
         setEditingId(data.Id);
         setShowEditModal(true);
       }
@@ -62,9 +95,9 @@ export default function GpaPickMapping() {
     setIsDeleting(true);
     try {
       const response = await api.post("/api/gpapickmapping/delete", { id: gpaPickToDelete });
-      
+
       const success = response.status === 1 || response.success || response.status === "Success" || response.message?.toLowerCase().includes("success");
-      const messageText = response.message || "GPA Pick deleted successfully";
+      const messageText = response.message || "GPA Pick Mapping deleted successfully";
 
       if (success) {
         alertsuccess(messageText);
@@ -78,7 +111,7 @@ export default function GpaPickMapping() {
       }
     } catch (error: any) {
       console.error("Delete GPA Pick error:", error);
-      alerterror(error.response?.data?.detail || error.message || "Error deleting GPA Pick");
+      alerterror(error.response?.data?.detail || error.message || "Error deleting GPA Pick Mapping");
       setShowDeleteConfirmModal(false);
       setGpaPickToDelete(null);
     } finally {
@@ -86,52 +119,12 @@ export default function GpaPickMapping() {
     }
   };
 
-  // Field validation
-  const validateField = (name: string, value: string): string => {
-    switch (name) {
-      case "GPA_PICK":
-        if (!value || value.trim() === "") {
-          return "GPA Pick is required";
-        }
-        return "";
-      default:
-        return "";
-    }
-  };
-
   const handleFieldChange = (name: string, value: string) => {
     setFormData((prev) => ({ ...prev, [name]: value }));
-    // Clear error for this field when user starts typing
-    if (errors[name]) {
-      setErrors((prev) => {
-        const newErrors = { ...prev };
-        delete newErrors[name];
-        return newErrors;
-      });
-    }
-  };
-
-  const handleBlur = (name: string, value: string) => {
-    const error = validateField(name, value);
-    if (error) {
-      setErrors((prev) => ({ ...prev, [name]: error }));
-    }
   };
 
   const handleSubmit = async (e: React.FormEvent, isEdit: boolean) => {
     e.preventDefault();
-    setErrors({});
-
-    // Validate all fields
-    const newErrors: Record<string, string> = {};
-    newErrors.GPA_PICK = validateField("GPA_PICK", formData.GPA_PICK);
-
-    // If there are errors, set them and return
-    const hasErrors = Object.values(newErrors).some((error) => error !== "");
-    if (hasErrors) {
-      setErrors(newErrors);
-      return;
-    }
 
     setLoading(true);
 
@@ -144,25 +137,58 @@ export default function GpaPickMapping() {
       const response = await api.post(endpoint, body);
 
       const success = response.status === 1 || response.success || response.message?.toLowerCase().includes("success");
-      const messageText = response.message || (isEdit ? "GPA Pick updated successfully" : "GPA Pick added successfully");
+      const messageText = response.message || (isEdit ? "GPA Pick Mapping updated successfully" : "GPA Pick Mapping added successfully");
 
       if (success) {
         alertsuccess(messageText);
         setShowAddModal(false);
         setShowEditModal(false);
-        setFormData({ GPA_PICK: "" });
+        setFormData({ ...INITIAL_FORM_DATA });
         setEditingId(null);
         setRefreshTrigger((prev) => prev + 1);
       } else {
-        alerterror(messageText || "Error saving GPA Pick");
+        alerterror(messageText || "Error saving GPA Pick Mapping");
       }
     } catch (error: any) {
       console.error("Save GPA Pick error:", error);
-      alerterror(error.response?.data?.detail || error.message || "Error saving GPA Pick");
+      alerterror(error.response?.data?.detail || error.message || "Error saving GPA Pick Mapping");
     } finally {
       setLoading(false);
     }
   };
+
+  // Reusable select component
+  const SelectField = ({ label, name, value, options, onChange }: {
+    label: string;
+    name: string;
+    value: string;
+    options: { value: string; label: string }[];
+    onChange: (name: string, value: string) => void;
+  }) => (
+    <div>
+      <Label>{label}</Label>
+      <select
+        className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm transition focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300"
+        value={value}
+        onChange={(e) => onChange(name, e.target.value)}
+      >
+        {options.map((opt) => (
+          <option key={opt.value} value={opt.value}>{opt.label}</option>
+        ))}
+      </select>
+    </div>
+  );
+
+  // Form content shared between Add and Edit modals
+  const FormFields = () => (
+    <>
+      <SelectField label="GPA Scale" name="GPA_SCALE" value={formData.GPA_SCALE} options={GPA_OPTIONS} onChange={handleFieldChange} />
+      <SelectField label="Weighted GPA" name="WEIGHTED_GPA" value={formData.WEIGHTED_GPA} options={GPA_OPTIONS} onChange={handleFieldChange} />
+      <SelectField label="Unweighted GPA" name="UNWEIGHTED_GPA" value={formData.UNWEIGHTED_GPA} options={GPA_OPTIONS} onChange={handleFieldChange} />
+      <SelectField label="CGPA" name="CGPA" value={formData.CGPA} options={GPA_OPTIONS} onChange={handleFieldChange} />
+      <SelectField label="Preferred GPA" name="PREFERRED_GPA" value={formData.PREFERRED_GPA} options={PREFERRED_GPA_OPTIONS} onChange={handleFieldChange} />
+    </>
+  );
 
   return (
     <PageWrapper>
@@ -170,10 +196,10 @@ export default function GpaPickMapping() {
       <PageBreadcrumb pageTitle="GPA Pick Mapping" />
       <PageContainer>
         <div className="mb-3 flex items-center justify-between">
-          <h3 className="font-semibold text-gray-800 text-theme-xl dark:text-white/90 sm:text-2xl">View GPA Pick</h3>
+          <h3 className="font-semibold text-gray-800 text-theme-xl dark:text-white/90 sm:text-2xl">View GPA Pick Mapping</h3>
           <div className="flex items-center gap-2">
             {hasAddPermission && (
-              <Button onClick={handleAdd}>Add GPA Pick</Button>
+              <Button onClick={handleAdd}>Add GPA Pick Mapping</Button>
             )}
             <Button onClick={() => setRefreshTrigger((prev) => prev + 1)} variant="outline" startIcon={<RefreshIcon className="w-5 h-5" />}>Refresh Data</Button>
           </div>
@@ -183,15 +209,19 @@ export default function GpaPickMapping() {
           refreshTrigger={refreshTrigger}
           ajaxUrl="/api/gpapickmapping/ajaxlist"
           columns={[
-            { data: "GPA_PICK", name: "GPA Pick", searchable: true, orderable: true },
-            { data: "UPDATED_BY", name: "Updated By", searchable: true, orderable: true },
-            { data: "LAST_UPDATED_DATETIME", name: "Updated On", searchable: false, orderable: true },
+            { data: "GPA_SCALE", name: "GPA Scale", searchable: true, orderable: true, textCenter: true },
+            { data: "WEIGHTED_GPA", name: "Weighted GPA", searchable: true, orderable: true },
+            { data: "UNWEIGHTED_GPA", name: "Unweighted GPA", searchable: true, orderable: true, textCenter: true },
+            { data: "CGPA", name: "CGPA", searchable: true, orderable: true, textCenter: true },
+            { data: "PREFERRED_GPA", name: "Preferred GPA", searchable: true, orderable: true, textCenter: true },
+            { data: "CREATED_BY", name: "Updated By", searchable: true, orderable: true },
+            { data: "CREATED_DATE", name: "Updated On", searchable: false, orderable: true },
             ...(hasUpdatePermission || hasDeletePermission ? [{
               data: "actions", name: "Action", searchable: false, orderable: false,
-              render: (data: any, row: any) => (
+              render: (_data: any, row: any) => (
                 <div className="flex items-center gap-2">
-                  {hasUpdatePermission && <button onClick={() => handleEdit(row.Id)} className="text-brand-500 hover:text-brand-700" title="Edit"><PencilIcon className="w-5 h-5" /></button>}
-                  {hasDeletePermission && <button onClick={() => handleDeleteClick(row.Id)} className="text-red-500 hover:text-red-700" title="Delete"><TrashBinIcon className="w-5 h-5" /></button>}
+                  {hasUpdatePermission && <button onClick={() => handleEdit(row.id)} className="text-brand-500 hover:text-brand-700" title="Edit"><PencilIcon className="w-5 h-5" /></button>}
+                  {hasDeletePermission && <button onClick={() => handleDeleteClick(row.id)} className="text-red-500 hover:text-red-700" title="Delete"><TrashBinIcon className="w-5 h-5" /></button>}
                 </div>
               ),
             }] : []),
@@ -199,33 +229,13 @@ export default function GpaPickMapping() {
         />
 
         {/* Add Modal */}
-        <Modal isOpen={showAddModal} onClose={() => {
-          setShowAddModal(false);
-          setErrors({});
-        }} className="max-w-md">
-          {/* Modal Header */}
+        <Modal isOpen={showAddModal} onClose={() => setShowAddModal(false)} className="max-w-md">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-            <h3 className="text-xl font-semibold text-gray-800 dark:text-white">
-              Add GPA Pick
-            </h3>
+            <h3 className="text-xl font-semibold text-gray-800 dark:text-white">Add GPA Pick Mapping</h3>
           </div>
-
-          {/* Modal Body */}
           <div className="p-6">
             <form onSubmit={(e) => handleSubmit(e, false)} className="space-y-4">
-              <div>
-                <Label>GPA Pick *</Label>
-                <Input
-                  value={formData.GPA_PICK}
-                  onChange={(e) => handleFieldChange("GPA_PICK", e.target.value)}
-                  onBlur={(e) => handleBlur("GPA_PICK", e.target.value)}
-                  placeholder="Enter GPA Pick"
-                  error={!!errors.GPA_PICK}
-                />
-                {errors.GPA_PICK && (
-                  <p className="mt-1 text-xs text-red-500">{errors.GPA_PICK}</p>
-                )}
-              </div>
+              <FormFields />
               <div className="flex gap-4 pt-4">
                 <button
                   type="submit"
@@ -241,15 +251,7 @@ export default function GpaPickMapping() {
                     "Submit"
                   )}
                 </button>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setShowAddModal(false);
-                    setErrors({});
-                  }}
-                  className="flex-1"
-                  disabled={loading}
-                >
+                <Button variant="outline" onClick={() => setShowAddModal(false)} className="flex-1" disabled={loading}>
                   Cancel
                 </Button>
               </div>
@@ -258,34 +260,13 @@ export default function GpaPickMapping() {
         </Modal>
 
         {/* Edit Modal */}
-        <Modal isOpen={showEditModal} onClose={() => {
-          setShowEditModal(false);
-          setEditingId(null);
-          setErrors({});
-        }} className="max-w-md">
-          {/* Modal Header */}
+        <Modal isOpen={showEditModal} onClose={() => { setShowEditModal(false); setEditingId(null); }} className="max-w-md">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-            <h3 className="text-xl font-semibold text-gray-800 dark:text-white">
-              Edit GPA Pick
-            </h3>
+            <h3 className="text-xl font-semibold text-gray-800 dark:text-white">Edit GPA Pick Mapping</h3>
           </div>
-
-          {/* Modal Body */}
           <div className="p-6">
             <form onSubmit={(e) => handleSubmit(e, true)} className="space-y-4">
-              <div>
-                <Label>GPA Pick *</Label>
-                <Input
-                  value={formData.GPA_PICK}
-                  onChange={(e) => handleFieldChange("GPA_PICK", e.target.value)}
-                  onBlur={(e) => handleBlur("GPA_PICK", e.target.value)}
-                  placeholder="Enter GPA Pick"
-                  error={!!errors.GPA_PICK}
-                />
-                {errors.GPA_PICK && (
-                  <p className="mt-1 text-xs text-red-500">{errors.GPA_PICK}</p>
-                )}
-              </div>
+              <FormFields />
               <div className="flex gap-4 pt-4">
                 <button
                   type="submit"
@@ -301,16 +282,7 @@ export default function GpaPickMapping() {
                     "Update"
                   )}
                 </button>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setShowEditModal(false);
-                    setEditingId(null);
-                    setErrors({});
-                  }}
-                  className="flex-1"
-                  disabled={loading}
-                >
+                <Button variant="outline" onClick={() => { setShowEditModal(false); setEditingId(null); }} className="flex-1" disabled={loading}>
                   Cancel
                 </Button>
               </div>
@@ -329,7 +301,7 @@ export default function GpaPickMapping() {
           }}
           onConfirm={handleDelete}
           title="Confirm Delete"
-          message="Are you sure you want to delete this GPA Pick? This action cannot be undone."
+          message="Are you sure you want to delete this GPA Pick Mapping? This action cannot be undone."
           confirmText="Delete"
           cancelText="Cancel"
           confirmVariant="danger"
@@ -339,4 +311,3 @@ export default function GpaPickMapping() {
     </PageWrapper>
   );
 }
-

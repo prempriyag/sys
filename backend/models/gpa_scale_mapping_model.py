@@ -10,21 +10,21 @@ logger = logging.getLogger(__name__)
 
 
 class GpaScaleMappingModel:
-    """Model for GPA Scale Mapping queries"""
+    """Model for GPA Scale Mapping queries - matches CI3 Gpascalemapping controller"""
 
     @staticmethod
     def build_search_conditions(request_data: Dict[str, Any]) -> str:
-        """Build search conditions from request data"""
+        """Build search conditions from request data (matching CI3 getgpascalemappingdata)"""
         search_conditions = []
         
-        # Global search (main search box)
+        # Global search (main search box) - matching CI3 search
         search_value = request_data.get("search", {}).get("value", "")
         if search_value:
             search_safe = check_special_name(search_value)
-            search_lower = check_special_name(search_value.lower())
-            search_conditions.append(f"""(GPA_SCALE like '%{search_safe}%' or 
-                lower(UPDATED_BY) like '%{search_lower}%' or 
-                LAST_UPDATED_DATETIME like '%{search_safe}%')""")
+            search_conditions.append(f"""(
+                PERCENTAGE like '%{search_safe}%' or
+                GPA like '%{search_safe}%'
+            )""")
 
         # Column-specific search (individual column search boxes)
         columns = request_data.get("columns", [])
@@ -38,13 +38,14 @@ class GpaScaleMappingModel:
                     col_search_safe = check_special_name(col_search_value)
                     col_search_lower = check_special_name(col_search_value.lower())
                     
-                    # Map column data names to database fields
-                    if col_data == "GPA_SCALE":
-                        search_conditions.append(f"GPA_SCALE like '%{col_search_safe}%'")
+                    if col_data == "PERCENTAGE":
+                        search_conditions.append(f"PERCENTAGE like '%{col_search_safe}%'")
+                    elif col_data == "GPA":
+                        search_conditions.append(f"GPA like '%{col_search_safe}%'")
                     elif col_data == "UPDATED_BY":
                         search_conditions.append(f"lower(UPDATED_BY) like '%{col_search_lower}%'")
-                    elif col_data == "LAST_UPDATED_DATETIME":
-                        search_conditions.append(f"LAST_UPDATED_DATETIME like '%{col_search_safe}%'")
+                    elif col_data == "UPDATED_DATE":
+                        search_conditions.append(f"UPDATED_DATE like '%{col_search_safe}%'")
 
         if search_conditions:
             return " AND ".join(search_conditions)
@@ -54,11 +55,12 @@ class GpaScaleMappingModel:
     def get_order_by_column(column_name: str) -> str:
         """Map frontend column name to SQL column for ordering"""
         column_mapping = {
-            "GPA_SCALE": "GPA_SCALE",
+            "PERCENTAGE": "PERCENTAGE",
+            "GPA": "GPA",
             "UPDATED_BY": "UPDATED_BY",
-            "LAST_UPDATED_DATETIME": "LAST_UPDATED_DATETIME",
+            "UPDATED_DATE": "UPDATED_DATE",
         }
-        return column_mapping.get(column_name, "LAST_UPDATED_DATETIME")
+        return column_mapping.get(column_name, "UPDATED_DATE")
 
     @staticmethod
     def get_gpa_scale_mapping_data(
@@ -67,6 +69,7 @@ class GpaScaleMappingModel:
     ) -> Dict[str, Any]:
         """
         Get GPA Scale Mapping data for DataTables
+        Matches CI3 Gpascalemapping_model::getgpascalemappingdata()
         """
         try:
             # Extract request parameters
@@ -84,9 +87,9 @@ class GpaScaleMappingModel:
 
             columns = request_data.get("columns", [])
             if columns and len(columns) > column_index:
-                column_name = columns[column_index].get("data", "LAST_UPDATED_DATETIME")
+                column_name = columns[column_index].get("data", "UPDATED_DATE")
             else:
-                column_name = "LAST_UPDATED_DATETIME"
+                column_name = "UPDATED_DATE"
 
             # Build search conditions
             search_query = GpaScaleMappingModel.build_search_conditions(request_data)
@@ -118,9 +121,9 @@ class GpaScaleMappingModel:
                 logger.error(f"Error executing count query: {e}")
                 raise
 
-            # Build data query
+            # Build data query - matching CI3 SELECT *
             data_query_sql = f"""
-                SELECT ID, GPA_SCALE, UPDATED_BY, LAST_UPDATED_DATETIME
+                SELECT Id, PERCENTAGE, GPA, UPDATED_BY, UPDATED_DATE
                 FROM {TBL_GPA_SCALE_MAPPING} WITH(NOLOCK)
                 WHERE {where_clause}
                 ORDER BY {order_by_clause}
@@ -135,16 +138,17 @@ class GpaScaleMappingModel:
                 logger.error(f"Error executing data query: {e}")
                 raise
 
-            # Format data
+            # Format data - matching CI3 response
             data = []
             for record in records:
                 record_dict = dict(record._mapping)
                 
                 data_row = {
-                    "Id": record_dict.get("Id"),
-                    "GPA_SCALE": record_dict.get("GPA_SCALE", ""),
+                    "Id": record_dict.get("Id") or record_dict.get("id") or record_dict.get("ID"),
+                    "PERCENTAGE": record_dict.get("PERCENTAGE", ""),
+                    "GPA": record_dict.get("GPA", ""),
                     "UPDATED_BY": record_dict.get("UPDATED_BY", ""),
-                    "LAST_UPDATED_DATETIME": str(record_dict.get("LAST_UPDATED_DATETIME", "")) if record_dict.get("LAST_UPDATED_DATETIME") else "",
+                    "UPDATED_DATE": str(record_dict.get("UPDATED_DATE", "")) if record_dict.get("UPDATED_DATE") else "",
                 }
 
                 data.append(data_row)
@@ -160,4 +164,3 @@ class GpaScaleMappingModel:
         except Exception as e:
             logger.error(f"Error in get_gpa_scale_mapping_data: {e}")
             raise
-

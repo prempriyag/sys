@@ -35,8 +35,8 @@ export default function HorizontalMenuItem({
   const isSubmenuOpen = openSubmenu[key] || false;
   const hasSubItems = item.subItems && item.subItems.length > 0;
   // Show icon only for items without subItems (Dashboard, User Management) OR items with subItems (for testing)
-  const showIconOnly = 
-    (!hasSubItems);// && (item.name === "Dashboard" || item.name === "User Management"));// ||
+  const showIconOnly = false;
+    //(!hasSubItems);// && (item.name === "Dashboard" || item.name === "User Management"));// ||
     //(hasSubItems && (item.name === "Transcripts" || item.name === "Dashboard" || item.name === "User Management")); // Add item names here to test icon-only with submenus
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevLocationRef = useRef<string>(location.pathname);

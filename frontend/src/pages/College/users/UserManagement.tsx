@@ -14,13 +14,13 @@ import ResetPasswordModal from "./ResetPasswordModal";
 import AddUserModal from "./AddUserModal";
 import EditUserModal from "./EditUserModal";
 import ConfirmationModal from "../../../components/common/ConfirmationModal";
+import { alertsuccess, alerterror } from "../../../utils/toast";
 
 export default function UserManagement() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
   const { alertsuccess, alerterror } = useToast();
   const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [showResetPasswordModal, setShowResetPasswordModal] = useState(false);
   const [showAddUserModal, setShowAddUserModal] = useState(false);
@@ -69,30 +69,27 @@ export default function UserManagement() {
       if (isSuccess) {
         const successMessage = message || "User deleted successfully";
         alertsuccess(successMessage);
-        setMessage({ type: "success", text: successMessage });
+        alertsuccess(successMessage);
         setRefreshTrigger((prev) => prev + 1);
         setShowDeleteConfirmModal(false);
         setUserToDelete(null);
         // Clear message after 5 seconds
-        setTimeout(() => setMessage(null), 5000);
       } else {
         const errorMessage = message || "Failed to delete user";
         alerterror(errorMessage);
-        setMessage({ type: "error", text: errorMessage });
+        alerterror(errorMessage);
         setShowDeleteConfirmModal(false);
         setUserToDelete(null);
         // Clear message after 5 seconds
-        setTimeout(() => setMessage(null), 5000);
       }
     } catch (err: any) {
       console.error("[DELETE] Delete user error:", err);
       const errorMessage = err.response?.data?.detail || err.response?.data?.message || err.message || "Failed to delete user";
       alerterror(errorMessage);
-      setMessage({ type: "error", text: errorMessage });
+      alerterror(errorMessage);
       setShowDeleteConfirmModal(false);
       setUserToDelete(null);
       // Clear message after 5 seconds
-      setTimeout(() => setMessage(null), 5000);
     } finally {
       setIsDeleting(false);
     }
@@ -183,25 +180,6 @@ export default function UserManagement() {
             >
               ×
             </button>
-          </div>
-        )}
-
-        {/* Success/Error Message Banner */}
-        {message && (
-          <div className={`mb-4 p-4 rounded-lg border ${
-            message.type === "success" 
-              ? "bg-green-50 text-green-800 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800" 
-              : "bg-red-50 text-red-800 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800"
-          }`}>
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">{message.text}</span>
-              <button
-                onClick={() => setMessage(null)}
-                className={`ml-4 ${message.type === "success" ? "text-green-800 dark:text-green-300" : "text-red-800 dark:text-red-300"}`}
-              >
-                ×
-              </button>
-            </div>
           </div>
         )}
 
@@ -368,13 +346,11 @@ export default function UserManagement() {
         isOpen={showAddUserModal}
         onClose={() => {
           setShowAddUserModal(false);
-          setMessage(null);
         }}
         onSuccess={(messageText?: string) => {
           setRefreshTrigger((prev) => prev + 1);
-          setMessage({ type: "success", text: messageText || "User added successfully" });
+          alertsuccess(messageText || "User added successfully");
           // Clear message after 5 seconds
-          setTimeout(() => setMessage(null), 5000);
         }}
       />
 
@@ -385,13 +361,11 @@ export default function UserManagement() {
         onClose={() => {
           setShowEditUserModal(false);
           setSelectedUserId(null);
-          setMessage(null);
         }}
         onSuccess={(messageText?: string) => {
           setRefreshTrigger((prev) => prev + 1);
-          setMessage({ type: "success", text: messageText || "User updated successfully" });
+          alertsuccess(messageText || "User updated successfully");
           // Clear message after 5 seconds
-          setTimeout(() => setMessage(null), 5000);
         }}
       />
 

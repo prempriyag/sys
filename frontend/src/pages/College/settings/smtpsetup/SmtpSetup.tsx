@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import DataTable from "../../../../components/ui/DataTable";
 import { API_BASE_URL } from "../../../../config/api";
+import { alertsuccess, alerterror } from "../../../../utils/toast";
 
 const SmtpSetup: React.FC = () => {
   const [showAddModal, setShowAddModal] = useState(false);
@@ -12,7 +13,6 @@ const SmtpSetup: React.FC = () => {
     password: "",
     port: "",
   });
-  const [message, setMessage] = useState<{ type: string; text: string } | null>(null);
 
   const columns = [
     { data: "host", title: "Host" },
@@ -55,7 +55,7 @@ const SmtpSetup: React.FC = () => {
           setShowEditModal(true);
         }
       } catch (error: any) {
-        setMessage({ type: "error", text: error.message || "Error fetching SMTP data" });
+        alerterror(error.message || "Error fetching SMTP data");
       }
     };
 
@@ -72,13 +72,13 @@ const SmtpSetup: React.FC = () => {
         });
         const result = await response.json();
         if (result.status === "Success") {
-          setMessage({ type: "success", text: "Successfully deleted" });
+          alertsuccess("Successfully deleted");
           window.location.reload();
         } else {
-          setMessage({ type: "error", text: "Failed to delete" });
+          alerterror("Failed to delete");
         }
       } catch (error: any) {
-        setMessage({ type: "error", text: error.message || "Error deleting SMTP" });
+        alerterror(error.message || "Error deleting SMTP");
       }
     };
 
@@ -108,7 +108,6 @@ const SmtpSetup: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent, isEdit: boolean) => {
     e.preventDefault();
-    setMessage(null);
     try {
       const endpoint = isEdit ? "/api/smtp/update" : "/api/smtp/insert";
       const body = isEdit ? { id: editingId, ...formData } : formData;
@@ -122,17 +121,17 @@ const SmtpSetup: React.FC = () => {
       });
       const result = await response.json();
       if (result.status === 1) {
-        setMessage({ type: "success", text: result.message });
+        alertsuccess(result.message);
         setShowAddModal(false);
         setShowEditModal(false);
         setFormData({ host: "", username: "", password: "", port: "" });
         setEditingId(null);
         setTimeout(() => window.location.reload(), 1000);
       } else {
-        setMessage({ type: "error", text: result.message });
+        alerterror(result.message);
       }
     } catch (error: any) {
-      setMessage({ type: "error", text: error.message || "Error saving SMTP configuration" });
+      alerterror(error.message || "Error saving SMTP configuration");
     }
   };
 
@@ -154,11 +153,6 @@ const SmtpSetup: React.FC = () => {
               </button>
             </div>
             <div className="card-body">
-              {message && (
-                <div className={`alert alert-${message.type === "success" ? "success" : "danger"}`}>
-                  {message.text}
-                </div>
-              )}
               <DataTable
                 ajaxUrl="/api/smtp/ajaxlist"
                 columns={columns}

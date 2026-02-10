@@ -23,7 +23,6 @@ export default function SkipCourses() {
   const [courseToDelete, setCourseToDelete] = useState<number | null>(null);
   const [formData, setFormData] = useState({ INSTITUTION_ID: "", EXTERNAL_SUBJECT: "", EXTERNAL_COURSE_ID: "" });
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -44,7 +43,6 @@ export default function SkipCourses() {
     setFormData({ INSTITUTION_ID: "", EXTERNAL_SUBJECT: "", EXTERNAL_COURSE_ID: "" });
     setErrors({});
     setShowAddModal(true);
-    setMessage(null);
   };
 
   const handleEdit = async (id: number) => {
@@ -56,10 +54,9 @@ export default function SkipCourses() {
         setErrors({});
         setEditingId(data.Id);
         setShowEditModal(true);
-        setMessage(null);
       }
     } catch (error: any) {
-      setMessage({ type: "error", text: error.response?.data?.detail || error.message || "Error loading course data" });
+      alerterror(error.response?.data?.detail || error.message || "Error loading course data");
     }
   };
 
@@ -79,23 +76,20 @@ export default function SkipCourses() {
       const messageText = response.message || "Course deleted successfully";
 
       if (success) {
-        setMessage({ type: "success", text: messageText });
+        alertsuccess(messageText);
         setRefreshTrigger((prev) => prev + 1);
         setShowDeleteConfirmModal(false);
         setCourseToDelete(null);
-        setTimeout(() => setMessage(null), 5000);
       } else {
-        setMessage({ type: "error", text: messageText });
+        alerterror(messageText);
         setShowDeleteConfirmModal(false);
         setCourseToDelete(null);
-        setTimeout(() => setMessage(null), 5000);
       }
     } catch (error: any) {
       console.error("Delete course error:", error);
-      setMessage({ type: "error", text: error.response?.data?.detail || error.message || "Error deleting course" });
+      alerterror(error.response?.data?.detail || error.message || "Error deleting course");
       setShowDeleteConfirmModal(false);
       setCourseToDelete(null);
-      setTimeout(() => setMessage(null), 5000);
     } finally {
       setIsDeleting(false);
     }
@@ -174,21 +168,18 @@ export default function SkipCourses() {
       const messageText = response.message || (isEdit ? "Course updated successfully" : "Course added successfully");
 
       if (success) {
-        setMessage({ type: "success", text: messageText });
+        alertsuccess(messageText);
         setShowAddModal(false);
         setShowEditModal(false);
         setFormData({ INSTITUTION_ID: "", EXTERNAL_SUBJECT: "", EXTERNAL_COURSE_ID: "" });
         setEditingId(null);
         setRefreshTrigger((prev) => prev + 1);
-        setTimeout(() => setMessage(null), 5000);
       } else {
-        setMessage({ type: "error", text: messageText || "Error saving course" });
-        setTimeout(() => setMessage(null), 5000);
+        alerterror(messageText || "Error saving course");
       }
     } catch (error: any) {
       console.error("Save course error:", error);
-      setMessage({ type: "error", text: error.response?.data?.detail || error.message || "Error saving course" });
-      setTimeout(() => setMessage(null), 5000);
+      alerterror(error.response?.data?.detail || error.message || "Error saving course");
     } finally {
       setLoading(false);
     }
@@ -206,25 +197,6 @@ export default function SkipCourses() {
         {hasAddPermission && (
           <div className="mb-4 flex justify-center">
             <Button onClick={handleAdd}>Add Course</Button>
-          </div>
-        )}
-
-        {/* Success/Error Message Banner */}
-        {message && (
-          <div className={`mb-4 p-4 rounded-lg border ${
-            message.type === "success" 
-              ? "bg-green-50 text-green-800 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800" 
-              : "bg-red-50 text-red-800 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800"
-          }`}>
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">{message.text}</span>
-              <button
-                onClick={() => setMessage(null)}
-                className={`ml-4 ${message.type === "success" ? "text-green-800 dark:text-green-300" : "text-red-800 dark:text-red-300"}`}
-              >
-                ×
-              </button>
-            </div>
           </div>
         )}
 
@@ -272,7 +244,6 @@ export default function SkipCourses() {
         {/* Add Modal */}
         <Modal isOpen={showAddModal} onClose={() => {
           setShowAddModal(false);
-          setMessage(null);
           setErrors({});
         }} className="max-w-md">
           {/* Modal Header */}
@@ -343,7 +314,6 @@ export default function SkipCourses() {
                   variant="outline"
                   onClick={() => {
                     setShowAddModal(false);
-                    setMessage(null);
                     setErrors({});
                   }}
                   className="flex-1"
@@ -360,7 +330,6 @@ export default function SkipCourses() {
         <Modal isOpen={showEditModal} onClose={() => {
           setShowEditModal(false);
           setEditingId(null);
-          setMessage(null);
           setErrors({});
         }} className="max-w-md">
           {/* Modal Header */}
@@ -432,7 +401,6 @@ export default function SkipCourses() {
                   onClick={() => {
                     setShowEditModal(false);
                     setEditingId(null);
-                    setMessage(null);
                     setErrors({});
                   }}
                   className="flex-1"

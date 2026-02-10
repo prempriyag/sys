@@ -5,13 +5,13 @@ import PageContainer, { PageWrapper } from "../../../components/common/PageConta
 import Button from "../../../components/ui/button/Button";
 import { API_BASE_URL, API_ENDPOINTS, getAuthToken } from "../../../config/api";
 import { ArrowUpIcon } from "../../../icons";
+import { alertsuccess, alerterror } from "../../../utils/toast";
 
 export default function TranscriptsUpload() {
   const [sourceType, setSourceType] = useState<string>("");
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [sources, setSources] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   // Fetch available source types
   useEffect(() => {
@@ -43,17 +43,16 @@ export default function TranscriptsUpload() {
     if (e.target.files) {
       const files = Array.from(e.target.files);
       if (files.length > 10) {
-        setMessage({ type: "error", text: "Please upload a maximum of 10 files" });
+        alerterror("Please upload a maximum of 10 files");
         return;
       }
       // Validate PDF files
       const pdfFiles = files.filter(file => file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf"));
       if (pdfFiles.length !== files.length) {
-        setMessage({ type: "error", text: "Only PDF files are allowed" });
+        alerterror("Only PDF files are allowed");
         return;
       }
       setSelectedFiles(pdfFiles);
-      setMessage(null);
     }
   };
 
@@ -61,17 +60,16 @@ export default function TranscriptsUpload() {
     e.preventDefault();
     
     if (!sourceType) {
-      setMessage({ type: "error", text: "Please select Source Type" });
+      alerterror("Please select Source Type");
       return;
     }
 
     if (selectedFiles.length === 0) {
-      setMessage({ type: "error", text: "Please upload at least one PDF file" });
+      alerterror("Please upload at least one PDF file");
       return;
     }
 
     setUploading(true);
-    setMessage(null);
 
     try {
       const formData = new FormData();
@@ -94,21 +92,21 @@ export default function TranscriptsUpload() {
       const data = await response.json();
 
       if (response.ok && data.success) {
-        setMessage({ type: "success", text: data.message || "Successfully uploaded for processing" });
+        alertsuccess(data.message || "Successfully uploaded for processing");
         setSelectedFiles([]);
         // Reset file input
         const fileInput = document.getElementById("transcript_files") as HTMLInputElement;
         if (fileInput) fileInput.value = "";
       } else {
-        setMessage({ type: "error", text: data.detail || data.message || "Upload failed" });
+        alerterror(data.detail || data.message || "Upload failed");
       }
     } catch (error: any) {
       console.error("Upload error:", error);
       // Handle JSON parse errors
       if (error instanceof SyntaxError) {
-        setMessage({ type: "error", text: "Server response error. Please check the console for details." });
+        alerterror("Server response error. Please check the console for details.");
       } else {
-        setMessage({ type: "error", text: error.message || "Upload failed. Please try again." });
+        alerterror(error.message || "Upload failed. Please try again.");
       }
     } finally {
       setUploading(false);
@@ -128,16 +126,6 @@ export default function TranscriptsUpload() {
           <h3 className="font-semibold text-gray-800 text-theme-xl dark:text-white/90 sm:text-2xl mb-4">
             College Transcripts Upload
           </h3>
-
-          {message && (
-            <div className={`mb-4 p-4 rounded-lg ${
-              message.type === "success" 
-                ? "bg-green-50 text-green-800 dark:bg-green-900/20 dark:text-green-400" 
-                : "bg-red-50 text-red-800 dark:bg-red-900/20 dark:text-red-400"
-            }`}>
-              {message.text}
-            </div>
-          )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

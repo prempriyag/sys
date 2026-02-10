@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { api } from "../../../../config/api";
 import PageContainer from "../../../../components/common/PageContainer";
+import { alertsuccess, alerterror } from "../../../../utils/toast";
 
 interface SystemSettings {
   system_name: string;
@@ -107,7 +108,6 @@ const MasterSettings: React.FC = () => {
   
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
   useEffect(() => {
     fetchAllData();
@@ -163,7 +163,7 @@ const MasterSettings: React.FC = () => {
       
     } catch (error: any) {
       console.error("Error fetching settings:", error);
-      setMessage({ type: 'error', text: error.message || "Error fetching settings" });
+      alerterror(error.message || "Error fetching settings");
     } finally {
       setLoading(false);
     }
@@ -172,7 +172,6 @@ const MasterSettings: React.FC = () => {
   const handleSystemSettingsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
-    setMessage(null);
     
     try {
       // Prepare data with JSON string for arrays
@@ -185,12 +184,12 @@ const MasterSettings: React.FC = () => {
       const response = await api.post("/api/mastersettings/update", dataToSend);
       
       if (response.status === 1) {
-        setMessage({ type: 'success', text: response.message });
+        alertsuccess(response.message);
       } else {
-        setMessage({ type: 'error', text: response.message });
+        alerterror(response.message);
       }
     } catch (error: any) {
-      setMessage({ type: 'error', text: error.message || "Error updating settings" });
+      alerterror(error.message || "Error updating settings");
     } finally {
       setSaving(false);
     }
@@ -199,18 +198,17 @@ const MasterSettings: React.FC = () => {
   const handleSmsSettingsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
-    setMessage(null);
     
     try {
       const response = await api.post("/api/settings/sms/update", smsSettings);
       
       if (response.status === 1) {
-        setMessage({ type: 'success', text: response.message });
+        alertsuccess(response.message);
       } else {
-        setMessage({ type: 'error', text: response.message });
+        alerterror(response.message);
       }
     } catch (error: any) {
-      setMessage({ type: 'error', text: error.message || "Error updating SMS settings" });
+      alerterror(error.message || "Error updating SMS settings");
     } finally {
       setSaving(false);
     }
@@ -219,18 +217,17 @@ const MasterSettings: React.FC = () => {
   const handleSmtpSettingsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
-    setMessage(null);
     
     try {
       const response = await api.post("/api/settings/smtp/update", smtpSettings);
       
       if (response.status === 1) {
-        setMessage({ type: 'success', text: response.message });
+        alertsuccess(response.message);
       } else {
-        setMessage({ type: 'error', text: response.message });
+        alerterror(response.message);
       }
     } catch (error: any) {
-      setMessage({ type: 'error', text: error.message || "Error updating SMTP settings" });
+      alerterror(error.message || "Error updating SMTP settings");
     } finally {
       setSaving(false);
     }
@@ -239,7 +236,6 @@ const MasterSettings: React.FC = () => {
   const handleLogoSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
-    setMessage(null);
     
     try {
       const formData = new FormData();
@@ -259,15 +255,15 @@ const MasterSettings: React.FC = () => {
       });
       
       if (response.status === 1) {
-        setMessage({ type: 'success', text: response.message });
+        alertsuccess(response.message);
         // Reset files after successful upload
         setLogoFiles({ BLACK_LOGO: null, SMALL_LOGO: null });
         setLogoPreviews({ blackLogo: '', smallLogo: '' });
       } else {
-        setMessage({ type: 'error', text: response.message });
+        alerterror(response.message);
       }
     } catch (error: any) {
-      setMessage({ type: 'error', text: error.message || "Error uploading logos" });
+      alerterror(error.message || "Error uploading logos");
     } finally {
       setSaving(false);
     }
@@ -331,28 +327,6 @@ const MasterSettings: React.FC = () => {
             Configure system settings, SMS/SMTP, and logos
           </p>
         </div>
-
-        {/* Message Alert */}
-        {message && (
-          <div className={`mb-6 p-4 rounded-lg ${
-            message.type === 'success' 
-              ? 'bg-green-50 text-green-800 border border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800'
-              : 'bg-red-50 text-red-800 border border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800'
-          }`}>
-            <div className="flex items-center">
-              {message.type === 'success' ? (
-                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              ) : (
-                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.998-.833-2.732 0L4.346 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                </svg>
-              )}
-              {message.text}
-            </div>
-          </div>
-        )}
 
         {/* Tabs */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden">

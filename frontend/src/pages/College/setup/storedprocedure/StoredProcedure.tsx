@@ -5,22 +5,21 @@ import PageContainer, { PageWrapper } from "../../../../components/common/PageCo
 import Button from "../../../../components/ui/button/Button";
 import { API_BASE_URL } from "../../../../config/api";
 import { BoltIcon } from "../../../../icons";
+import { alertsuccess, alerterror } from "../../../../utils/toast";
 
 export default function StoredProcedure() {
   const [batchId, setBatchId] = useState<string>("");
   const [studentName, setStudentName] = useState<string>("");
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [validating, setValidating] = useState(false);
 
   const validateBatchId = async () => {
     if (!batchId.trim()) {
-      setMessage({ type: "error", text: "Batch ID is required" });
+      alerterror("Batch ID is required");
       return;
     }
 
     setValidating(true);
-    setMessage(null);
     setStudentName("");
 
     try {
@@ -37,13 +36,13 @@ export default function StoredProcedure() {
 
       if (data.error === 0 && data.data) {
         setStudentName(data.data.STUDENT_FULL_NAME || "");
-        setMessage({ type: "success", text: data.msg || "Valid Batch ID" });
+        alertsuccess(data.msg || "Valid Batch ID");
       } else {
-        setMessage({ type: "error", text: data.msg || "Invalid Batch ID" });
+        alerterror(data.msg || "Invalid Batch ID");
         setStudentName("");
       }
     } catch (error: any) {
-      setMessage({ type: "error", text: error.message || "Error validating Batch ID" });
+      alerterror(error.message || "Error validating Batch ID");
       setStudentName("");
     } finally {
       setValidating(false);
@@ -54,7 +53,7 @@ export default function StoredProcedure() {
     e.preventDefault();
 
     if (!batchId.trim()) {
-      setMessage({ type: "error", text: "Batch ID is required" });
+      alerterror("Batch ID is required");
       return;
     }
 
@@ -68,7 +67,6 @@ export default function StoredProcedure() {
     }
 
     setLoading(true);
-    setMessage(null);
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/storedprocedure/run`, {
@@ -83,17 +81,17 @@ export default function StoredProcedure() {
       const data = await response.json();
 
       if (data.error === 0) {
-        setMessage({ type: "success", text: data.msg || "Stored Procedure executed successfully!" });
+        alertsuccess(data.msg || "Stored Procedure executed successfully!");
         // Clear form after successful execution
         setTimeout(() => {
           setBatchId("");
           setStudentName("");
         }, 2000);
       } else {
-        setMessage({ type: "error", text: data.msg || "Error executing stored procedure" });
+        alerterror(data.msg || "Error executing stored procedure");
       }
     } catch (error: any) {
-      setMessage({ type: "error", text: error.message || "Error executing stored procedure" });
+      alerterror(error.message || "Error executing stored procedure");
     } finally {
       setLoading(false);
     }
@@ -113,16 +111,6 @@ export default function StoredProcedure() {
             Reset Batch ID
           </h3>
 
-          {message && (
-            <div className={`mb-4 p-4 rounded-lg ${
-              message.type === "success" 
-                ? "bg-green-50 text-green-800 dark:bg-green-900/20 dark:text-green-400" 
-                : "bg-red-50 text-red-800 dark:bg-red-900/20 dark:text-red-400"
-            }`}>
-              {message.text}
-            </div>
-          )}
-
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -135,7 +123,6 @@ export default function StoredProcedure() {
                   onChange={(e) => {
                     setBatchId(e.target.value);
                     setStudentName("");
-                    setMessage(null);
                   }}
                   onBlur={validateBatchId}
                   placeholder="Enter Batch ID"

@@ -25,7 +25,6 @@ export default function OverrideEditMapping() {
     INSTITUTION_ID: "", TERM: "", SUBJECT: "", COURSE: "", EQV_SUBJECT: "", EQV_COURSE: "", COURSE_ATTRIBUTE: ""
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -46,7 +45,6 @@ export default function OverrideEditMapping() {
     setFormData({ INSTITUTION_ID: "", TERM: "", SUBJECT: "", COURSE: "", EQV_SUBJECT: "", EQV_COURSE: "", COURSE_ATTRIBUTE: "" });
     setErrors({});
     setShowAddModal(true);
-    setMessage(null);
   };
 
   const handleEdit = async (id: number) => {
@@ -62,10 +60,9 @@ export default function OverrideEditMapping() {
         setErrors({});
         setEditingId(data.Id);
         setShowEditModal(true);
-        setMessage(null);
       }
     } catch (error: any) {
-      setMessage({ type: "error", text: error.response?.data?.detail || error.message || "Error loading override data" });
+      alerterror(error.response?.data?.detail || error.message || "Error loading override data");
     }
   };
 
@@ -85,23 +82,20 @@ export default function OverrideEditMapping() {
       const messageText = response.message || "Override deleted successfully";
 
       if (success) {
-        setMessage({ type: "success", text: messageText });
+        alertsuccess(messageText);
         setRefreshTrigger((prev) => prev + 1);
         setShowDeleteConfirmModal(false);
         setOverrideToDelete(null);
-        setTimeout(() => setMessage(null), 5000);
       } else {
-        setMessage({ type: "error", text: messageText });
+        alerterror(messageText);
         setShowDeleteConfirmModal(false);
         setOverrideToDelete(null);
-        setTimeout(() => setMessage(null), 5000);
       }
     } catch (error: any) {
       console.error("Delete override error:", error);
-      setMessage({ type: "error", text: error.response?.data?.detail || error.message || "Error deleting override" });
+      alerterror(error.response?.data?.detail || error.message || "Error deleting override");
       setShowDeleteConfirmModal(false);
       setOverrideToDelete(null);
-      setTimeout(() => setMessage(null), 5000);
     } finally {
       setIsDeleting(false);
     }
@@ -191,21 +185,18 @@ export default function OverrideEditMapping() {
       const messageText = response.message || (isEdit ? "Override updated successfully" : "Override added successfully");
 
       if (success) {
-        setMessage({ type: "success", text: messageText });
+        alertsuccess(messageText);
         setShowAddModal(false);
         setShowEditModal(false);
         setFormData({ INSTITUTION_ID: "", TERM: "", SUBJECT: "", COURSE: "", EQV_SUBJECT: "", EQV_COURSE: "", COURSE_ATTRIBUTE: "" });
         setEditingId(null);
         setRefreshTrigger((prev) => prev + 1);
-        setTimeout(() => setMessage(null), 5000);
       } else {
-        setMessage({ type: "error", text: messageText || "Error saving override" });
-        setTimeout(() => setMessage(null), 5000);
+        alerterror(messageText || "Error saving override");
       }
     } catch (error: any) {
       console.error("Save override error:", error);
-      setMessage({ type: "error", text: error.response?.data?.detail || error.message || "Error saving override" });
-      setTimeout(() => setMessage(null), 5000);
+      alerterror(error.response?.data?.detail || error.message || "Error saving override");
     } finally {
       setLoading(false);
     }
@@ -223,25 +214,6 @@ export default function OverrideEditMapping() {
         {hasAddPermission && (
           <div className="mb-4 flex justify-center">
             <Button onClick={handleAdd}>Add Override</Button>
-          </div>
-        )}
-
-        {/* Success/Error Message Banner */}
-        {message && (
-          <div className={`mb-4 p-4 rounded-lg border ${
-            message.type === "success" 
-              ? "bg-green-50 text-green-800 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800" 
-              : "bg-red-50 text-red-800 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800"
-          }`}>
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">{message.text}</span>
-              <button
-                onClick={() => setMessage(null)}
-                className={`ml-4 ${message.type === "success" ? "text-green-800 dark:text-green-300" : "text-red-800 dark:text-red-300"}`}
-              >
-                ×
-              </button>
-            </div>
           </div>
         )}
 
@@ -292,7 +264,6 @@ export default function OverrideEditMapping() {
         {/* Add Modal */}
         <Modal isOpen={showAddModal} onClose={() => {
           setShowAddModal(false);
-          setMessage(null);
           setErrors({});
         }} className="max-w-2xl">
           {/* Modal Header */}
@@ -402,7 +373,6 @@ export default function OverrideEditMapping() {
                   variant="outline"
                   onClick={() => {
                     setShowAddModal(false);
-                    setMessage(null);
                     setErrors({});
                   }}
                   className="flex-1"
@@ -419,7 +389,6 @@ export default function OverrideEditMapping() {
         <Modal isOpen={showEditModal} onClose={() => {
           setShowEditModal(false);
           setEditingId(null);
-          setMessage(null);
           setErrors({});
         }} className="max-w-2xl">
           {/* Modal Header */}
@@ -530,7 +499,6 @@ export default function OverrideEditMapping() {
                   onClick={() => {
                     setShowEditModal(false);
                     setEditingId(null);
-                    setMessage(null);
                     setErrors({});
                   }}
                   className="flex-1"

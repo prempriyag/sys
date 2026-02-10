@@ -130,6 +130,53 @@ export default function SchoolDashboard() {
     </div>
   );
 
+  // ── CI3 label → colour map (single source of truth) ──
+  // Every dataset label used across all charts gets its colour here.
+  const LABEL_COLORS: Record<string, string> = {
+    // Upload Transcript Status
+    NEW:                        "#adc5ff",
+    RERUN:                      "#A9B1BC",
+    Rerun:                      "#A9B1BC",
+    PROCESSED:                  "#86f886",
+    DUPLICATE:                  "#7cffeb",
+    FAILED:                     "#ff8f8f",
+    Failed:                     "#ff8f8f",
+
+    // Transcript Sources
+    Parchment:                  "#daa3f1",
+    NSC:                        "#adc5ff",
+    Scanned:                    "#86f886",
+    ScannedUnofficial:          "#ffb272",
+
+    // Transcripts Processed In Banner (School)
+    Downloaded:                 "#86f886",
+    SOAHSCH:                    "#b1a2ff",
+    SOATEST:                    "#ffa6e2",
+    SOAHOLD:                    "#adc5ff",
+    BDMS:                       "#7cffeb",
+
+    // Kickouts & Processed
+    "Transcript Kickouts":      "#ff8f8f",
+    "Transcript Processed":     "#86f886",
+
+    // Donut chart colours
+    Success:                    "#86f886",
+  };
+
+  /** Resolve an ordered colour array from dataset names, falling back to a palette. */
+  const getColorsForDatasets = (datasets: { name: string }[] | undefined): string[] => {
+    const fallback = ["#3C50E0", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899", "#06B6D4"];
+    if (!datasets || datasets.length === 0) return fallback;
+    return datasets.map((ds, i) => LABEL_COLORS[ds.name] ?? fallback[i % fallback.length]);
+  };
+
+  /** Resolve donut colours from label names via LABEL_COLORS */
+  const getDonutColors = (labels: string[] | undefined): string[] => {
+    const fallback = ["#e57124", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899"];
+    if (!labels || labels.length === 0) return fallback;
+    return labels.map((l, i) => LABEL_COLORS[l] ?? fallback[i % fallback.length]);
+  };
+
   // Chart options with glassmorphic styling
   const getBarChartOptions = (categories: string[], customColors?: string[]): ApexOptions => ({
     chart: {
@@ -193,12 +240,7 @@ export default function SchoolDashboard() {
     },
   });
 
-  // CI3 colors for "Transcripts Processed In Banner" chart
-  // Order: Downloaded, SOAHSCH, SOATEST, SOAHOLD, BDMS
-  const bannerProcessedColors = ["#86f886", "#b1a2ff", "#ffa6e2", "#adc5ff", "#7cffeb"];
-
-
-  const getLineChartOptions = (categories: string[]): ApexOptions => ({
+  const getLineChartOptions = (categories: string[], customColors?: string[]): ApexOptions => ({
     chart: {
       type: "line",
       toolbar: { show: false },
@@ -229,7 +271,7 @@ export default function SchoolDashboard() {
         return seriesName.charAt(0).toUpperCase() + seriesName.slice(1).toLowerCase();
       }
     },
-    colors: ["#3C50E0", "#10B981", "#F59E0B", "#EF4444"],
+    colors: customColors || ["#3C50E0", "#10B981", "#F59E0B", "#EF4444"],
     grid: {
       borderColor: "rgba(148, 163, 184, 0.1)",
       strokeDashArray: 4,
@@ -272,7 +314,7 @@ export default function SchoolDashboard() {
         return seriesName.charAt(0).toUpperCase() + seriesName.slice(1).toLowerCase();
       }
     },
-    colors: ["#3C50E0", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899"],
+    colors: getDonutColors(labels),
     tooltip: {
       theme: "light",
       style: {
@@ -491,7 +533,7 @@ export default function SchoolDashboard() {
                   </div>
                   <div className="rounded-lg bg-white/80 p-3 shadow-inner dark:bg-gray-900/50">
                     {hasChartData(dashboardData.transcriptSources?.labels, dashboardData.transcriptSources?.datasets) ? (
-                      <Chart options={getLineChartOptions(dashboardData.transcriptSources.labels)} series={dashboardData.transcriptSources.datasets} type="line" height={280} />
+                      <Chart options={getLineChartOptions(dashboardData.transcriptSources.labels, getColorsForDatasets(dashboardData.transcriptSources?.datasets))} series={dashboardData.transcriptSources.datasets} type="line" height={280} />
                     ) : (
                       <NoDataPlaceholder height={280} />
                     )}
@@ -512,7 +554,7 @@ export default function SchoolDashboard() {
                   </div>
                   <div className="rounded-lg bg-white/80 p-3 shadow-inner dark:bg-gray-900/50">
                     {hasChartData(dashboardData.transcriptStatus?.labels, dashboardData.transcriptStatus?.datasets) ? (
-                      <Chart options={getBarChartOptions(dashboardData.transcriptStatus.labels)} series={dashboardData.transcriptStatus.datasets} type="bar" height={280} />
+                      <Chart options={getBarChartOptions(dashboardData.transcriptStatus.labels, getColorsForDatasets(dashboardData.transcriptStatus?.datasets))} series={dashboardData.transcriptStatus.datasets} type="bar" height={280} />
                     ) : (
                       <NoDataPlaceholder height={280} />
                     )}
@@ -533,7 +575,7 @@ export default function SchoolDashboard() {
                   </div>
                   <div className="rounded-lg bg-white/80 p-3 shadow-inner dark:bg-gray-900/50">
                     {hasChartData(dashboardData.transcriptProcessed?.labels, dashboardData.transcriptProcessed?.datasets) ? (
-                      <Chart options={getBarChartOptions(dashboardData.transcriptProcessed.labels, bannerProcessedColors)} series={dashboardData.transcriptProcessed.datasets} type="bar" height={320} />
+                      <Chart options={getBarChartOptions(dashboardData.transcriptProcessed.labels, getColorsForDatasets(dashboardData.transcriptProcessed?.datasets))} series={dashboardData.transcriptProcessed.datasets} type="bar" height={320} />
                     ) : (
                       <NoDataPlaceholder height={320} />
                     )}
@@ -551,7 +593,7 @@ export default function SchoolDashboard() {
                   <h3 className="mb-4 text-sm font-bold text-gray-800 dark:text-white">Initial Kickouts</h3>
                   <div className="rounded-lg bg-white/80 p-3 shadow-inner dark:bg-gray-900/50">
                     {hasChartData(dashboardData.initialKickouts?.labels, dashboardData.initialKickouts?.datasets) ? (
-                      <Chart options={getBarChartOptions(dashboardData.initialKickouts.labels)} series={dashboardData.initialKickouts.datasets} type="bar" height={250} />
+                      <Chart options={getBarChartOptions(dashboardData.initialKickouts.labels, getColorsForDatasets(dashboardData.initialKickouts?.datasets))} series={dashboardData.initialKickouts.datasets} type="bar" height={250} />
                     ) : (
                       <NoDataPlaceholder height={250} />
                     )}
@@ -566,7 +608,7 @@ export default function SchoolDashboard() {
                   <h3 className="mb-4 text-sm font-bold text-gray-800 dark:text-white">Transcripts Kickouts</h3>
                   <div className="rounded-lg bg-white/80 p-3 shadow-inner dark:bg-gray-900/50">
                     {hasChartData(dashboardData.transcriptKickouts?.labels, dashboardData.transcriptKickouts?.datasets) ? (
-                      <Chart options={getBarChartOptions(dashboardData.transcriptKickouts.labels)} series={dashboardData.transcriptKickouts.datasets} type="bar" height={250} />
+                      <Chart options={getBarChartOptions(dashboardData.transcriptKickouts.labels, getColorsForDatasets(dashboardData.transcriptKickouts?.datasets))} series={dashboardData.transcriptKickouts.datasets} type="bar" height={250} />
                     ) : (
                       <NoDataPlaceholder height={250} />
                     )}

@@ -160,6 +160,28 @@ export default function HorizontalMenuItem({
     }
   }, [isSubmenuOpen]);
 
+  // Handle click outside to close submenu
+  useEffect(() => {
+    if (!isSubmenuOpen) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      // Check if click is outside both button and dropdown
+      // For Portaled items, we check the dropdownRef
+      const isOutsideButton = buttonRef.current && !buttonRef.current.contains(target);
+      const isOutsideDropdown = dropdownRef.current && !dropdownRef.current.contains(target);
+      
+      if (isOutsideButton && isOutsideDropdown) {
+        onSubmenuToggle(key);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isSubmenuOpen, key, onSubmenuToggle]);
+
   // Check tooltip position on hover - use portal to escape scroll container
   useEffect(() => {
     if (showIconOnly && iconRef.current) {
@@ -258,20 +280,20 @@ export default function HorizontalMenuItem({
             ref={tooltipRef}
             className="fixed bg-gray-900 text-white text-xs rounded px-2 py-1 pointer-events-none z-[10001] whitespace-nowrap opacity-100 transition-opacity"
             style={{
-              top: `${tooltipPosition.top}px`,
-              left: `${tooltipPosition.left}px`,
+              top: `${tooltipPosition!.top}px`,
+              left: `${tooltipPosition!.left}px`,
               transform: 'translateX(-50%)',
             }}
           >
             {item.name}
             <span 
               className={`absolute left-1/2 -translate-x-1/2 border-4 border-transparent ${
-                tooltipPosition.placement === "top"
+                tooltipPosition!.placement === "top"
                   ? "top-full border-t-gray-900"
                   : "bottom-full border-b-gray-900"
               }`}
               style={{
-                [tooltipPosition.placement === "top" ? "top" : "bottom"]: "100%"
+                [tooltipPosition!.placement === "top" ? "top" : "bottom"]: "100%"
               }}
             ></span>
           </div>,
@@ -359,6 +381,7 @@ export default function HorizontalMenuItem({
                     isSubItemActive={isSubItemActive}
                     openSubmenu={openSubmenu}
                     onSubmenuToggle={onSubmenuToggle}
+                    onRootClose={() => onSubmenuToggle(key)}
                   />
                 );
               }
@@ -367,6 +390,7 @@ export default function HorizontalMenuItem({
                 <Link
                   key={subKey}
                   to={subItem.path || "#"}
+                  onClick={() => onSubmenuToggle(key)} // Close main submenu
                   className={`flex items-center gap-2 px-4 py-2 text-sm transition-colors ${
                     isSubItemActive
                       ? "bg-brand-50 text-brand-600 dark:bg-brand-900/20 dark:text-brand-400"
@@ -399,12 +423,14 @@ function NestedMenuItem({
   isSubItemActive,
   openSubmenu,
   onSubmenuToggle,
+  onRootClose,
 }: {
   subItem: MenuItem;
   subKey: string;
   isSubItemActive: boolean;
   openSubmenu: Record<string, boolean>;
   onSubmenuToggle: (key: string) => void;
+  onRootClose: () => void;
 }) {
   const nestedButtonRef = useRef<HTMLButtonElement>(null);
   const nestedDropdownRef = useRef<HTMLDivElement>(null);
@@ -433,6 +459,26 @@ function NestedMenuItem({
     }
   }, [isNestedOpen]);
 
+  // Handle click outside for nested menu
+  useEffect(() => {
+    if (!isNestedOpen) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      const isOutsideButton = nestedButtonRef.current && !nestedButtonRef.current.contains(target);
+      const isOutsideDropdown = nestedDropdownRef.current && !nestedDropdownRef.current.contains(target);
+      
+      if (isOutsideButton && isOutsideDropdown) {
+        onSubmenuToggle(subKey);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isNestedOpen, subKey, onSubmenuToggle]);
+
   return (
     <div className="relative group/nested" style={{ position: "relative" }}>
       <button
@@ -460,6 +506,10 @@ function NestedMenuItem({
                 <Link
                   key={nestedKey}
                   to={nestedItem.path || "#"}
+                  onClick={() => {
+                    onSubmenuToggle(subKey); // Close nested submenu
+                    onRootClose(); // Close root menu
+                  }}
                   className="block px-4 py-2 text-sm transition-colors text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
                 >
                   {nestedItem.name}

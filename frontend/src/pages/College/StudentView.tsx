@@ -1,13 +1,16 @@
 import { useState, useEffect, useRef, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router";
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
 import PageMeta from "../../components/common/PageMeta";
 import PageContainer, { PageWrapper } from "../../components/common/PageContainer";
 import TranscriptReports from "./transcriptreports/TranscriptReports";
 import ArticulationReports from "./articulationreports/ArticulationReports";
+import HorizontalTree from "../../components/common/HorizontalTree";
 import { API_ENDPOINTS } from "../../config/api";
 import { api } from "../../config/api";
 import { useToast } from "../../context/ToastContext";
+import ThemedLoader from "../../components/common/ThemedLoader";
 
 interface Student {
   STUDENT_ID: string;
@@ -69,16 +72,18 @@ export default function StudentView() {
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [isInputFocused, setIsInputFocused] = useState<boolean>(false);
   const [isAccordionOpen, setIsAccordionOpen] = useState<boolean>(true);
+  const [isRootExpanded, setIsRootExpanded] = useState<boolean>(true);
+  const [treeZoom, setTreeZoom] = useState<number>(100);
   const { alerterror } = useToast();
   const selectRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Filter students based on search query (matching CI3 Select2 behavior)
+  // Filter students based on search query
   const filteredStudents = useMemo(() => {
     if (!students || students.length === 0) return [];
     if (!searchQuery || searchQuery.trim() === '') {
-      // Show first 50 students when input is focused but no search query (matching CI3 Select2 behavior)
-      return students.slice(0, 50);
+      // Show all students when no search query
+      return students;
     }
     // Filter by search query
     const query = searchQuery.toLowerCase().trim();
@@ -105,6 +110,47 @@ export default function StudentView() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  // Handle zoom with Alt+Scroll and keyboard shortcuts
+  useEffect(() => {
+    const handleWheel = (event: WheelEvent) => {
+      if (event.altKey) {
+        event.preventDefault();
+        setTreeZoom(prev => {
+          const newZoom = event.deltaY < 0 
+            ? Math.min(prev + 10, 150) 
+            : Math.max(prev - 10, 70);
+          return newZoom;
+        });
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Ctrl/Cmd + Plus/Equals to zoom in
+      if ((event.ctrlKey || event.metaKey) && (event.key === '+' || event.key === '=')) {
+        event.preventDefault();
+        setTreeZoom(prev => Math.min(prev + 10, 150));
+      }
+      // Ctrl/Cmd + Minus to zoom out
+      if ((event.ctrlKey || event.metaKey) && event.key === '-') {
+        event.preventDefault();
+        setTreeZoom(prev => Math.max(prev - 10, 70));
+      }
+      // Ctrl/Cmd + 0 to reset zoom
+      if ((event.ctrlKey || event.metaKey) && event.key === '0') {
+        event.preventDefault();
+        setTreeZoom(100);
+      }
+    };
+
+    document.addEventListener('wheel', handleWheel, { passive: false });
+    document.addEventListener('keydown', handleKeyDown);
+    
+    return () => {
+      document.removeEventListener('wheel', handleWheel);
+      document.removeEventListener('keydown', handleKeyDown);
     };
   }, []);
 
@@ -361,6 +407,142 @@ export default function StudentView() {
     return menuWithBatch;
   };
 
+  // Document icon component
+  const DocumentIcon = () => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+      <polyline points="14 2 14 8 20 8"></polyline>
+      <line x1="16" y1="13" x2="8" y2="13"></line>
+      <line x1="16" y1="17" x2="8" y2="17"></line>
+      <polyline points="10 9 9 9 8 9"></polyline>
+    </svg>
+  );
+
+  // Convert student data to tree structure for HorizontalTree
+  const convertToTreeStructure = () => {
+    if (!studentData || !studentData.institution_name.length) return null;
+
+    // Get student display name
+    const studentName = getStudentDisplayName();
+    
+    // Count total batches for badge
+    const totalBatches = Object.values(studentData.batch_details).reduce((sum, batches) => sum + batches.length, 0);
+
+    // Process all institutions and batches
+    const batchChildren = studentData.institution_name.flatMap((institution) => {
+      const batches = studentData.batch_details[institution.INSTITUTION_ID] || [];
+      
+      return batches.map((batchId) => {
+        const menuWithBatch = getMenuItems(institution.INSTITUTION_ID, batchId);
+        const batchMeta = studentData.batch_metadata?.[institution.INSTITUTION_ID]?.[batchId];
+        const ocrDate = formatDate(batchMeta?.OCR_EXTRACTED_DATE);
+        const batchTitle = ocrDate 
+          ? `${institution.INSTITUTION_NAME} - ${institution.INSTITUTION_ID} - ${batchId} - ${ocrDate}`
+          : `${institution.INSTITUTION_NAME} - ${institution.INSTITUTION_ID} - ${batchId}`;
+        
+        const key = `${institution.INSTITUTION_ID}-${batchId}`;
+        const isExpanded = expandedBatches.has(key);
+
+        // Build level 3 children (action items)
+        const actionChildren = [];
+
+        // Transcript Status Items
+        if (menuWithBatch["Failed"] > 0) {
+          actionChildren.push({
+            id: `failed-${key}`,
+            label: "Transcript Kickouts",
+            icon: <DocumentIcon />,
+            badge: menuWithBatch["Failed"] > 1 ? menuWithBatch["Failed"] : undefined,
+            onClick: () => handleViewPageLoad(studentId, "Failed", institution.INSTITUTION_ID, batchId, "transcript"),
+          });
+        }
+
+        if (menuWithBatch["Articulation-Kickouts"] > 0 && !menuWithBatch["articulation_Failed"]) {
+          actionChildren.push({
+            id: `articulation-kickouts-${key}`,
+            label: "Articulation-Kickouts",
+            icon: <DocumentIcon />,
+            badge: menuWithBatch["Articulation-Kickouts"] > 1 ? menuWithBatch["Articulation-Kickouts"] : undefined,
+            onClick: () => handleViewPageLoad(studentId, "Articulation-Kickouts", institution.INSTITUTION_ID, batchId, "transcript"),
+          });
+        }
+
+        if (menuWithBatch["Articulation-Kickouts"] === 0 && menuWithBatch["Processed"] > 0) {
+          const processedLabel = batchMeta?.LAST_UPDATED_DATETIME 
+            ? `Transcript Processed - ${formatDate(batchMeta.LAST_UPDATED_DATETIME)}${batchMeta?.OCR_EXTRACTED_DATE && batchMeta?.LAST_UPDATED_DATETIME ? ` (${calculateDays(batchMeta.OCR_EXTRACTED_DATE, batchMeta.LAST_UPDATED_DATETIME)} days)` : ''}`
+            : "Transcript Processed";
+          actionChildren.push({
+            id: `processed-${key}`,
+            label: processedLabel,
+            icon: <DocumentIcon />,
+            badge: menuWithBatch["Processed"] > 1 ? menuWithBatch["Processed"] : undefined,
+            onClick: () => handleViewPageLoad(studentId, "Processed", institution.INSTITUTION_ID, batchId, "transcript"),
+          });
+        }
+
+        if (menuWithBatch["Rerun"] > 0) {
+          actionChildren.push({
+            id: `rerun-${key}`,
+            label: "Transcript Rerun",
+            icon: <DocumentIcon />,
+            badge: menuWithBatch["Rerun"] > 1 ? menuWithBatch["Rerun"] : undefined,
+            onClick: () => handleViewPageLoad(studentId, "Rerun", institution.INSTITUTION_ID, batchId, "transcript"),
+          });
+        }
+
+        // Articulation Status Items
+        if (menuWithBatch["articulation_Failed"] > 0) {
+          actionChildren.push({
+            id: `articulation-failed-${key}`,
+            label: "Articulation Course Kickouts",
+            icon: <DocumentIcon />,
+            badge: menuWithBatch["articulation_Failed"],
+            onClick: () => handleViewPageLoad(studentId, "Failed", institution.INSTITUTION_ID, batchId, "articulation"),
+          });
+        }
+
+        if (menuWithBatch["articulation_Processed"] > 0) {
+          actionChildren.push({
+            id: `articulation-processed-${key}`,
+            label: "Articulation Course Processed",
+            icon: <DocumentIcon />,
+            badge: menuWithBatch["articulation_Processed"],
+            onClick: () => handleViewPageLoad(studentId, "Processed", institution.INSTITUTION_ID, batchId, "articulation"),
+          });
+        }
+
+        if (menuWithBatch["articulation_Rerun"] > 0) {
+          actionChildren.push({
+            id: `articulation-rerun-${key}`,
+            label: "Articulation Course Rerun",
+            icon: <DocumentIcon />,
+            badge: menuWithBatch["articulation_Rerun"],
+            onClick: () => handleViewPageLoad(studentId, "Rerun", institution.INSTITUTION_ID, batchId, "articulation"),
+          });
+        }
+
+        return {
+          id: key,
+          label: batchTitle,
+          icon: undefined, // Will use default folder icon
+          badge: undefined,
+          children: actionChildren.length > 0 ? actionChildren : undefined,
+          onClick: () => toggleBatch(institution.INSTITUTION_ID, batchId),
+          isExpanded: isExpanded,
+        };
+      });
+    });
+
+    return {
+      id: "student-root",
+      label: studentName,
+      badge: totalBatches > 0 ? totalBatches : undefined,
+      children: batchChildren.length > 0 ? batchChildren : undefined,
+      onClick: () => setIsRootExpanded(!isRootExpanded), // Root node click handler
+      isExpanded: isRootExpanded,
+    };
+  };
+
   return (
     <PageWrapper>
       <PageMeta
@@ -371,238 +553,278 @@ export default function StudentView() {
 
       <PageContainer>
         <div className="mb-6">
-          <h3 className="font-semibold text-gray-800 text-xl dark:text-white/90 mb-4">
-            Student to Transcripts Action Center
-          </h3>
-          
-          {/* Student Information Accordion */}
-          <div className="mb-6 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
-            <div className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+          {/* Header with Zoom Controls */}
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-gray-800 text-xl dark:text-white/90">
+              Student to Transcripts Action Center
+            </h3>
+            {/* Zoom Controls - Top Right */}
+            <div className="flex items-center gap-2">
               <button
-                className="w-full px-4 py-3 text-left font-semibold text-gray-800 dark:text-white flex items-center justify-between hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                onClick={() => setIsAccordionOpen(!isAccordionOpen)}
+                onClick={() => setTreeZoom(prev => Math.max(prev - 10, 70))}
+                className="p-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors shadow-sm"
+                title="Zoom Out (Ctrl+Minus or Alt+Scroll)"
               >
-                <span id="Student_info">{getStudentDisplayName()}</span>
-                <svg
-                  className={`w-5 h-5 transition-transform ${isAccordionOpen ? "rotate-180" : ""}`}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                <svg className="w-5 h-5 text-gray-600 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                </svg>
+              </button>
+              <span 
+                className="px-3 py-1 bg-gray-100 dark:bg-gray-700 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 min-w-[50px] text-center shadow-sm cursor-help"
+                title="Zoom level: Alt+Scroll or Ctrl+Plus/Minus to zoom | Ctrl+0 to reset"
+              >
+                {treeZoom}%
+              </span>
+              <button
+                onClick={() => setTreeZoom(prev => Math.min(prev + 10, 150))}
+                className="p-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors shadow-sm"
+                title="Zoom In (Ctrl+Plus or Alt+Scroll)"
+              >
+                <svg className="w-5 h-5 text-gray-600 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+              </button>
+              <button
+                onClick={() => setTreeZoom(100)}
+                className="p-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors shadow-sm"
+                title="Reset Zoom (Ctrl+0)"
+              >
+                <svg className="w-5 h-5 text-gray-600 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
               </button>
             </div>
+          </div>
 
-            {isAccordionOpen && (
-              <div className="p-4">
-                {/* Student Selector with Search */}
-                <div className="mb-4 relative">
-                  <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Select Student
-                  </label>
-                  <div className="relative" ref={dropdownRef}>
-                    <input
-                      ref={selectRef}
-                      type="text"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      onFocus={() => setIsInputFocused(true)}
-                      placeholder={studentId ? getStudentDisplayName() : "Search by Student Name or ID..."}
-                      disabled={loadingStudents}
-                      className="w-full rounded-lg border border-blue-500 bg-white px-4 py-2.5 pr-10 text-sm text-gray-800 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 disabled:opacity-50 disabled:cursor-not-allowed"
-                    />
-                    {loadingStudents && (
-                      <div className="absolute right-12 top-1/2 -translate-y-1/2">
-                        <div className="h-5 w-5 animate-spin rounded-full border-2 border-solid border-brand-500 border-r-transparent"></div>
-                      </div>
-                    )}
-                    {!loadingStudents && studentData && studentData.total_transcripts > 0 && (
-                      <span className="absolute right-12 top-1/2 -translate-y-1/2 inline-flex items-center justify-center rounded-full bg-red-500 h-6 w-6 text-xs font-medium text-white">
-                        {studentData.total_transcripts}
-                      </span>
-                    )}
-                    {!loadingStudents && (
-                      <svg
-                        className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                        />
-                      </svg>
-                    )}
-
-                    {/* Dropdown Results - Show when input is focused and has students to display */}
-                    {isInputFocused && !loadingStudents && filteredStudents.length > 0 && (
-                      <div 
-                        className="absolute z-50 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg max-h-80 overflow-auto"
-                      >
-                        {filteredStudents.map((student, index) => {
-                          const displayText = student.STUDENT_FULL_NAME
-                            ? `${student.STUDENT_FULL_NAME}${student.STUDENT_ID ? ` - ${student.STUDENT_ID}` : ""}`
-                            : student.STUDENT_ID || "";
-                          // Create unique key by combining ID, name, and index
-                          const uniqueKey = `${student.STUDENT_ID || ""}_${student.STUDENT_FULL_NAME || ""}_${index}`;
-                          return (
-                            <button
-                              key={uniqueKey}
+          {/* Information Note */}
+          <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+            <div className="flex gap-3">
+              <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+              </svg>
+              <div className="text-sm text-blue-800 dark:text-blue-200">
+                <p className="font-semibold mb-1">How to use this view:</p>
+                <ul className="list-disc list-inside space-y-1 text-xs leading-relaxed">
+                  <li>Search and select a student from the dropdown above</li>
+                  <li>View their transcript hierarchy by institution and batch</li>
+                  <li>Click on status items (Failed, Processed, Rerun) to view details</li>
+                  <li><strong>Zoom Controls:</strong> Use the buttons above or press <code className="bg-blue-100 dark:bg-blue-900 px-1.5 py-0.5 rounded text-xs">Alt+Scroll</code>, <code className="bg-blue-100 dark:bg-blue-900 px-1.5 py-0.5 rounded text-xs">Ctrl++/−</code>, or <code className="bg-blue-100 dark:bg-blue-900 px-1.5 py-0.5 rounded text-xs">Ctrl+0</code> to zoom</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+          <div className="mb-6 relative">
+            <div className="flex flex-wrap items-start gap-6" style={{ transform: `scale(${treeZoom / 100})`, transformOrigin: 'top left', transition: 'transform 0.2s ease' }}>
+              <div className="student-tree">
+                {(() => {
+                  // Define the Search Input Component to be used as the Root Node Label
+                  const SearchInputNode = (
+                    <div 
+                      className="w-full relative" 
+                      ref={dropdownRef}
+                      onClick={(e) => e.stopPropagation()} 
+                      onMouseDown={(e) => e.stopPropagation()}
+                      style={{ outline: 'none', userSelect: 'none' }}
+                    >
+                      <div className="relative flex flex-col gap-2 flex-shrink-0">
+                        <div className="flex items-center gap-2">
+                          <div className="relative flex-shrink-0">
+                            <svg className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                            <input
+                              ref={selectRef}
+                              type="text"
+                              value={searchQuery}
+                              onChange={(e) => setSearchQuery(e.target.value)}
+                              onFocus={() => setIsInputFocused(true)}
                               onClick={(e) => {
-                                e.preventDefault();
                                 e.stopPropagation();
-                                console.log("[StudentView] Button clicked for student:", student);
-                                handleStudentSelect(student);
+                                setIsInputFocused(true);
                               }}
-                              className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 transition-colors"
-                            >
-                              {displayText}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                    {isInputFocused && loadingStudents && (
-                      <div className="absolute z-50 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg p-4">
-                        <div className="flex items-center justify-center py-4">
-                          <div className="h-6 w-6 animate-spin rounded-full border-2 border-solid border-brand-500 border-r-transparent"></div>
-                          <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">Loading students...</span>
+                              placeholder={studentId ? getStudentDisplayName() : "Search by Student Name or ID..."}
+                              disabled={loadingStudents}
+                              className="w-[260px] flex-shrink-0 rounded-lg border border-gray-200 bg-gradient-to-b from-white to-gray-50 px-3 py-1.5 pl-9 text-sm text-gray-800 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-600 dark:bg-gray-900 dark:text-white/90 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-all"
+                            />
+                          </div>
+                          {loadingStudents && (
+                            <div className="flex-shrink-0 h-4 w-4 animate-spin rounded-full border-2 border-solid border-brand-500 border-r-transparent"></div>
+                          )}
                         </div>
+                        {studentId && !searchQuery && (
+                          <div className="flex items-center gap-2">
+                            <div className="text-sm text-gray-700 dark:text-gray-300 px-3 py-2 rounded-lg bg-blue-50 dark:bg-blue-900/30 font-medium">
+                              ✓ {getStudentDisplayName()}
+                            </div>
+                            {!loadingStudents && studentData && studentData.total_transcripts > 0 && (
+                              <span className="flex-shrink-0 inline-flex items-center justify-center rounded-full bg-red-500 h-6 w-6 text-xs font-medium text-white">
+                                {studentData.total_transcripts}
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                </div>
 
-                {/* Tree View Structure - matching CI3 horizontal tree layout */}
-                {loading ? (
-                  <div className="mt-4 flex items-center justify-center py-8">
-                    <div className="text-center">
-                      <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-brand-500 border-r-transparent"></div>
-                      <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Loading...</p>
-                    </div>
-                  </div>
-                ) : studentData && studentData.institution_name.length > 0 ? (
-                  <div className="mt-4 overflow-x-auto">
-                    {studentData.institution_name.map((institution, instIndex) => {
-                      const batches = studentData.batch_details[institution.INSTITUTION_ID] || [];
-                      
-                      return batches.map((batchId, batchIndex) => {
-                        const menuWithBatch = getMenuItems(institution.INSTITUTION_ID, batchId);
-                        const batchMeta = studentData.batch_metadata?.[institution.INSTITUTION_ID]?.[batchId];
-                        const ocrDate = formatDate(batchMeta?.OCR_EXTRACTED_DATE);
-                        const batchTitle = ocrDate 
-                          ? `${institution.INSTITUTION_NAME} - ${institution.INSTITUTION_ID} - ${batchId} - ${ocrDate}`
-                          : `${institution.INSTITUTION_NAME} - ${institution.INSTITUTION_ID} - ${batchId}`;
-                        const uniqueBatchKey = `${institution.INSTITUTION_ID}-${batchId}-${batchIndex}`;
-                        const animationDelay = (instIndex * 50) + (batchIndex * 30);
-
-                        // Collect status items to render
-                        const statusItems: Array<{
-                          key: string;
-                          label: string;
-                          count: number;
-                          type: string;
-                          pageType: "transcript" | "articulation";
-                          icon: "document" | "folder";
-                        }> = [];
-
-                        if (menuWithBatch["Failed"] > 0) {
-                          statusItems.push({ key: "Failed-t", label: "Transcript Kickouts", count: menuWithBatch["Failed"], type: "Failed", pageType: "transcript", icon: "document" });
-                        }
-                        if (menuWithBatch["Articulation-Kickouts"] > 0 && !menuWithBatch["articulation_Failed"]) {
-                          statusItems.push({ key: "ArtKick-t", label: "Articulation-Kickouts", count: menuWithBatch["Articulation-Kickouts"], type: "Articulation-Kickouts", pageType: "transcript", icon: "document" });
-                        }
-                        if (menuWithBatch["Processed"] > 0) {
-                          const processedLabel = `Transcript Processed${batchMeta?.LAST_UPDATED_DATETIME ? ` - ${formatDate(batchMeta.LAST_UPDATED_DATETIME)}` : ""}${batchMeta?.OCR_EXTRACTED_DATE && batchMeta?.LAST_UPDATED_DATETIME ? `  (${calculateDays(batchMeta.OCR_EXTRACTED_DATE, batchMeta.LAST_UPDATED_DATETIME)} Days)` : ""}`;
-                          statusItems.push({ key: "Processed-t", label: processedLabel, count: menuWithBatch["Processed"], type: "Processed", pageType: "transcript", icon: "document" });
-                        }
-                        if (menuWithBatch["Rerun"] > 0) {
-                          statusItems.push({ key: "Rerun-t", label: "Transcript Rerun", count: menuWithBatch["Rerun"], type: "Rerun", pageType: "transcript", icon: "document" });
-                        }
-                        if (menuWithBatch["articulation_Failed"] > 0) {
-                          statusItems.push({ key: "Failed-a", label: "Articulation Course Kickouts", count: menuWithBatch["articulation_Failed"], type: "Failed", pageType: "articulation", icon: "document" });
-                        }
-                        if (menuWithBatch["articulation_Processed"] > 0) {
-                          statusItems.push({ key: "Processed-a", label: "Articulation Course Processed", count: menuWithBatch["articulation_Processed"], type: "Processed", pageType: "articulation", icon: "document" });
-                        }
-                        if (menuWithBatch["articulation_Rerun"] > 0) {
-                          statusItems.push({ key: "Rerun-a", label: "Articulation Course Rerun", count: menuWithBatch["articulation_Rerun"], type: "Rerun", pageType: "articulation", icon: "document" });
-                        }
-
-                        return (
-                          <div 
-                            key={uniqueBatchKey} 
-                            className="htree-wrapper mb-6"
-                            style={{ animation: `fadeInUp 0.4s ease-out ${animationDelay}ms both` }}
-                          >
-                            {/* Horizontal Tree */}
-                            <div className="htree">
-                              {/* Parent Node - Institution/Batch */}
-                              <div className="htree-parent">
-                                <div className="htree-node htree-node-parent">
-                                  <svg className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                                    <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
-                                  </svg>
-                                  <span className="htree-node-text">{batchTitle}</span>
+                      {/* Dropdown Results - Beautiful Modern Design */}
+                      {isInputFocused && createPortal(
+                        <div 
+                          className="fixed z-[9999] w-[320px] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200"
+                          style={{
+                            top: selectRef.current ? `${selectRef.current.getBoundingClientRect().bottom + 8}px` : '0px',
+                            left: selectRef.current ? `${selectRef.current.getBoundingClientRect().left}px` : '0px',
+                          }}
+                        >
+                          {loadingStudents ? (
+                            <div className="px-4 py-4 text-center">
+                              <div className="inline-flex items-center justify-center gap-2">
+                                <div className="h-4 w-4 animate-spin rounded-full border-2 border-solid border-brand-500 border-r-transparent"></div>
+                                <span className="text-xs font-medium text-gray-600 dark:text-gray-300">Loading...</span>
+                              </div>
+                            </div>
+                          ) : filteredStudents.length > 0 ? (
+                            <>
+                              {/* Header with count */}
+                              <div className="px-3 py-2 bg-gradient-to-r from-brand-50 to-blue-50 dark:from-gray-900 dark:to-gray-800 border-b border-gray-200 dark:border-gray-700">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-semibold text-brand-700 dark:text-brand-400 uppercase tracking-wide">
+                                    {searchQuery ? 'Results' : 'Students'}
+                                  </span>
+                                  <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full bg-brand-500 text-white text-xs font-bold">
+                                    {filteredStudents.length}
+                                  </span>
                                 </div>
                               </div>
-
-                              {/* Children Nodes - Status Items */}
-                              {statusItems.length > 0 && (
-                                <div className="htree-children">
-                                  <div className="htree-connector"></div>
-                                  <div className="htree-children-list">
-                                    {statusItems.map((item) => {
-                                      const isActiveItem = isActive(item.type, institution.INSTITUTION_ID, batchId, item.pageType);
-                                      return (
-                                        <div key={item.key} className="htree-child">
-                                          <div className="htree-child-connector"></div>
-                                          <button
-                                            className={`htree-node htree-node-child ${isActiveItem ? 'htree-node-active' : ''}`}
-                                            onClick={(e) => {
-                                              e.preventDefault();
-                                              handleViewPageLoad(
-                                                studentId,
-                                                item.type,
-                                                institution.INSTITUTION_ID,
-                                                batchId,
-                                                item.pageType
-                                              );
-                                            }}
-                                          >
-                                            <svg className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                            </svg>
-                                            <span className="htree-node-text">{item.label}</span>
-                                            {item.count > 0 && (
-                                              <span className="htree-badge">
-                                                {item.count}
-                                              </span>
-                                            )}
-                                          </button>
+                              
+                              {/* Student List */}
+                              <div className="max-h-[350px] overflow-y-auto custom-scrollbar">
+                                {filteredStudents.map((student, index) => {
+                                  const displayText = student.STUDENT_FULL_NAME
+                                    ? `${student.STUDENT_FULL_NAME}${student.STUDENT_ID ? ` - ${student.STUDENT_ID}` : ""}`
+                                    : student.STUDENT_ID || "";
+                                  const uniqueKey = `${student.STUDENT_ID || ""}_${student.STUDENT_FULL_NAME || ""}_${index}`;
+                                  
+                                  return (
+                                    <button
+                                      key={uniqueKey}
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        handleStudentSelect(student);
+                                      }}
+                                      className="w-full px-3 py-2 text-left transition-all duration-150 hover:bg-gradient-to-r hover:from-brand-50 hover:to-blue-50 dark:hover:from-gray-700 dark:hover:to-gray-600 border-b border-gray-100 dark:border-gray-700 last:border-0 group"
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        {/* Avatar Circle */}
+                                        <div className="flex-shrink-0 w-7 h-7 rounded-full bg-gradient-to-br from-brand-400 to-blue-500 flex items-center justify-center text-white text-xs font-bold shadow-sm group-hover:shadow-md transition-shadow">
+                                          {student.STUDENT_FULL_NAME ? student.STUDENT_FULL_NAME.charAt(0).toUpperCase() : student.STUDENT_ID?.charAt(0) || '?'}
                                         </div>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
+                                        
+                                        {/* Student Info */}
+                                        <div className="flex-1 min-w-0">
+                                          <div className="text-xs font-medium text-gray-900 dark:text-white truncate group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors">
+                                            {student.STUDENT_FULL_NAME || 'Unknown'}
+                                          </div>
+                                          {student.STUDENT_ID && (
+                                            <div className="text-xs text-gray-500 dark:text-gray-400 font-mono truncate">
+                                              {student.STUDENT_ID}
+                                            </div>
+                                          )}
+                                        </div>
+                                        
+                                        {/* Arrow Icon */}
+                                        <svg className="w-4 h-4 text-gray-400 group-hover:text-brand-500 group-hover:translate-x-1 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                        </svg>
+                                      </div>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </>
+                          ) : (
+                            <div className="px-6 py-12 text-center">
+                              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
+                                <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                </svg>
+                              </div>
+                              <p className="text-sm font-medium text-gray-900 dark:text-white mb-1">
+                                {searchQuery ? 'No students found' : 'No students available'}
+                              </p>
+                              {searchQuery && (
+                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                  Try adjusting your search terms
+                                </p>
                               )}
                             </div>
-                          </div>
-                        );
-                      });
-                    })}
-                  </div>
-                ) : studentData ? (
-                  <div className="mt-4 text-center text-gray-500 dark:text-gray-400">
-                    No institution data available for this student
-                  </div>
-                ) : null}
+                          )}
+                        </div>,
+                        document.body
+                      )}
+                    </div>
+                  );
+
+                  // Helper to inject our custom label into the tree data
+                  const getTreeDataWithSearch = () => {
+                    const baseTree = convertToTreeStructure();
+                    
+                    // Spinner icon for loading
+                    const LoadingSpinner = (
+                      <span className="inline-flex h-4 w-4 animate-spin rounded-full border-2 border-solid border-brand-500 border-r-transparent"></span>
+                    );
+                    
+                    // If no student data, create a minimal tree with just the search input
+                    if (!baseTree) {
+                      return {
+                        id: "student-root-empty",
+                        label: SearchInputNode,
+                        badge: undefined,
+                        children: undefined,
+                        onClick: () => {}, // No-op when no data
+                        isExpanded: false
+                      };
+                    }
+                    
+                    // If loading after student selection, show loader at level-2 position and hide actual level-2/3
+                    if (loading && studentId) {
+                      return {
+                        ...baseTree,
+                        label: SearchInputNode,
+                        onClick: () => setIsRootExpanded(!isRootExpanded),
+                        isExpanded: true, // Always expand when loading
+                        children: [
+                          {
+                            id: "loading-batch",
+                            label: "Loading batches...",
+                            icon: LoadingSpinner,
+                            onClick: () => {},
+                            isExpanded: false,
+                            children: undefined,
+                          },
+                        ],
+                      };
+                    }
+                    
+                    return {
+                      ...baseTree,
+                      label: SearchInputNode,
+                      onClick: () => setIsRootExpanded(!isRootExpanded),
+                      isExpanded: isRootExpanded
+                    };
+                  };
+
+                  const treeData = getTreeDataWithSearch();
+                  
+                  return (
+                    <HorizontalTree
+                      rootNode={treeData}
+                      headerTitle={null}
+                      className="mb-4"
+                    />
+                  );
+                })()}
               </div>
-            )}
+            </div>
           </div>
 
           {/* ============================================= */}
@@ -826,11 +1048,13 @@ export default function StudentView() {
         .htree-connector {
           width: 40px;
           height: 2px;
-          background: #94a3b8;
+          background: linear-gradient(90deg, #3b82f6 0%, #06b6d4 100%);
           flex-shrink: 0;
+          box-shadow: 0 0 6px rgba(59, 130, 246, 0.4);
         }
         .dark .htree-connector {
-          background: #64748b;
+          background: linear-gradient(90deg, #60a5fa 0%, #22d3ee 100%);
+          box-shadow: 0 0 6px rgba(34, 211, 238, 0.3);
         }
 
         /* Vertical list of children */
@@ -857,10 +1081,12 @@ export default function StudentView() {
           top: 0;
           bottom: 50%;
           width: 2px;
-          background: #94a3b8;
+          background: linear-gradient(180deg, #10b981 0%, #06b6d4 100%);
+          box-shadow: 0 0 6px rgba(16, 185, 129, 0.4);
         }
         .dark .htree-child::before {
-          background: #64748b;
+          background: linear-gradient(180deg, #34d399 0%, #22d3ee 100%);
+          box-shadow: 0 0 6px rgba(34, 211, 238, 0.3);
         }
 
         /* Bottom half of vertical line (connects to sibling below) */
@@ -871,10 +1097,12 @@ export default function StudentView() {
           top: 50%;
           bottom: 0;
           width: 2px;
-          background: #94a3b8;
+          background: linear-gradient(180deg, #06b6d4 0%, #10b981 100%);
+          box-shadow: 0 0 6px rgba(16, 185, 129, 0.4);
         }
         .dark .htree-child::after {
-          background: #64748b;
+          background: linear-gradient(180deg, #22d3ee 0%, #34d399 100%);
+          box-shadow: 0 0 6px rgba(34, 211, 238, 0.3);
         }
 
         /* First child: no line going up */
@@ -897,12 +1125,14 @@ export default function StudentView() {
         .htree-child-connector {
           width: 28px;
           height: 2px;
-          background: #94a3b8;
+          background: linear-gradient(90deg, #8b5cf6 0%, #ec4899 100%);
           flex-shrink: 0;
           margin-left: 2px;
+          box-shadow: 0 0 6px rgba(139, 92, 246, 0.4);
         }
         .dark .htree-child-connector {
-          background: #64748b;
+          background: linear-gradient(90deg, #a78bfa 0%, #f472b6 100%);
+          box-shadow: 0 0 6px rgba(244, 114, 182, 0.3);
         }
 
         /* Node text */

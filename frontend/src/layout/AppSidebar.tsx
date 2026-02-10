@@ -108,6 +108,10 @@ const AppSidebar: React.FC = () => {
   // Initialize open submenus based on active route
   useEffect(() => {
     // Reset all submenus first, then only open the ones containing active routes
+    if (menuLayout === "horizontal") {
+      setOpenSubmenu({});
+      return;
+    }
     const newOpenSubmenu: Record<string, boolean> = {};
     
     const checkActiveMenu = (

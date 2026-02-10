@@ -1,11 +1,12 @@
 """Transfer Grades Mapping Controller"""
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from pydantic import BaseModel
 import logging
 from datetime import datetime
 from database.connection import get_db
+from helpers.security_helper import get_username_from_token
 from models.transfer_grades_mapping_model import TransferGradesMappingModel
 from config.constants import TBL_TRANSFER_GRADES_MAPPING
 
@@ -55,7 +56,7 @@ async def insert(request: TransferGradeRequest, db: Session = Depends(get_db)):
         insert_query = text(f"INSERT INTO {TBL_TRANSFER_GRADES_MAPPING} (TRANSFER_GRADE, UPDATED_BY, UPDATED_ON) VALUES (:transfer_grade, :updated_by, :updated_on)")
         db.execute(insert_query, {
             "transfer_grade": request.TRANSFER_GRADE.upper() if request.TRANSFER_GRADE and request.TRANSFER_GRADE.upper() != "NULL" else None,
-            "updated_by": "System",
+            "updated_by": get_username_from_token(http_request),
             "updated_on": datetime.now().strftime('%Y-%m-%d %H:%M:%S.000')
         })
         db.commit()
@@ -80,7 +81,7 @@ async def get_grade(request: DeleteRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 @router.post("/update", response_model=dict)
-async def update(request: TransferGradeUpdateRequest, db: Session = Depends(get_db)):
+async def update(request: TransferGradeUpdateRequest, http_request: Request, db: Session = Depends(get_db)):
     try:
         if not request.TRANSFER_GRADE:
             return {"status": 0, "message": "Please Enter Transfer Grade", "refresh": False, "modal_close": False}
@@ -88,7 +89,7 @@ async def update(request: TransferGradeUpdateRequest, db: Session = Depends(get_
         result = db.execute(update_query, {
             "id": request.Id,
             "transfer_grade": request.TRANSFER_GRADE.upper() if request.TRANSFER_GRADE and request.TRANSFER_GRADE.upper() != "NULL" else None,
-            "updated_by": "System",
+            "updated_by": get_username_from_token(http_request),
             "updated_on": datetime.now().strftime('%Y-%m-%d %H:%M:%S.000')
         })
         db.commit()

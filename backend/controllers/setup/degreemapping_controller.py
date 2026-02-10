@@ -4,7 +4,7 @@ FastAPI version of CI3 Degreemapping controller
 Handles CRUD operations for Degree Mapping
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import Optional
@@ -14,6 +14,7 @@ from datetime import datetime
 
 from database.connection import get_db
 from helpers.permission_dependency import require_permission
+from helpers.security_helper import get_username_from_token
 from models import User
 from models.degree_mapping_model import DegreeMappingModel
 from config.constants import TBL_DEGREE
@@ -88,6 +89,7 @@ async def ajaxlist(
 @router.post("/insert", response_model=dict)
 async def insert(
     request: DegreeRequest,
+    http_request: Request,
     # Temporarily disabled authentication for testing
     # current_user: User = Depends(
     #     require_permission("college_degree", "ADD")
@@ -136,7 +138,7 @@ async def insert(
         db.execute(insert_query, {
             "degree_cd": request.DEGREE_CD,
             "degree_name": request.DEGREE_NAME,
-            "updated_by": "System",  # TODO: Get from current_user when auth is enabled
+            "updated_by": get_username_from_token(http_request),
             "last_updated_datetime": datetime.now().strftime('%Y-%m-%d %H:%M:%S.000')
         })
         db.commit()
@@ -195,6 +197,7 @@ async def get_degree(
 @router.post("/update", response_model=dict)
 async def update(
     request: DegreeUpdateRequest,
+    http_request: Request,
     # Temporarily disabled authentication for testing
     # current_user: User = Depends(
     #     require_permission("college_degree", "UPDATE")
@@ -249,7 +252,7 @@ async def update(
             "id": request.Id,
             "degree_cd": request.DEGREE_CD,
             "degree_name": request.DEGREE_NAME,
-            "updated_by": "System",  # TODO: Get from current_user when auth is enabled
+            "updated_by": get_username_from_token(http_request),
             "last_updated_datetime": datetime.now().strftime('%Y-%m-%d %H:%M:%S.000')
         })
         db.commit()

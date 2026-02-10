@@ -1,11 +1,12 @@
 """Skip Courses Controller"""
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from pydantic import BaseModel
 import logging
 from datetime import datetime
 from database.connection import get_db
+from helpers.security_helper import get_username_from_token
 from models.skip_courses_model import SkipCoursesModel
 from config.constants import TBL_COURSES
 
@@ -52,7 +53,7 @@ async def ajaxlist(request: DataTableRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 @router.post("/insert", response_model=dict)
-async def insert(request: SkipCourseRequest, db: Session = Depends(get_db)):
+async def insert(request: SkipCourseRequest, http_request: Request, db: Session = Depends(get_db)):
     try:
         if not request.INSTITUTION_ID or not request.EXTERNAL_SUBJECT or not request.EXTERNAL_COURSE_ID:
             return {"status": 0, "message": "Please select an Institution ID and enter external subject name and course ID", "refresh": False}
@@ -75,7 +76,7 @@ async def insert(request: SkipCourseRequest, db: Session = Depends(get_db)):
             "institution_id": request.INSTITUTION_ID,
             "external_subject": request.EXTERNAL_SUBJECT.strip().upper(),
             "external_course_id": request.EXTERNAL_COURSE_ID.strip().lower(),
-            "updated_by": "System",
+            "updated_by": get_username_from_token(http_request),
             "last_updated_datetime": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         })
         db.commit()
@@ -100,7 +101,7 @@ async def get_course(request: DeleteRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 @router.post("/update", response_model=dict)
-async def update(request: SkipCourseUpdateRequest, db: Session = Depends(get_db)):
+async def update(request: SkipCourseUpdateRequest, http_request: Request, db: Session = Depends(get_db)):
     try:
         if not request.INSTITUTION_ID or not request.EXTERNAL_SUBJECT or not request.EXTERNAL_COURSE_ID:
             return {"status": 0, "message": "Please select an Institution ID and enter external subject name and course ID", "refresh": False}
@@ -129,7 +130,7 @@ async def update(request: SkipCourseUpdateRequest, db: Session = Depends(get_db)
             "institution_id": request.INSTITUTION_ID,
             "external_subject": request.EXTERNAL_SUBJECT.strip().upper(),
             "external_course_id": request.EXTERNAL_COURSE_ID.strip().lower(),
-            "updated_by": "System",
+            "updated_by": get_username_from_token(http_request),
             "last_updated_datetime": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         })
         db.commit()

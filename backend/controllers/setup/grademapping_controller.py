@@ -1,11 +1,12 @@
 """Grade Mapping Controller - Equivalent Grades"""
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from pydantic import BaseModel
 import logging
 from datetime import datetime
 from database.connection import get_db
+from helpers.security_helper import get_username_from_token
 from models.grade_mapping_model import GradeMappingModel
 from config.constants import TBL_GRADE
 
@@ -50,7 +51,7 @@ async def ajaxlist(request: DataTableRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 @router.post("/insert", response_model=dict)
-async def insert(request: GradeRequest, db: Session = Depends(get_db)):
+async def insert(request: GradeRequest, http_request: Request, db: Session = Depends(get_db)):
     try:
         if not request.GRADE or not request.GRADE_TO_CONSIDER:
             return {"status": 0, "message": "Please Enter Grade and Grade To Consider", "refresh": False, "modal_close": False}
@@ -61,7 +62,7 @@ async def insert(request: GradeRequest, db: Session = Depends(get_db)):
         db.execute(insert_query, {
             "equivalent_grade": request.GRADE.upper() if request.GRADE.upper() != "NULL" else None,
             "transcript_grade": request.GRADE_TO_CONSIDER.upper() if request.GRADE_TO_CONSIDER.upper() != "NULL" else None,
-            "updated_by": "System",
+            "updated_by": get_username_from_token(http_request),
             "updated_on": datetime.now().strftime('%Y-%m-%d %H:%M:%S.000')
         })
         db.commit()
@@ -86,7 +87,7 @@ async def get_grade(request: DeleteRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 @router.post("/update", response_model=dict)
-async def update(request: GradeUpdateRequest, db: Session = Depends(get_db)):
+async def update(request: GradeUpdateRequest, http_request: Request, db: Session = Depends(get_db)):
     try:
         if not request.GRADE or not request.GRADE_TO_CONSIDER:
             return {"status": 0, "message": "Please Enter Grade and Grade To Consider", "refresh": False, "modal_close": False}
@@ -100,7 +101,7 @@ async def update(request: GradeUpdateRequest, db: Session = Depends(get_db)):
             "id": request.Id,
             "equivalent_grade": request.GRADE.upper() if request.GRADE.upper() != "NULL" else None,
             "transcript_grade": request.GRADE_TO_CONSIDER.upper() if request.GRADE_TO_CONSIDER.upper() != "NULL" else None,
-            "updated_by": "System",
+            "updated_by": get_username_from_token(http_request),
             "updated_on": datetime.now().strftime('%Y-%m-%d %H:%M:%S.000')
         })
         db.commit()

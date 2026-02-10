@@ -41,6 +41,10 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "DEV"  # DEV | UAT | PROD
     DEBUG: bool = True
     
+    # Profiling Configuration (matches CI3 enable_profiler)
+    # When False, no profiling logic runs at all (zero overhead)
+    ENABLE_PROFILING: bool = True
+    
     # Optional overrides; if not set, defaults from _ENV_URLS are used per ENVIRONMENT
     BASE_URL: Optional[str] = None   # Backend base URL for SSO redirects
     FRONTEND_URL: Optional[str] = None  # Frontend URL for SSO callbacks

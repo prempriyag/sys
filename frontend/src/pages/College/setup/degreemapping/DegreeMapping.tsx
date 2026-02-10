@@ -8,6 +8,7 @@ import { Modal } from "../../../../components/ui/modal";
 import Input from "../../../../components/form/input/InputField";
 import Label from "../../../../components/form/Label";
 import { API_BASE_URL } from "../../../../config/api";
+import { alertsuccess, alerterror } from "../../../../utils/toast";
 import { RefreshIcon, PlusIcon, PencilIcon, TrashBinIcon } from "../../../../icons";
 import { useAuth } from "../../../../context/AuthContext";
 
@@ -18,7 +19,7 @@ export default function DegreeMapping() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [formData, setFormData] = useState({ DEGREE_CD: "", DEGREE_NAME: "" });
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
 
   const hasAddPermission = hasPermission("college_degree", "ADD");
   const hasUpdatePermission = hasPermission("college_degree", "UPDATE");
@@ -27,7 +28,6 @@ export default function DegreeMapping() {
   const handleAdd = () => {
     setFormData({ DEGREE_CD: "", DEGREE_NAME: "" });
     setShowAddModal(true);
-    setMessage(null);
   };
 
   const handleEdit = async (id: number) => {
@@ -46,10 +46,9 @@ export default function DegreeMapping() {
         setFormData({ DEGREE_CD: data.DEGREE_CD, DEGREE_NAME: data.DEGREE_NAME });
         setEditingId(id);
         setShowEditModal(true);
-        setMessage(null);
       }
     } catch (error: any) {
-      setMessage({ type: "error", text: error.message || "Error loading degree data" });
+      alerterror(error.message || "Error loading degree data");
     }
   };
 
@@ -70,13 +69,13 @@ export default function DegreeMapping() {
 
       const data = await response.json();
       if (data.status === "Success") {
-        setMessage({ type: "success", text: "Degree deleted successfully" });
+        alertsuccess("Degree deleted successfully");
         setRefreshTrigger((prev) => prev + 1);
       } else {
-        setMessage({ type: "error", text: "Error deleting degree" });
+        alerterror("Error deleting degree");
       }
     } catch (error: any) {
-      setMessage({ type: "error", text: error.message || "Error deleting degree" });
+      alerterror(error.message || "Error deleting degree");
     }
   };
 
@@ -100,17 +99,17 @@ export default function DegreeMapping() {
 
       const data = await response.json();
       if (data.status === 1) {
-        setMessage({ type: "success", text: data.message || "Success" });
+        alertsuccess(data.message || "Success");
         setShowAddModal(false);
         setShowEditModal(false);
         setFormData({ DEGREE_CD: "", DEGREE_NAME: "" });
         setEditingId(null);
         setRefreshTrigger((prev) => prev + 1);
       } else {
-        setMessage({ type: "error", text: data.message || "Error saving degree" });
+        alerterror(data.message || "Error saving degree");
       }
     } catch (error: any) {
-      setMessage({ type: "error", text: error.message || "Error saving degree" });
+      alerterror(error.message || "Error saving degree");
     }
   };
 
@@ -140,16 +139,6 @@ export default function DegreeMapping() {
             </Button>
           </div>
         </div>
-
-        {message && (
-          <div className={`mb-4 p-4 rounded-lg ${
-            message.type === "success" 
-              ? "bg-green-50 text-green-800 dark:bg-green-900/20 dark:text-green-400" 
-              : "bg-red-50 text-red-800 dark:bg-red-900/20 dark:text-red-400"
-          }`}>
-            {message.text}
-          </div>
-        )}
 
         <DataTable
           refreshTrigger={refreshTrigger}

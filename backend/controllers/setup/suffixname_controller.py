@@ -1,11 +1,12 @@
 """Suffix Name Controller"""
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from pydantic import BaseModel
 import logging
 from datetime import datetime
 from database.connection import get_db
+from helpers.security_helper import get_username_from_token
 from models.suffix_name_model import SuffixNameModel
 from config.constants import TBL_SuffixName
 
@@ -48,7 +49,7 @@ async def ajaxlist(request: DataTableRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 @router.post("/insert", response_model=dict)
-async def insert(request: SuffixRequest, db: Session = Depends(get_db)):
+async def insert(request: SuffixRequest, http_request: Request, db: Session = Depends(get_db)):
     try:
         if not request.Suffix:
             return {"status": 0, "message": "Please enter a suffix", "refresh": False, "modal_close": False}
@@ -60,7 +61,7 @@ async def insert(request: SuffixRequest, db: Session = Depends(get_db)):
         insert_query = text(f"INSERT INTO {TBL_SuffixName} (Suffix, Updated_By, Updated_on) VALUES (:suffix, :updated_by, :updated_on)")
         db.execute(insert_query, {
             "suffix": suffix if suffix != "NULL" else None,
-            "updated_by": "System",
+            "updated_by": get_username_from_token(http_request),
             "updated_on": datetime.now().strftime('%Y-%m-%d %H:%M:%S.000')
         })
         db.commit()
@@ -85,7 +86,7 @@ async def get_suffix(request: DeleteRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 @router.post("/update", response_model=dict)
-async def update(request: SuffixUpdateRequest, db: Session = Depends(get_db)):
+async def update(request: SuffixUpdateRequest, http_request: Request, db: Session = Depends(get_db)):
     try:
         if not request.Suffix:
             return {"status": 0, "message": "Please enter a suffix", "refresh": False, "modal_close": False}
@@ -98,7 +99,7 @@ async def update(request: SuffixUpdateRequest, db: Session = Depends(get_db)):
         result = db.execute(update_query, {
             "id": request.Id,
             "suffix": suffix if suffix != "NULL" else None,
-            "updated_by": "System",
+            "updated_by": get_username_from_token(http_request),
             "updated_on": datetime.now().strftime('%Y-%m-%d %H:%M:%S.000')
         })
         db.commit()

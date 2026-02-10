@@ -1,11 +1,12 @@
 """Accredited Institution Controller"""
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from pydantic import BaseModel
 import logging
 from datetime import datetime
 from database.connection import get_db
+from helpers.security_helper import get_username_from_token
 from models.accredited_institution_model import AccreditedInstitutionModel
 from config.constants import TBL_ACCREDITED_INSTITUTION
 
@@ -52,7 +53,7 @@ async def ajaxlist(request: DataTableRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 @router.post("/insert", response_model=dict)
-async def insert(request: AccreditedInstitutionRequest, db: Session = Depends(get_db)):
+async def insert(request: AccreditedInstitutionRequest, http_request: Request, db: Session = Depends(get_db)):
     try:
         if not request.INSTITUTION_ID or not request.EFFECTIVE_START_TERM or not request.EFFECTIVE_END_TERM:
             return {"status": 0, "message": "Please fill all required fields", "refresh": False, "modal_close": False}
@@ -64,7 +65,7 @@ async def insert(request: AccreditedInstitutionRequest, db: Session = Depends(ge
             "institution_id": request.INSTITUTION_ID,
             "effective_start_term": request.EFFECTIVE_START_TERM.lower() if request.EFFECTIVE_START_TERM and request.EFFECTIVE_START_TERM.lower() != "null" else None,
             "effective_end_term": request.EFFECTIVE_END_TERM.lower() if request.EFFECTIVE_END_TERM and request.EFFECTIVE_END_TERM.lower() != "null" else None,
-            "updated_by": "System",
+            "updated_by": get_username_from_token(http_request),
             "updated_on": datetime.now().strftime('%Y-%m-%d %H:%M:%S.000')
         })
         db.commit()
@@ -89,7 +90,7 @@ async def get_accredited(request: DeleteRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 @router.post("/update", response_model=dict)
-async def update(request: AccreditedInstitutionUpdateRequest, db: Session = Depends(get_db)):
+async def update(request: AccreditedInstitutionUpdateRequest, http_request: Request, db: Session = Depends(get_db)):
     try:
         if not request.INSTITUTION_ID or not request.EFFECTIVE_START_TERM or not request.EFFECTIVE_END_TERM:
             return {"status": 0, "message": "Please fill all required fields", "refresh": False, "modal_close": False}
@@ -104,7 +105,7 @@ async def update(request: AccreditedInstitutionUpdateRequest, db: Session = Depe
             "institution_id": request.INSTITUTION_ID,
             "effective_start_term": request.EFFECTIVE_START_TERM.lower() if request.EFFECTIVE_START_TERM and request.EFFECTIVE_START_TERM.lower() != "null" else None,
             "effective_end_term": request.EFFECTIVE_END_TERM.lower() if request.EFFECTIVE_END_TERM and request.EFFECTIVE_END_TERM.lower() != "null" else None,
-            "updated_by": "System",
+            "updated_by": get_username_from_token(http_request),
             "updated_on": datetime.now().strftime('%Y-%m-%d %H:%M:%S.000')
         })
         db.commit()

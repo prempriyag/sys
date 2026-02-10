@@ -1,11 +1,12 @@
 """Accepted Grades Mapping Controller"""
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from pydantic import BaseModel
 import logging
 from datetime import datetime
 from database.connection import get_db
+from helpers.security_helper import get_username_from_token
 from models.accepted_grades_mapping_model import AcceptedGradesMappingModel
 from config.constants import TBL_ACCEPTED_GRADES_MAPPING
 
@@ -52,7 +53,7 @@ async def ajaxlist(request: DataTableRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 @router.post("/insert", response_model=dict)
-async def insert(request: AcceptedGradeRequest, db: Session = Depends(get_db)):
+async def insert(request: AcceptedGradeRequest, http_request: Request, db: Session = Depends(get_db)):
     try:
         insert_query = text(f"""
             INSERT INTO {TBL_ACCEPTED_GRADES_MAPPING} (INSTITUTION_ID, ACCEPTED_GRADE, TRANSFER_GRADE, UPDATED_BY, UPDATED_ON)
@@ -62,7 +63,7 @@ async def insert(request: AcceptedGradeRequest, db: Session = Depends(get_db)):
             "institution_id": request.INSTITUTION_ID,
             "accepted_grade": request.ACCEPTED_GRADE.upper() if request.ACCEPTED_GRADE and request.ACCEPTED_GRADE.upper() != "NULL" else None,
             "transfer_grade": request.TRANSFER_GRADE.upper() if request.TRANSFER_GRADE and request.TRANSFER_GRADE.upper() != "NULL" else None,
-            "updated_by": "System",
+            "updated_by": get_username_from_token(http_request),
             "updated_on": datetime.now().strftime('%Y-%m-%d %H:%M:%S.000')
         })
         db.commit()
@@ -87,7 +88,7 @@ async def get_grade(request: DeleteRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 @router.post("/update", response_model=dict)
-async def update(request: AcceptedGradeUpdateRequest, db: Session = Depends(get_db)):
+async def update(request: AcceptedGradeUpdateRequest, http_request: Request, db: Session = Depends(get_db)):
     try:
         update_query = text(f"""
             UPDATE {TBL_ACCEPTED_GRADES_MAPPING}
@@ -100,7 +101,7 @@ async def update(request: AcceptedGradeUpdateRequest, db: Session = Depends(get_
             "institution_id": request.INSTITUTION_ID,
             "accepted_grade": request.ACCEPTED_GRADE.upper() if request.ACCEPTED_GRADE and request.ACCEPTED_GRADE.upper() != "NULL" else None,
             "transfer_grade": request.TRANSFER_GRADE.upper() if request.TRANSFER_GRADE and request.TRANSFER_GRADE.upper() != "NULL" else None,
-            "updated_by": "System",
+            "updated_by": get_username_from_token(http_request),
             "updated_on": datetime.now().strftime('%Y-%m-%d %H:%M:%S.000')
         })
         db.commit()

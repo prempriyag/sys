@@ -213,6 +213,7 @@ export default function InstitutionMapping({ instType = "" }: InstitutionMapping
   };
 
   const pageTitle = instType === "TECH" ? "Tech Center Mapping" : "Institution Mapping";
+  const entityLabel = instType === "TECH" ? "Tech Center Mapping" : "Institution";
 
   return (
     <PageWrapper>
@@ -223,7 +224,7 @@ export default function InstitutionMapping({ instType = "" }: InstitutionMapping
           <h3 className="font-semibold text-gray-800 text-theme-xl dark:text-white/90 sm:text-2xl">View Institutions</h3>
           <div className="flex items-center gap-2">
             {hasAddPermission && (
-              <Button onClick={handleAdd}>Add Institution</Button>
+              <Button onClick={handleAdd}>Add {entityLabel}</Button>
             )}
             <Button onClick={() => setRefreshTrigger((prev) => prev + 1)} variant="outline" startIcon={<RefreshIcon className="w-5 h-5" />}>Refresh Data</Button>
           </div>
@@ -279,7 +280,7 @@ export default function InstitutionMapping({ instType = "" }: InstitutionMapping
           {/* Modal Header */}
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
             <h3 className="text-xl font-semibold text-gray-800 dark:text-white">
-              Add Institution
+              Add {entityLabel}
             </h3>
           </div>
 
@@ -391,7 +392,7 @@ export default function InstitutionMapping({ instType = "" }: InstitutionMapping
           {/* Modal Header */}
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
             <h3 className="text-xl font-semibold text-gray-800 dark:text-white">
-              Edit Institution
+              Edit {entityLabel}
             </h3>
           </div>
 

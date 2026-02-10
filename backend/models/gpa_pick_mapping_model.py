@@ -10,11 +10,11 @@ logger = logging.getLogger(__name__)
 
 
 class GpaPickMappingModel:
-    """Model for GPA Pick Mapping queries"""
+    """Model for GPA Pick Mapping queries - matches CI3 GpapickMapping controller"""
 
     @staticmethod
     def build_search_conditions(request_data: Dict[str, Any]) -> str:
-        """Build search conditions from request data"""
+        """Build search conditions from request data (matching CI3 getgpapickMappingdata)"""
         search_conditions = []
         
         # Global search (main search box)
@@ -22,9 +22,15 @@ class GpaPickMappingModel:
         if search_value:
             search_safe = check_special_name(search_value)
             search_lower = check_special_name(search_value.lower())
-            search_conditions.append(f"""(GPA_PICK like '%{search_safe}%' or 
-                lower(UPDATED_BY) like '%{search_lower}%' or 
-                LAST_UPDATED_DATETIME like '%{search_safe}%')""")
+            search_conditions.append(f"""(
+                lower(GPA_SCALE) like '%{search_lower}%' or
+                lower(WEIGHTED_GPA) like '%{search_lower}%' or
+                lower(UNWEIGHTED_GPA) like '%{search_lower}%' or
+                lower(CGPA) like '%{search_lower}%' or
+                lower(PREFERRED_GPA) like '%{search_lower}%' or
+                lower(CREATED_BY) like '%{search_lower}%' or
+                lower(CREATED_DATE) like '%{search_safe}%'
+            )""")
 
         # Column-specific search (individual column search boxes)
         columns = request_data.get("columns", [])
@@ -39,12 +45,20 @@ class GpaPickMappingModel:
                     col_search_lower = check_special_name(col_search_value.lower())
                     
                     # Map column data names to database fields
-                    if col_data == "GPA_PICK":
-                        search_conditions.append(f"GPA_PICK like '%{col_search_safe}%'")
-                    elif col_data == "UPDATED_BY":
-                        search_conditions.append(f"lower(UPDATED_BY) like '%{col_search_lower}%'")
-                    elif col_data == "LAST_UPDATED_DATETIME":
-                        search_conditions.append(f"LAST_UPDATED_DATETIME like '%{col_search_safe}%'")
+                    if col_data == "GPA_SCALE":
+                        search_conditions.append(f"lower(GPA_SCALE) like '%{col_search_lower}%'")
+                    elif col_data == "WEIGHTED_GPA":
+                        search_conditions.append(f"lower(WEIGHTED_GPA) like '%{col_search_lower}%'")
+                    elif col_data == "UNWEIGHTED_GPA":
+                        search_conditions.append(f"lower(UNWEIGHTED_GPA) like '%{col_search_lower}%'")
+                    elif col_data == "CGPA":
+                        search_conditions.append(f"lower(CGPA) like '%{col_search_lower}%'")
+                    elif col_data == "PREFERRED_GPA":
+                        search_conditions.append(f"lower(PREFERRED_GPA) like '%{col_search_lower}%'")
+                    elif col_data == "CREATED_BY":
+                        search_conditions.append(f"lower(CREATED_BY) like '%{col_search_lower}%'")
+                    elif col_data == "CREATED_DATE":
+                        search_conditions.append(f"CREATED_DATE like '%{col_search_safe}%'")
 
         if search_conditions:
             return " AND ".join(search_conditions)
@@ -54,11 +68,15 @@ class GpaPickMappingModel:
     def get_order_by_column(column_name: str) -> str:
         """Map frontend column name to SQL column for ordering"""
         column_mapping = {
-            "GPA_PICK": "GPA_PICK",
-            "UPDATED_BY": "UPDATED_BY",
-            "LAST_UPDATED_DATETIME": "LAST_UPDATED_DATETIME",
+            "GPA_SCALE": "GPA_SCALE",
+            "WEIGHTED_GPA": "WEIGHTED_GPA",
+            "UNWEIGHTED_GPA": "UNWEIGHTED_GPA",
+            "CGPA": "CGPA",
+            "PREFERRED_GPA": "PREFERRED_GPA",
+            "CREATED_BY": "CREATED_BY",
+            "CREATED_DATE": "CREATED_DATE",
         }
-        return column_mapping.get(column_name, "LAST_UPDATED_DATETIME")
+        return column_mapping.get(column_name, "CREATED_DATE")
 
     @staticmethod
     def get_gpa_pick_mapping_data(
@@ -67,6 +85,7 @@ class GpaPickMappingModel:
     ) -> Dict[str, Any]:
         """
         Get GPA Pick Mapping data for DataTables
+        Matches CI3 GpapickMapping_model::getgpapickMappingdata()
         """
         try:
             # Extract request parameters
@@ -84,9 +103,9 @@ class GpaPickMappingModel:
 
             columns = request_data.get("columns", [])
             if columns and len(columns) > column_index:
-                column_name = columns[column_index].get("data", "LAST_UPDATED_DATETIME")
+                column_name = columns[column_index].get("data", "CREATED_DATE")
             else:
-                column_name = "LAST_UPDATED_DATETIME"
+                column_name = "CREATED_DATE"
 
             # Build search conditions
             search_query = GpaPickMappingModel.build_search_conditions(request_data)
@@ -118,9 +137,9 @@ class GpaPickMappingModel:
                 logger.error(f"Error executing count query: {e}")
                 raise
 
-            # Build data query
+            # Build data query - matching CI3 SELECT *
             data_query_sql = f"""
-                SELECT ID, GPA_PICK, UPDATED_BY, LAST_UPDATED_DATETIME
+                SELECT id, GPA_SCALE, WEIGHTED_GPA, UNWEIGHTED_GPA, CGPA, PREFERRED_GPA, CREATED_BY, CREATED_DATE
                 FROM {TBL_GPA_PICK_MAPPING} WITH(NOLOCK)
                 WHERE {where_clause}
                 ORDER BY {order_by_clause}
@@ -135,16 +154,20 @@ class GpaPickMappingModel:
                 logger.error(f"Error executing data query: {e}")
                 raise
 
-            # Format data
+            # Format data - matching CI3 response format
             data = []
             for record in records:
                 record_dict = dict(record._mapping)
                 
                 data_row = {
-                    "Id": record_dict.get("ID") or record_dict.get("Id"),
-                    "GPA_PICK": record_dict.get("GPA_PICK", ""),
-                    "UPDATED_BY": record_dict.get("UPDATED_BY", ""),
-                    "LAST_UPDATED_DATETIME": str(record_dict.get("LAST_UPDATED_DATETIME", "")) if record_dict.get("LAST_UPDATED_DATETIME") else "",
+                    "id": record_dict.get("id") or record_dict.get("Id") or record_dict.get("ID"),
+                    "GPA_SCALE": (record_dict.get("GPA_SCALE") or "").lower() if record_dict.get("GPA_SCALE") else "",
+                    "WEIGHTED_GPA": (record_dict.get("WEIGHTED_GPA") or "").lower() if record_dict.get("WEIGHTED_GPA") else "",
+                    "UNWEIGHTED_GPA": (record_dict.get("UNWEIGHTED_GPA") or "").lower() if record_dict.get("UNWEIGHTED_GPA") else "",
+                    "CGPA": (record_dict.get("CGPA") or "").lower() if record_dict.get("CGPA") else "",
+                    "PREFERRED_GPA": record_dict.get("PREFERRED_GPA", ""),
+                    "CREATED_BY": (record_dict.get("CREATED_BY") or "").lower() if record_dict.get("CREATED_BY") else "",
+                    "CREATED_DATE": str(record_dict.get("CREATED_DATE", "")) if record_dict.get("CREATED_DATE") else "",
                 }
 
                 data.append(data_row)
@@ -160,4 +183,3 @@ class GpaPickMappingModel:
         except Exception as e:
             logger.error(f"Error in get_gpa_pick_mapping_data: {e}")
             raise
-

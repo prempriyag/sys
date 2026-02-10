@@ -206,8 +206,52 @@ export default function CollegeDashboard() {
     </div>
   );
 
+  // ── CI3 label → colour map (single source of truth) ──
+  // Every dataset label used across all charts gets its colour here.
+  // When a new label is added, just add one entry – no positional arrays to keep in sync.
+  const LABEL_COLORS: Record<string, string> = {
+    // Upload Transcript Status
+    NEW:                        "#adc5ff",
+    RERUN:                      "#A9B1BC",
+    Rerun:                      "#A9B1BC",
+    PROCESSED:                  "#86f886",
+    DUPLICATE:                  "#7cffeb",
+    FAILED:                     "#ff8f8f",
+    Failed:                     "#ff8f8f",
+
+    // Transcript Sources
+    Parchment:                  "#daa3f1",
+    NSC:                        "#adc5ff",
+    Scanned:                    "#86f886",
+    ScannedUnofficial:          "#ffb272",
+
+    // Transcripts Processed In Banner
+    Downloaded:                 "#86f886",
+    SOAPCOL:                    "#b1a2ff",
+    SHATAEQ:                    "#ffa6e2",
+    BDMS:                       "#7cffeb",
+
+    // Initial Kickouts & Processed
+    "Transcript Kickouts":      "#ff8f8f",
+    "Transcript Processed":     "#86f886",
+
+    // Articulation Kickouts & Processed
+    "PARTIALLY PROCESSED":      "#ffe17a",
+    "PROCESSED & ROLLED":       "#B3A5EF",
+
+    // Donut chart colours
+    Success:                    "#86f886",
+  };
+
+  /** Resolve an ordered colour array from dataset names, falling back to a palette. */
+  const getColorsForDatasets = (datasets: { name: string }[] | undefined): string[] => {
+    const fallback = ["#3C50E0", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899", "#06B6D4"];
+    if (!datasets || datasets.length === 0) return fallback;
+    return datasets.map((ds, i) => LABEL_COLORS[ds.name] ?? fallback[i % fallback.length]);
+  };
+
   // Chart options with glassmorphic styling
-  const getBarChartOptions = (categories: string[]): ApexOptions => {
+  const getBarChartOptions = (categories: string[], customColors?: string[]): ApexOptions => {
     // Calculate adaptive border radius based on number of categories
     // More categories = narrower bars = smaller radius
     const categoryCount = categories.length;
@@ -273,7 +317,7 @@ export default function CollegeDashboard() {
           return seriesName.charAt(0).toUpperCase() + seriesName.slice(1).toLowerCase();
         }
       },
-      colors: ["#e57124", "#f8a962", "#fab876", "#F59E0B", "#EF4444"],
+      colors: customColors || ["#adc5ff", "#a9b1bc", "#86f886", "#7cffeb", "#EF4444"],
       grid: {
         borderColor: "rgba(148, 163, 184, 0.1)",
         strokeDashArray: 4,
@@ -293,7 +337,7 @@ export default function CollegeDashboard() {
     };
   };
 
-  const getLineChartOptions = (categories: string[]): ApexOptions => ({
+  const getLineChartOptions = (categories: string[], customColors?: string[]): ApexOptions => ({
     chart: {
       type: "line",
       toolbar: { show: false },
@@ -324,7 +368,7 @@ export default function CollegeDashboard() {
         return safeFormatter(seriesName);
       }
     },
-    colors: ["#e57124", "#10B981", "#F59E0B", "#EF4444"],
+    colors: customColors || ["#e57124", "#10B981", "#F59E0B", "#EF4444"],
     grid: {
       borderColor: "rgba(148, 163, 184, 0.1)",
       strokeDashArray: 4,
@@ -346,6 +390,10 @@ export default function CollegeDashboard() {
       hover: { size: 7 }
     },
   });
+
+  // CI3 colors for "Transcripts Processed In Banner" chart
+  // Order: Downloaded, SOAPCOL, SHATAEQ, BDMS, Rerun, Failed
+  const bannerProcessedColors = ["#86f886", "#b1a2ff", "#ffa6e2", "#7cffeb", "#A9B1BC", "#ff8f8f"];
 
   const donutChartOptions = (labels: string[]): ApexOptions => ({
     chart: { 
@@ -698,10 +746,10 @@ export default function CollegeDashboard() {
                 <div className="relative">
                   <div className="mb-4 flex items-center justify-between">
                     <h3 className="text-base font-bold text-gray-800 dark:text-white">Transcripts Downloaded From Sources</h3>
-                    <div className="flex items-center gap-2">
+                    {/* <div className="flex items-center gap-2">
                       <span className="text-xs text-gray-500 dark:text-gray-400">Live</span>
                       <div className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" title="Live data indicator"></div>
-                    </div>
+                    </div> */}
                   </div>
                   <div className="rounded-lg bg-white/80 p-3 shadow-inner dark:bg-gray-900/50">
                     {hasChartData(dashboardData.transcriptSources?.labels, dashboardData.transcriptSources?.datasets) ? (
@@ -758,13 +806,13 @@ export default function CollegeDashboard() {
                   <div className="rounded-lg bg-white/80 p-3 shadow-inner dark:bg-gray-900/50">
                     {hasChartData(dashboardData.transcriptProcessed?.labels, dashboardData.transcriptProcessed?.datasets) ? (
                       <Chart 
-                        options={getLineChartOptions(dashboardData.transcriptProcessed?.labels || [])} 
+                        options={getBarChartOptions(dashboardData.transcriptProcessed?.labels || [], bannerProcessedColors)} 
                         series={dashboardData.transcriptProcessed?.datasets || []} 
-                        type="line" 
-                        height={280} 
+                        type="bar" 
+                        height={320} 
                       />
                     ) : (
-                      <NoDataPlaceholder height={280} />
+                      <NoDataPlaceholder height={320} />
                     )}
                   </div>
                 </div>

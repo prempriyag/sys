@@ -318,118 +318,185 @@ class SchoolDashboardModel:
         db: Session, college_name: str, fromdate: str, todate: str,
         date_ranges: List, use_daily: bool
     ) -> List[Dict[str, Any]]:
-        """Get transcripts processed in Banner
-        Matches CI3 transcript_SAAADMS_dashboard() method for school
-        Queries DIGISCRIPT_LOG for STATUS_SOAHSCH, STATUS_SOATEST, STATUS_SOAHOLD, STATUS_BDMS
+        """Get transcripts processed in Banner for school
+        Matches CI3 school dashboard:
+          - Downloaded   (transcript_download_dashboard)
+          - SOAHSCH      (transcript_SAAADMS_dashboard)
+          - SOATEST      (transcript_SAAADMS_dashboard)
+          - SOAHOLD      (transcript_SAAADMS_dashboard)
+          - BDMS         (transcript_SAAADMS_dashboard)
         """
         try:
-            # School uses different status flags than college
             status_flags = ['SOAHSCH', 'SOATEST', 'SOAHOLD', 'BDMS']
-            college_filter = f" AND (t.INSTITUTION_ID = '{college_name}')" if college_name else ""
-            
+            all_names = ['Downloaded'] + status_flags
+            if not date_ranges:
+                return [{"name": n, "data": []} for n in all_names]
+
+            college_filter_t = f" AND (t.INSTITUTION_ID = '{college_name}')" if college_name else ""
+            college_filter_d = f" AND d.INSTITUTION_ID = '{college_name}'" if college_name else ""
+
             first_start_date = fromdate.split()[0]
             last_end_date = todate.split()[0]
-            
-            # Build date values for SQL VALUES clause
+
             if use_daily:
-                if not date_ranges:
-                    return [{"name": sf, "data": []} for sf in status_flags]
                 date_values = ", ".join([f"('{dr}')" for dr in date_ranges])
             else:
-                if not date_ranges:
-                    return [{"name": sf, "data": []} for sf in status_flags]
                 date_values = ", ".join([f"('{dr['StartDate']}')" for dr in date_ranges])
                 first_start_date = date_ranges[0]['StartDate']
                 last_end_date = date_ranges[-1]['EndDate']
 
-            # Build all status columns in one query (matching CI3 approach)
+            # helper to map rows to date_ranges
+            def _map_rows(rows, col_name, daily=use_daily):
+                data_map = {}
+                for row in rows:
+                    rd = dict(row._mapping) if hasattr(row, '_mapping') else {}
+                    if daily:
+                        dv = rd.get('date', rd.get('DAY', None))
+                        if dv is None:
+                            dv = row[0]
+                        key = dv.strftime('%Y-%m-%d') if hasattr(dv, 'strftime') else str(dv)[:10]
+                    else:
+                        y = rd.get('year', row[1] if len(row) > 1 else 0)
+                        m = rd.get('mth', row[2] if len(row) > 2 else 0)
+                        key = f"{y}-{int(m):02d}"
+                    data_map[key] = rd.get(col_name, 0)
+                out = []
+                for dr in date_ranges:
+                    if daily:
+                        k = dr[:10] if len(dr) > 10 else dr
+                    else:
+                        dt = datetime.strptime(dr['StartDate'], '%Y-%m-%d')
+                        k = f"{dt.year}-{dt.month:02d}"
+                    out.append(data_map.get(k, 0) or 0)
+                return out
+
+            # ─── 1. Downloaded ───
+            if use_daily:
+                dl_query = text(f"""
+                    SELECT
+                        month_data.date AS date,
+                        COUNT(t.BATCH_ID) AS resultdata
+                    FROM
+                        (VALUES {date_values}) AS month_data(date)
+                    LEFT JOIN
+                        {TBL_DOWNLOAD} AS t
+                        ON CAST(t.UPLOADED_DATETIME AS DATE) = month_data.date
+                        AND t.PROJECT_ID = {SCHOOL_PROJECT_ID}
+                    LEFT JOIN
+                        {TBL_KICKOUT} AS d
+                        ON COALESCE(d.BATCH_ID, '') = COALESCE(t.BATCH_ID, '')
+                    WHERE CAST(t.UPLOADED_DATETIME AS DATE) BETWEEN '{first_start_date}' AND '{last_end_date}'
+                        {college_filter_d}
+                    GROUP BY month_data.date
+                    ORDER BY month_data.date
+                """)
+            else:
+                dl_query = text(f"""
+                    SELECT
+                        LEFT(DATENAME(month, month_data.date), 3) AS month,
+                        YEAR(month_data.date) AS year,
+                        DATEPART(MM, month_data.date) AS mth,
+                        COUNT(t.BATCH_ID) AS resultdata
+                    FROM
+                        (VALUES {date_values}) AS month_data(date)
+                    LEFT JOIN
+                        {TBL_DOWNLOAD} AS t
+                        ON MONTH(t.UPLOADED_DATETIME) = MONTH(month_data.date)
+                        AND YEAR(t.UPLOADED_DATETIME) = YEAR(month_data.date)
+                        AND t.PROJECT_ID = {SCHOOL_PROJECT_ID}
+                        AND CAST(t.UPLOADED_DATETIME AS DATE) BETWEEN '{first_start_date}' AND '{last_end_date}'
+                    LEFT JOIN
+                        {TBL_KICKOUT} AS d
+                        ON COALESCE(d.BATCH_ID, '') = COALESCE(t.BATCH_ID, '')
+                    WHERE 1=1 {college_filter_d}
+                    GROUP BY
+                        DATENAME(month, month_data.date),
+                        YEAR(month_data.date),
+                        DATEPART(MM, month_data.date)
+                    ORDER BY
+                        YEAR(month_data.date),
+                        DATEPART(MM, month_data.date)
+                """)
+            dl_rows = db.execute(dl_query).fetchall()
+            downloaded_data = _map_rows(dl_rows, 'resultdata')
+
+            # ─── 2. SOAHSCH / SOATEST / SOAHOLD / BDMS ───
             sql_cols = ", ".join([
                 f"ISNULL(SUM(CASE WHEN UPPER(t.STATUS_{sf}) = 'PROCESSED' THEN 1 ELSE 0 END), 0) AS {sf}Count"
                 for sf in status_flags
             ])
-            
+
             if use_daily:
-                query = text(f"""
-                    SELECT 
+                saaadms_query = text(f"""
+                    SELECT
                         month_data.date AS date,
                         {sql_cols}
                     FROM
                         (VALUES {date_values}) AS month_data(date)
                     LEFT JOIN
-                        {TBL_KICKOUT} AS t 
+                        {TBL_KICKOUT} AS t
                         ON CAST(t.LAST_UPDATED_DATETIME AS DATE) = month_data.date
                         AND (t.PROJECT_ID = {SCHOOL_PROJECT_ID})
-                        {college_filter}
-                    GROUP BY 
-                        month_data.date
-                    ORDER BY 
-                        month_data.date
+                        {college_filter_t}
+                    GROUP BY month_data.date
+                    ORDER BY month_data.date
                 """)
             else:
-                query = text(f"""
-                    SELECT 
+                saaadms_query = text(f"""
+                    SELECT
                         LEFT(DATENAME(month, month_data.date), 3) AS month,
                         YEAR(month_data.date) AS year,
                         DATEPART(MM, month_data.date) AS mth,
                         {sql_cols}
-                    FROM 
+                    FROM
                         (VALUES {date_values}) AS month_data(date)
-                    LEFT JOIN 
-                        {TBL_KICKOUT} AS t 
+                    LEFT JOIN
+                        {TBL_KICKOUT} AS t
                         ON MONTH(t.LAST_UPDATED_DATETIME) = MONTH(month_data.date)
                         AND YEAR(t.LAST_UPDATED_DATETIME) = YEAR(month_data.date)
                         AND (t.PROJECT_ID = {SCHOOL_PROJECT_ID})
                         AND CAST(t.LAST_UPDATED_DATETIME AS DATE) BETWEEN '{first_start_date}' AND '{last_end_date}'
-                        {college_filter}
-                    GROUP BY 
-                        DATENAME(month, month_data.date), 
-                        YEAR(month_data.date), 
+                        {college_filter_t}
+                    GROUP BY
+                        DATENAME(month, month_data.date),
+                        YEAR(month_data.date),
                         DATEPART(MM, month_data.date)
-                    ORDER BY 
-                        YEAR(month_data.date), 
+                    ORDER BY
+                        YEAR(month_data.date),
                         DATEPART(MM, month_data.date)
                 """)
 
-            result = db.execute(query).fetchall()
+            saaadms_rows = db.execute(saaadms_query).fetchall()
 
-            # Build a map of results by month/date
-            result_map = {}
-            for row in result:
-                row_dict = dict(row._mapping) if hasattr(row, '_mapping') else dict(zip([c.key for c in row._parent.keys], row))
+            saaadms_map = {}
+            for row in saaadms_rows:
+                rd = dict(row._mapping) if hasattr(row, '_mapping') else {}
                 if use_daily:
-                    date_val = row_dict.get('date', row[0])
-                    if hasattr(date_val, 'strftime'):
-                        key = date_val.strftime('%Y-%m-%d')
-                    else:
-                        key = str(date_val)[:10]
+                    dv = rd.get('date', row[0])
+                    key = dv.strftime('%Y-%m-%d') if hasattr(dv, 'strftime') else str(dv)[:10]
                 else:
-                    year = row_dict.get('year', row[1])
-                    mth = row_dict.get('mth', row[2])
-                    key = f"{year}-{int(mth):02d}"
-                result_map[key] = row_dict
+                    y = rd.get('year', row[1])
+                    m = rd.get('mth', row[2])
+                    key = f"{y}-{int(m):02d}"
+                saaadms_map[key] = rd
 
-            # Build datasets for each status flag
-            datasets = []
-            for status_flag in status_flags:
+            flag_datasets = {}
+            for sf in status_flags:
                 data = []
                 for dr in date_ranges:
                     if use_daily:
-                        key = dr[:10] if len(dr) > 10 else dr
+                        k = dr[:10] if len(dr) > 10 else dr
                     else:
                         dt = datetime.strptime(dr['StartDate'], '%Y-%m-%d')
-                        key = f"{dt.year}-{dt.month:02d}"
-                    
-                    count_key = f"{status_flag}Count"
-                    if key in result_map:
-                        count = result_map[key].get(count_key, 0)
-                    else:
-                        count = 0
-                    data.append(count if count else 0)
+                        k = f"{dt.year}-{dt.month:02d}"
+                    cnt = saaadms_map.get(k, {}).get(f"{sf}Count", 0)
+                    data.append(cnt if cnt else 0)
+                flag_datasets[sf] = data
 
-                datasets.append({
-                    "name": status_flag,
-                    "data": data
-                })
+            # ─── Build final datasets in CI3 order ───
+            datasets = [{"name": "Downloaded", "data": downloaded_data}]
+            for sf in status_flags:
+                datasets.append({"name": sf, "data": flag_datasets[sf]})
 
             return datasets
         except Exception as e:

@@ -131,7 +131,7 @@ export default function SchoolDashboard() {
   );
 
   // Chart options with glassmorphic styling
-  const getBarChartOptions = (categories: string[]): ApexOptions => ({
+  const getBarChartOptions = (categories: string[], customColors?: string[]): ApexOptions => ({
     chart: {
       type: "bar",
       toolbar: { show: false },
@@ -174,7 +174,7 @@ export default function SchoolDashboard() {
         return seriesName.charAt(0).toUpperCase() + seriesName.slice(1).toLowerCase();
       }
     },
-    colors: ["#3C50E0", "#8FD0EF", "#80CAEE", "#F59E0B", "#EF4444"],
+    colors: customColors || ["#3C50E0", "#8FD0EF", "#80CAEE", "#F59E0B", "#EF4444"],
     grid: {
       borderColor: "rgba(148, 163, 184, 0.1)",
       strokeDashArray: 4,
@@ -192,6 +192,10 @@ export default function SchoolDashboard() {
       }
     },
   });
+
+  // CI3 colors for "Transcripts Processed In Banner" chart
+  // Order: Downloaded, SOAHSCH, SOATEST, SOAHOLD, BDMS
+  const bannerProcessedColors = ["#86f886", "#b1a2ff", "#ffa6e2", "#adc5ff", "#7cffeb"];
 
 
   const getLineChartOptions = (categories: string[]): ApexOptions => ({
@@ -529,9 +533,9 @@ export default function SchoolDashboard() {
                   </div>
                   <div className="rounded-lg bg-white/80 p-3 shadow-inner dark:bg-gray-900/50">
                     {hasChartData(dashboardData.transcriptProcessed?.labels, dashboardData.transcriptProcessed?.datasets) ? (
-                      <Chart options={getLineChartOptions(dashboardData.transcriptProcessed.labels)} series={dashboardData.transcriptProcessed.datasets} type="line" height={280} />
+                      <Chart options={getBarChartOptions(dashboardData.transcriptProcessed.labels, bannerProcessedColors)} series={dashboardData.transcriptProcessed.datasets} type="bar" height={320} />
                     ) : (
-                      <NoDataPlaceholder height={280} />
+                      <NoDataPlaceholder height={320} />
                     )}
                   </div>
                 </div>

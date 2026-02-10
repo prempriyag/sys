@@ -157,17 +157,17 @@ export default function HorizontalTree({
 
         .tree-level-1-node {
           display: inline-flex;
-          align-items: flex-start; /* For wrap */
+          align-items: center;
           justify-content: space-between;
           gap: 8px;
-          padding: 10px 14px;
+          padding: 12px 14px;
           width: 320px;
           min-height: 44px;
           height: auto;
-          background: white;
-          border: 1px solid #d1d5db;
-          border-radius: 6px;
-          color: #4b5563;
+          background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
+          border: 2px solid #93c5fd;
+          border-radius: 10px;
+          color: #0f172a;
           font-size: 14px;
           font-weight: 500;
           cursor: pointer;
@@ -175,32 +175,42 @@ export default function HorizontalTree({
           box-sizing: border-box;
           position: relative;
           line-height: 1.4;
+          box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.08);
         }
 
         .tree-level-1-node:hover {
-          background: #f3f4f6;
-          border-color: #9ca3af;
+          background: linear-gradient(135deg, #eef2ff 0%, #dbeafe 100%);
+          border: 3px solid #60a5fa;
+          box-shadow: 0 16px 32px rgba(15, 23, 42, 0.15), 0 4px 8px rgba(15, 23, 42, 0.12);
         }
 
         .dark .tree-level-1-node:hover {
-          background: #374151;
+          background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+          border: 3px solid #3b82f6;
+          box-shadow: 0 16px 32px rgba(2, 6, 23, 0.6), 0 4px 8px rgba(2, 6, 23, 0.5);
         }
 
         .dark .tree-level-1-node {
-          background: #1f2937;
-          border-color: #4b5563;
-          color: #9ca3af;
+          background: linear-gradient(135deg, #0f172a 0%, #1f2937 100%);
+          border: 2px solid #1e40af;
+          color: #e2e8f0;
+          box-shadow: 0 10px 24px rgba(2, 6, 23, 0.5), 0 1px 2px rgba(2, 6, 23, 0.4);
         }
         
         .tree-level-1-badge-wrapper {
           display: flex;
           align-items: center;
           gap: 8px;
-          overflow: hidden;
+          flex: 1;
+          min-width: 0;
+          margin-right: 8px;
         }
         
         .tree-level-1-label {
-           word-break: break-word; /* wrap */
+          display: flex;
+          align-items: center;
+          min-width: 0;
+          word-break: break-word; /* wrap */
         }
 
         /* --- Level 2 Container --- */
@@ -274,9 +284,9 @@ export default function HorizontalTree({
 
         .tree-level-2-node {
           display: inline-flex;
-          align-items: flex-start;
+          align-items: center;
           justify-content: space-between;
-          gap: 10px;
+          gap: 8px;
           padding: 10px 14px;
           width: 400px;
           min-height: 44px;
@@ -357,9 +367,11 @@ export default function HorizontalTree({
         
         .tree-level-2-content {
            display: flex; 
-           align-items: flex-start; /* wrap */
-           gap: 10px; 
-           flex: 1; 
+           align-items: center;
+           gap: 8px; 
+           flex: 1;
+           min-width: 0;
+           margin-right: 8px;
         }
 
         /* --- Level 3 (Action Items) --- */
@@ -434,8 +446,8 @@ export default function HorizontalTree({
 
         .tree-level-3-node {
           display: inline-flex;
-          align-items: flex-start; /* wrap */
-          gap: 10px;
+          align-items: center;
+          gap: 8px;
           padding: 8px 14px;
           width: 320px;
           min-height: 40px;
@@ -494,9 +506,6 @@ export default function HorizontalTree({
              <button className={`tree-level-1-node ${rootNode.isExpanded ? 'expanded' : ''}`} onClick={rootNode.onClick}>
                 <div className="tree-level-1-badge-wrapper">
                   <span className="tree-level-1-label">{rootNode.label}</span>
-                  {rootNode.badge !== undefined && rootNode.badge > 0 && (
-                     <span className="tree-badge">{rootNode.badge}</span>
-                  )}
                 </div>
                 <svg className={`tree-chevron ${rootNode.isExpanded ? 'expanded' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -518,9 +527,6 @@ export default function HorizontalTree({
                          <div className="tree-level-2-content">
                             {batchNode.icon || <FolderIcon />}
                             <span className="tree-level-2-label">{batchNode.label}</span>
-                            {batchNode.badge !== undefined && batchNode.badge > 0 && (
-                               <span className="tree-badge">{batchNode.badge}</span>
-                            )}
                          </div>
                          {hasChildren && (
                             <svg className={`tree-chevron ${batchNode.isExpanded ? 'expanded' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -537,9 +543,6 @@ export default function HorizontalTree({
                                   <button className="tree-level-3-node" onClick={actionNode.onClick}>
                                      {actionNode.icon || <DocumentIcon />}
                                      <span className="tree-level-3-label">{actionNode.label}</span>
-                                     {actionNode.badge !== undefined && actionNode.badge > 0 && (
-                                        <span className="tree-badge">{actionNode.badge}</span>
-                                     )}
                                   </button>
                                </div>
                             ))}

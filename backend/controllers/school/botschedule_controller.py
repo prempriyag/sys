@@ -1,11 +1,12 @@
 """Bot Schedule Controller"""
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from pydantic import BaseModel
 import logging
 from datetime import datetime
 from database.connection import get_db
+from helpers.security_helper import get_username_from_token
 from models.bot_schedule_model import BotScheduleModel
 from config.constants import TBL_BOT_SCHEDULE
 
@@ -62,7 +63,7 @@ async def ajaxlist(request: DataTableRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 @router.post("/insert", response_model=dict)
-async def insert(request: BotScheduleRequest, db: Session = Depends(get_db)):
+async def insert(request: BotScheduleRequest, http_request: Request, db: Session = Depends(get_db)):
     try:
         check_query = text(f"""
             SELECT COUNT(*) as count FROM {TBL_BOT_SCHEDULE}
@@ -97,8 +98,8 @@ async def insert(request: BotScheduleRequest, db: Session = Depends(get_db)):
             "finishfirstrun": request.FINISHFIRSTRUN.strip(),
             "serverip": request.SERVERIP.strip(),
             "username": request.USERNAME.strip(),
-            "createdby": "System",
-            "updatedby": "System",
+            "createdby": get_username_from_token(http_request),
+            "updatedby": get_username_from_token(http_request),
             "createdon": now,
             "updatedon": now
         })
@@ -124,7 +125,7 @@ async def get_bot(request: DeleteRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 @router.post("/update", response_model=dict)
-async def update(request: BotScheduleUpdateRequest, db: Session = Depends(get_db)):
+async def update(request: BotScheduleUpdateRequest, http_request: Request, db: Session = Depends(get_db)):
     try:
         check_query = text(f"""
             SELECT COUNT(*) as count FROM {TBL_BOT_SCHEDULE}
@@ -163,7 +164,7 @@ async def update(request: BotScheduleUpdateRequest, db: Session = Depends(get_db
             "finishfirstrun": request.FINISHFIRSTRUN.strip(),
             "serverip": request.SERVERIP.strip(),
             "username": request.USERNAME.strip(),
-            "updatedby": "System",
+            "updatedby": get_username_from_token(http_request),
             "updatedon": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         })
         db.commit()

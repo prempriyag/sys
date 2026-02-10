@@ -2,13 +2,14 @@
 Term Mapping Controller
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from pydantic import BaseModel
 import logging
 from datetime import datetime
 from database.connection import get_db
+from helpers.security_helper import get_username_from_token
 from models.term_mapping_model import TermMappingModel
 from config.constants import TBL_TERM_MAPPING
 from helpers.common_helper import check_special_name
@@ -62,7 +63,7 @@ async def ajaxlist(request: DataTableRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 @router.post("/insert", response_model=dict)
-async def insert(request: TermRequest, db: Session = Depends(get_db)):
+async def insert(request: TermRequest, http_request: Request, db: Session = Depends(get_db)):
     try:
         from datetime import datetime as dt
         term_start = dt.strptime(request.TERM_START, "%Y-%m-%d").strftime("%m-%d-%Y")
@@ -94,7 +95,7 @@ async def insert(request: TermRequest, db: Session = Depends(get_db)):
             "term_end": term_end,
             "is_active": request.IS_ACTIVE.strip(),
             "grace_period": request.GRACE_PERIOD,
-            "updated_by": "System",
+            "updated_by": get_username_from_token(http_request),
             "last_updated_datetime": datetime.now().strftime('%Y-%m-%d %H:%M:%S.000')
         })
         db.commit()
@@ -119,7 +120,7 @@ async def get_term(request: DeleteRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 @router.post("/update", response_model=dict)
-async def update(request: TermUpdateRequest, db: Session = Depends(get_db)):
+async def update(request: TermUpdateRequest, http_request: Request, db: Session = Depends(get_db)):
     try:
         from datetime import datetime as dt
         term_start = dt.strptime(request.TERM_START, "%Y-%m-%d").strftime("%m-%d-%Y")
@@ -157,7 +158,7 @@ async def update(request: TermUpdateRequest, db: Session = Depends(get_db)):
             "term_end": term_end,
             "is_active": request.IS_ACTIVE.strip(),
             "grace_period": request.GRACE_PERIOD,
-            "updated_by": "System",
+            "updated_by": get_username_from_token(http_request),
             "last_updated_datetime": datetime.now().strftime('%Y-%m-%d %H:%M:%S.000')
         })
         db.commit()

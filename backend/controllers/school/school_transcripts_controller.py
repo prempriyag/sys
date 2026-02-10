@@ -4,7 +4,7 @@ FastAPI version of CI3 Transcripts controller
 Handles transcript upload and uploaded transcripts list
 """
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from typing import Optional, List
 from pydantic import BaseModel
@@ -16,6 +16,7 @@ import string
 
 from database.connection import get_db
 from helpers.permission_dependency import require_permission
+from helpers.security_helper import get_username_from_token
 from helpers.email_helper import trigger_update_mail
 from models import User
 from models.school_transcripts_model import SchoolTranscriptsModel
@@ -110,6 +111,7 @@ def sanitize_filename(filename: str) -> str:
 
 @router.post("/upload")
 async def upload_transcripts(
+    http_request: Request,
     source_type: str = Form(...),
     files: List[UploadFile] = File(...),
     # Temporarily disabled authentication for testing
@@ -229,7 +231,7 @@ async def upload_transcripts(
                     "filename": file.filename,
                     "formatted_filename": new_filename,
                     "filepath": TRANSCRIPTS_COLLEGE + f"\\{source_type}\\",
-                    "uploaded_by": "System"  # TODO: Get from current_user when auth is enabled
+                    "uploaded_by": get_username_from_token(http_request)
                 })
                 db.commit()
 
@@ -262,7 +264,7 @@ async def upload_transcripts(
                     "institution_type": "High School",
                     "source_type": source_type,
                     "files_count": uploaded_count,
-                    "uploaded_by": "System",  # TODO: Get from current_user when auth is enabled
+                    "uploaded_by": get_username_from_token(http_request),
                     "uploaded_datetime": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                     "uploaded_files": uploaded_files
                 }

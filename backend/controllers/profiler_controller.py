@@ -13,9 +13,13 @@ from sqlalchemy import text
 from database.connection import get_db
 from helpers.security_helper import get_current_user
 from helpers.profiler_helper import (
+    PROFILING_ENABLED,
     get_stored_profiler_data,
+    get_all_stored_requests,
+    clear_stored_requests,
     is_ktech_user,
 )
+from config.constants import TBL_ADMIN, TBL_CONFIGURATION, TBL_ROLES, TBL_KICKOUT, COLLEGE_PROJECT_ID
 from models import User
 
 logger = logging.getLogger(__name__)
@@ -74,6 +78,46 @@ async def get_profiler_data(
     }
 
 
+@router.get("/requests")
+async def get_request_profiles(
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Get all recent request profiles for this user.
+    Shows every API call with its SQL queries and timing.
+    """
+    if not is_ktech_user(current_user.email):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Profiler access restricted to authorized users"
+        )
+    
+    session_id = str(current_user.id)
+    requests_data = get_all_stored_requests(session_id)
+    
+    return {
+        "enabled": True,
+        "requests": requests_data,
+        "total_requests": len(requests_data),
+    }
+
+
+@router.post("/clear")
+async def clear_request_profiles(
+    current_user: User = Depends(get_current_user),
+):
+    """Clear stored request profiles for this user."""
+    if not is_ktech_user(current_user.email):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Profiler access restricted to authorized users"
+        )
+    
+    session_id = str(current_user.id)
+    clear_stored_requests(session_id)
+    return {"success": True, "message": "Profiler data cleared"}
+
+
 @router.get("/speedtest")
 async def speedtest(
     current_user: User = Depends(get_current_user),
@@ -95,7 +139,7 @@ async def speedtest(
         "summary": {}
     }
     
-    # Test 1: Simple SELECT
+    # Test 1: Simple SELECT (connectivity check)
     start = time.time()
     try:
         db.execute(text("SELECT 1"))
@@ -112,49 +156,49 @@ async def speedtest(
             "error": str(e)
         })
     
-    # Test 2: Count query on a table
+    # Test 2: Count query on user table (PORTAL_ADMIN)
     start = time.time()
     try:
-        result = db.execute(text("SELECT COUNT(*) as cnt FROM PORTAL_USER WITH(NOLOCK)")).fetchone()
+        result = db.execute(text(f"SELECT COUNT(*) as cnt FROM {TBL_ADMIN} WITH(NOLOCK)")).fetchone()
         results["tests"].append({
-            "name": "Count PORTAL_USER",
+            "name": f"Count {TBL_ADMIN}",
             "duration_ms": round((time.time() - start) * 1000, 2),
             "status": "pass",
             "result": result[0] if result else 0
         })
     except Exception as e:
         results["tests"].append({
-            "name": "Count PORTAL_USER",
+            "name": f"Count {TBL_ADMIN}",
             "duration_ms": round((time.time() - start) * 1000, 2),
             "status": "fail",
             "error": str(e)
         })
     
-    # Test 3: Settings query
+    # Test 3: Settings query (PORTAL_CONFIGURATION)
     start = time.time()
     try:
-        result = db.execute(text("SELECT TOP 5 * FROM PORTAL_SETTINGS WITH(NOLOCK)")).fetchall()
+        result = db.execute(text(f"SELECT TOP 5 * FROM {TBL_CONFIGURATION} WITH(NOLOCK)")).fetchall()
         results["tests"].append({
-            "name": "Settings Query",
+            "name": f"Settings Query ({TBL_CONFIGURATION})",
             "duration_ms": round((time.time() - start) * 1000, 2),
             "status": "pass",
             "rows_returned": len(result)
         })
     except Exception as e:
         results["tests"].append({
-            "name": "Settings Query",
+            "name": f"Settings Query ({TBL_CONFIGURATION})",
             "duration_ms": round((time.time() - start) * 1000, 2),
             "status": "fail",
             "error": str(e)
         })
     
-    # Test 4: Join query performance
+    # Test 4: Join query performance (PORTAL_ADMIN + PORTAL_ROLES)
     start = time.time()
     try:
-        result = db.execute(text("""
+        result = db.execute(text(f"""
             SELECT TOP 10 u.id, u.name, r.ROLE_NAME 
-            FROM PORTAL_USER u WITH(NOLOCK)
-            JOIN PORTAL_ROLE r WITH(NOLOCK) ON u.role_id = r.ID
+            FROM {TBL_ADMIN} u WITH(NOLOCK)
+            JOIN {TBL_ROLES} r WITH(NOLOCK) ON u.role_id = r.ID
         """)).fetchall()
         results["tests"].append({
             "name": "User-Role Join",
@@ -165,6 +209,27 @@ async def speedtest(
     except Exception as e:
         results["tests"].append({
             "name": "User-Role Join",
+            "duration_ms": round((time.time() - start) * 1000, 2),
+            "status": "fail",
+            "error": str(e)
+        })
+    
+    # Test 5: Heavy table count (DIGISCRIPT_LOG)
+    start = time.time()
+    try:
+        result = db.execute(text(f"""
+            SELECT COUNT(*) as cnt FROM {TBL_KICKOUT} WITH(NOLOCK)
+            WHERE PROJECT_ID = {COLLEGE_PROJECT_ID}
+        """)).fetchone()
+        results["tests"].append({
+            "name": f"Count {TBL_KICKOUT} (College)",
+            "duration_ms": round((time.time() - start) * 1000, 2),
+            "status": "pass",
+            "result": result[0] if result else 0
+        })
+    except Exception as e:
+        results["tests"].append({
+            "name": f"Count {TBL_KICKOUT} (College)",
             "duration_ms": round((time.time() - start) * 1000, 2),
             "status": "fail",
             "error": str(e)
@@ -192,10 +257,17 @@ async def profiler_status(
     """
     Get profiler status - whether it's enabled for current user.
     """
-    is_enabled = is_ktech_user(current_user.email)
+    is_user_authorized = is_ktech_user(current_user.email)
     
     return {
-        "enabled": is_enabled,
+        "enabled": is_user_authorized,
+        "profiling_active": PROFILING_ENABLED,
         "user_email": current_user.email,
-        "message": "Profiler enabled" if is_enabled else "Profiler access restricted"
+        "message": (
+            "Profiler enabled"
+            if is_user_authorized and PROFILING_ENABLED
+            else "Profiler access restricted"
+            if not is_user_authorized
+            else "Profiling disabled (ENABLE_PROFILING=False in .env)"
+        ),
     }

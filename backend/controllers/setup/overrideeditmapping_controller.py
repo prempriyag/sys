@@ -1,11 +1,12 @@
 """Override Edit Mapping Controller"""
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from pydantic import BaseModel
 import logging
 from datetime import datetime
 from database.connection import get_db
+from helpers.security_helper import get_username_from_token
 from models.override_edit_mapping_model import OverrideEditMappingModel
 from config.constants import TBL_OVERRRIDE
 
@@ -60,7 +61,7 @@ async def ajaxlist(request: DataTableRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 @router.post("/insert", response_model=dict)
-async def insert(request: OverrideRequest, db: Session = Depends(get_db)):
+async def insert(request: OverrideRequest, http_request: Request, db: Session = Depends(get_db)):
     try:
         if not request.INSTITUTION_ID or not request.TERM or not request.SUBJECT or not request.COURSE:
             return {"status": 0, "message": "Please fill all required fields", "refresh": False, "modal_close": False}
@@ -76,7 +77,7 @@ async def insert(request: OverrideRequest, db: Session = Depends(get_db)):
             "eqv_subject": request.EQV_SUBJECT.lower() if request.EQV_SUBJECT and request.EQV_SUBJECT.lower() != "null" else None,
             "eqv_course": request.EQV_COURSE.lower() if request.EQV_COURSE and request.EQV_COURSE.lower() != "null" else None,
             "course_attribute": request.COURSE_ATTRIBUTE.lower() if request.COURSE_ATTRIBUTE and request.COURSE_ATTRIBUTE.lower() != "null" else None,
-            "updated_by": "System",
+            "updated_by": get_username_from_token(http_request),
             "updated_on": datetime.now().strftime('%Y-%m-%d %H:%M:%S.000')
         })
         db.commit()
@@ -101,7 +102,7 @@ async def get_override(request: DeleteRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 @router.post("/update", response_model=dict)
-async def update(request: OverrideUpdateRequest, db: Session = Depends(get_db)):
+async def update(request: OverrideUpdateRequest, http_request: Request, db: Session = Depends(get_db)):
     try:
         if not request.INSTITUTION_ID or not request.TERM or not request.SUBJECT or not request.COURSE:
             return {"status": 0, "message": "Please fill all required fields", "refresh": False, "modal_close": False}
@@ -121,7 +122,7 @@ async def update(request: OverrideUpdateRequest, db: Session = Depends(get_db)):
             "eqv_subject": request.EQV_SUBJECT.lower() if request.EQV_SUBJECT and request.EQV_SUBJECT.lower() != "null" else None,
             "eqv_course": request.EQV_COURSE.lower() if request.EQV_COURSE and request.EQV_COURSE.lower() != "null" else None,
             "course_attribute": request.COURSE_ATTRIBUTE.lower() if request.COURSE_ATTRIBUTE and request.COURSE_ATTRIBUTE.lower() != "null" else None,
-            "updated_by": "System",
+            "updated_by": get_username_from_token(http_request),
             "updated_on": datetime.now().strftime('%Y-%m-%d %H:%M:%S.000')
         })
         db.commit()

@@ -1,11 +1,12 @@
 """Institution Mapping Controller"""
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from pydantic import BaseModel
 import logging
 from datetime import datetime
 from database.connection import get_db
+from helpers.security_helper import get_username_from_token
 from models.institution_mapping_model import InstitutionMappingModel
 from config.constants import TBL_INSTITUTION_MAPPING
 
@@ -62,7 +63,7 @@ async def ajaxlist(request: DataTableRequest, inst_type: str = Query("", alias="
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 @router.post("/insert", response_model=dict)
-async def insert(request: InstitutionRequest, db: Session = Depends(get_db)):
+async def insert(request: InstitutionRequest, http_request: Request, db: Session = Depends(get_db)):
     try:
         if not request.INSTITUTION_ID or not request.INSTITUTION_NAME or not request.SLATE_INSTITUTION_ID or not request.EXTERNAL_INSTITUTION_NAME or not request.SLATE_INSTITUTION_NAME:
             return {"status": 0, "message": "Please fill all required fields", "refresh": False, "modal_close": False}
@@ -96,7 +97,7 @@ async def insert(request: InstitutionRequest, db: Session = Depends(get_db)):
             "external_institution_name": request.EXTERNAL_INSTITUTION_NAME.strip().upper() if request.EXTERNAL_INSTITUTION_NAME.strip().upper() != "NULL" else None,
             "external_institution_zipcode": request.EXTERNAL_INSTITUTION_ZIPCODE if request.EXTERNAL_INSTITUTION_ZIPCODE and request.EXTERNAL_INSTITUTION_ZIPCODE != "NULL" else None,
             "slate_institution_id": request.SLATE_INSTITUTION_ID.upper() if request.SLATE_INSTITUTION_ID and request.SLATE_INSTITUTION_ID.upper() != "NULL" else None,
-            "updated_by": "System",
+            "updated_by": get_username_from_token(http_request),
             "last_updated_datetime": datetime.now().strftime('%Y-%m-%d %H:%M:%S.000')
         })
         db.commit()
@@ -121,7 +122,7 @@ async def get_institution(request: DeleteRequest, db: Session = Depends(get_db))
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 @router.post("/update", response_model=dict)
-async def update(request: InstitutionUpdateRequest, db: Session = Depends(get_db)):
+async def update(request: InstitutionUpdateRequest, http_request: Request, db: Session = Depends(get_db)):
     try:
         if not request.INSTITUTION_ID or not request.INSTITUTION_NAME or not request.SLATE_INSTITUTION_ID or not request.EXTERNAL_INSTITUTION_NAME or not request.SLATE_INSTITUTION_NAME:
             return {"status": 0, "message": "Please fill all required fields", "refresh": False, "modal_close": False}
@@ -159,7 +160,7 @@ async def update(request: InstitutionUpdateRequest, db: Session = Depends(get_db
             "external_institution_name": request.EXTERNAL_INSTITUTION_NAME.strip().upper() if request.EXTERNAL_INSTITUTION_NAME.strip().upper() != "NULL" else None,
             "external_institution_zipcode": request.EXTERNAL_INSTITUTION_ZIPCODE if request.EXTERNAL_INSTITUTION_ZIPCODE and request.EXTERNAL_INSTITUTION_ZIPCODE != "NULL" else None,
             "slate_institution_id": request.SLATE_INSTITUTION_ID.upper() if request.SLATE_INSTITUTION_ID and request.SLATE_INSTITUTION_ID.upper() != "NULL" else None,
-            "updated_by": "System",
+            "updated_by": get_username_from_token(http_request),
             "last_updated_datetime": datetime.now().strftime('%Y-%m-%d %H:%M:%S.000')
         })
         db.commit()

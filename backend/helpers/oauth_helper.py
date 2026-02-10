@@ -314,6 +314,7 @@ def get_userinfo(user_data: Dict, sso_type: str, db: Optional[Session] = None) -
                 "sub": user.email,
                 "user_id": user.id,
                 "role_id": user.role_id,
+                "name": user.name or user.email,
                 "sso_type": sso_type
             },
             expires_delta=access_token_expires

@@ -155,7 +155,7 @@ def _complete_login(user, db: Session) -> LoginResponse:
     """Create access token, load permissions, update last login and return LoginResponse."""
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user.email, "user_id": user.id, "role_id": user.role_id},
+        data={"sub": user.email, "user_id": user.id, "role_id": user.role_id, "name": user.name or user.email},
         expires_delta=access_token_expires
     )
 

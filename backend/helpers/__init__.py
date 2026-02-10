@@ -40,6 +40,11 @@ from helpers.common_helper import (
     sanitize_string,
 )
 
+# Security helpers
+from helpers.security_helper import (
+    get_username_from_token,
+)
+
 # Permission helpers
 from helpers.permission_helper import (
     load_user_permissions,
@@ -81,6 +86,8 @@ __all__ = [
     "check_special_name",
     "sanitize_for_json",
     "sanitize_string",
+    # Security
+    "get_username_from_token",
     # Permission
     "load_user_permissions",
     "check_permission",

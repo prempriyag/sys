@@ -141,7 +141,7 @@ class _CORSMiddleware(BaseHTTPMiddleware):
         if origin and _cors_origin_allowed(origin):
             r.headers["Access-Control-Allow-Origin"] = origin
             r.headers["Access-Control-Allow-Credentials"] = "true"
-            r.headers["Access-Control-Expose-Headers"] = "*"
+            r.headers["Access-Control-Expose-Headers"] = "*, X-Process-Time-ms"
             if request.method == "OPTIONS":
                 r.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
                 r.headers["Access-Control-Allow-Headers"] = "*"
@@ -191,60 +191,76 @@ app.add_middleware(_ProxyHeadersMiddleware)
 
 # ==================== PROFILER MIDDLEWARE ====================
 # Captures database queries and timing per request (like CI3 MY_Profiler)
+# Controlled by ENABLE_PROFILING env var. When False, middleware is a no-op.
 from helpers.profiler_helper import (
-    start_request_profiler, 
-    end_request_profiler, 
+    PROFILING_ENABLED,
+    start_request_profiler,
+    end_request_profiler,
     setup_query_profiling,
-    is_ktech_user
+    is_ktech_user,
 )
 from database.connection import engine
 
-# Setup SQLAlchemy query profiling
+# Setup SQLAlchemy query profiling (no-op when ENABLE_PROFILING=False)
 setup_query_profiling(engine)
-print("[MAIN] Query profiling enabled")
+
 
 class _ProfilerMiddleware(BaseHTTPMiddleware):
-    """Middleware to capture profiler data per request for KTech users."""
-    
+    """Middleware to capture profiler data per request for KTech users.
+    Adds X-Process-Time-ms response header when profiling is enabled.
+    When ENABLE_PROFILING=False, simply passes the request through.
+    """
+
     async def dispatch(self, request, call_next):
-        # Check if this is an API request (not static files)
-        path = request.url.path
-        if not path.startswith("/api/") and not path.startswith("/assets/"):
+        # Fast path: profiling disabled - zero overhead
+        if not PROFILING_ENABLED:
             return await call_next(request)
-        
+
+        path = request.url.path
+        # Only profile /api/ requests (skip static assets)
+        if not path.startswith("/api/"):
+            return await call_next(request)
+
         # Determine if AJAX request
         is_ajax = request.headers.get("x-requested-with", "").lower() == "xmlhttprequest"
-        
-        # Try to get user_id from JWT token (if authenticated)
+
+        # Try to get user_id from JWT token
         user_id = None
         auth_header = request.headers.get("authorization", "")
         if auth_header.startswith("Bearer "):
             try:
-                from helpers.auth_helper import decode_access_token
+                from helpers.auth_helper import verify_token
                 token = auth_header[7:]
-                payload = decode_access_token(token)
+                payload = verify_token(token)
                 if payload:
                     user_id = payload.get("user_id")
             except Exception:
                 pass
-        
-        # Start profiler for this request
-        profiler = start_request_profiler(
+
+        # Start profiler
+        start_request_profiler(
             uri=path,
             method=request.method,
             is_ajax=is_ajax,
-            user_id=user_id
+            user_id=user_id,
         )
-        
+
+        status_code = 500
         try:
             response = await call_next(request)
+            status_code = response.status_code
+            # End profiler and get total time
+            total_ms = end_request_profiler(user_id, status_code=status_code)
+            # Inject X-Process-Time-ms header
+            if total_ms is not None:
+                response.headers["X-Process-Time-ms"] = str(round(total_ms, 2))
             return response
-        finally:
-            # End profiler and store data
-            end_request_profiler(user_id)
+        except Exception:
+            end_request_profiler(user_id, status_code=status_code)
+            raise
 
 app.add_middleware(_ProfilerMiddleware)
-print("[MAIN] Profiler middleware enabled")
+print(f"[MAIN] Profiler middleware {'ENABLED' if PROFILING_ENABLED else 'DISABLED (ENABLE_PROFILING=False)'}")
 
 # Import dashboard controller
 try:

@@ -4,7 +4,7 @@ FastAPI version of CI3 Storedprocedure controller
 Handles Reset Batch ID stored procedure execution
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from sqlalchemy import text
@@ -12,6 +12,7 @@ import logging
 
 from database.connection import get_db
 from helpers.permission_dependency import require_permission
+from helpers.security_helper import get_username_from_token
 from models import User
 from config.constants import TBL_TRANSCRIPTHDRDATA
 
@@ -95,6 +96,7 @@ class RunResponse(BaseModel):
 @router.post("/run", response_model=RunResponse)
 async def run(
     request: BatchIdRequest,
+    http_request: Request,
     # Temporarily disabled authentication for testing
     # current_user: User = Depends(
     #     require_permission("stored_procedure", "ADD")
@@ -114,8 +116,8 @@ async def run(
                 msg="Batch ID is missing."
             )
         
-        # Get username (for now using "System", should be from current_user when auth is enabled)
-        username = "System"  # TODO: Get from current_user when auth is restored
+        # Get username from JWT token
+        username = get_username_from_token(http_request)
         
         # Execute stored procedure
         # Note: SQL Server stored procedure execution with parameters

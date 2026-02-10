@@ -148,6 +148,8 @@ export const API_ENDPOINTS = {
   PROFILER_DATA: "/api/profiler/data",
   PROFILER_STATUS: "/api/profiler/status",
   PROFILER_SPEEDTEST: "/api/profiler/speedtest",
+  PROFILER_REQUESTS: "/api/profiler/requests",
+  PROFILER_CLEAR: "/api/profiler/clear",
 };
 
 // Helper function to get auth token from localStorage
@@ -164,6 +166,42 @@ export const setAuthToken = (token: string): void => {
 export const removeAuthToken = (): void => {
   localStorage.removeItem("auth_token");
   localStorage.removeItem("user");
+};
+
+// ============================================================================
+// Profiler: frontend timing + backend X-Process-Time-ms header comparison
+// ============================================================================
+const PROFILER_LOG_ENABLED =
+  APP_ENVIRONMENT === "DEV" ||
+  localStorage.getItem("profiler_log") === "true";
+
+/** Read backend execution time from response header */
+export const getBackendTime = (response: Response): number | null => {
+  const header = response.headers.get("X-Process-Time-ms");
+  return header ? parseFloat(header) : null;
+};
+
+/**
+ * Log frontend vs backend timing for a request.
+ * Only runs when profiler logging is enabled (DEV env or localStorage flag).
+ */
+const logRequestTiming = (
+  endpoint: string,
+  frontendMs: number,
+  response: Response
+) => {
+  if (!PROFILER_LOG_ENABLED) return;
+  const backendMs = getBackendTime(response);
+  const networkMs = backendMs !== null ? Math.max(0, frontendMs - backendMs) : null;
+  const parts = [
+    `[PROFILER] ${endpoint}`,
+    `frontend=${frontendMs.toFixed(1)}ms`,
+  ];
+  if (backendMs !== null) {
+    parts.push(`backend=${backendMs.toFixed(1)}ms`);
+    parts.push(`network≈${networkMs!.toFixed(1)}ms`);
+  }
+  console.debug(parts.join(" | "));
 };
 
 // API fetch wrapper with auth headers
@@ -183,6 +221,7 @@ export const apiRequest = async (
   }
 
   let response: Response;
+  const fetchStart = performance.now();
   
   try {
     response = await fetch(`${API_BASE_URL}${endpoint}`, {
@@ -215,6 +254,10 @@ export const apiRequest = async (
     // Re-throw other errors
     throw fetchError;
   }
+
+  // Log frontend vs backend timing
+  const fetchEnd = performance.now();
+  logRequestTiming(endpoint, fetchEnd - fetchStart, response);
 
   if (!response.ok) {
     // Try to get error message from response

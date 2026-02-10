@@ -1,11 +1,12 @@
 """Term Name Mapping Controller"""
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from pydantic import BaseModel
 import logging
 from datetime import datetime
 from database.connection import get_db
+from helpers.security_helper import get_username_from_token
 from models.term_name_mapping_model import TermNameMappingModel
 from config.constants import TBL_TERM_NAMEMAPPING
 
@@ -50,7 +51,7 @@ async def ajaxlist(request: DataTableRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 @router.post("/insert", response_model=dict)
-async def insert(request: TermNameRequest, db: Session = Depends(get_db)):
+async def insert(request: TermNameRequest, http_request: Request, db: Session = Depends(get_db)):
     try:
         if not request.OCR_TERM_NAME or not request.TERM_NAME:
             return {"status": 0, "message": "Please Enter OCR Term Name and Term Name", "refresh": False, "modal_close": False}
@@ -59,7 +60,7 @@ async def insert(request: TermNameRequest, db: Session = Depends(get_db)):
         if check_result and (check_result.count if hasattr(check_result, 'count') else check_result[0]) > 0:
             return {"status": 0, "message": "Duplicate Data found.", "refresh": False, "modal_close": True}
         insert_query = text(f"INSERT INTO {TBL_TERM_NAMEMAPPING} (OCR_TERM_NAME, TERM_NAME, Updated_by, Updated_on) VALUES (:ocr_term_name, :term_name, :updated_by, :updated_on)")
-        db.execute(insert_query, {"ocr_term_name": request.OCR_TERM_NAME, "term_name": request.TERM_NAME, "updated_by": "System", "updated_on": datetime.now().strftime('%Y-%m-%d %H:%M:%S.000')})
+        db.execute(insert_query, {"ocr_term_name": request.OCR_TERM_NAME, "term_name": request.TERM_NAME, "updated_by": get_username_from_token(http_request), "updated_on": datetime.now().strftime('%Y-%m-%d %H:%M:%S.000')})
         db.commit()
         return {"status": 1, "message": "Successfully added.", "refresh": False, "modal_close": True}
     except Exception as e:
@@ -82,7 +83,7 @@ async def get_termname(request: DeleteRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 @router.post("/update", response_model=dict)
-async def update(request: TermNameUpdateRequest, db: Session = Depends(get_db)):
+async def update(request: TermNameUpdateRequest, http_request: Request, db: Session = Depends(get_db)):
     try:
         if not request.OCR_TERM_NAME or not request.TERM_NAME:
             return {"status": 0, "message": "Please Enter OCR Term Name and Term Name", "refresh": False, "modal_close": False}
@@ -91,7 +92,7 @@ async def update(request: TermNameUpdateRequest, db: Session = Depends(get_db)):
         if check_result and (check_result.count if hasattr(check_result, 'count') else check_result[0]) > 0:
             return {"status": 0, "message": "Duplicate Data found.", "refresh": False, "modal_close": True}
         update_query = text(f"UPDATE {TBL_TERM_NAMEMAPPING} SET OCR_TERM_NAME = :ocr_term_name, TERM_NAME = :term_name, Updated_by = :updated_by, Updated_on = :updated_on WHERE Id = :id")
-        result = db.execute(update_query, {"id": request.Id, "ocr_term_name": request.OCR_TERM_NAME, "term_name": request.TERM_NAME, "updated_by": "System", "updated_on": datetime.now().strftime('%Y-%m-%d %H:%M:%S.000')})
+        result = db.execute(update_query, {"id": request.Id, "ocr_term_name": request.OCR_TERM_NAME, "term_name": request.TERM_NAME, "updated_by": get_username_from_token(http_request), "updated_on": datetime.now().strftime('%Y-%m-%d %H:%M:%S.000')})
         db.commit()
         return {"status": 1, "message": "Successfully updated.", "refresh": False, "modal_close": True} if result.rowcount > 0 else {"status": 0, "message": "Sorry record not updated please try again.", "refresh": False, "modal_close": True}
     except Exception as e:

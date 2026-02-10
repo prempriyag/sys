@@ -5,6 +5,7 @@ import PageBreadcrumb from "../../components/common/PageBreadCrumb";
 import PageMeta from "../../components/common/PageMeta";
 import PageContainer, { PageWrapper } from "../../components/common/PageContainer";
 import Button from "../../components/ui/button/Button";
+import { alertsuccess, alerterror } from "../../utils/toast";
 
 const STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: "", label: "Select Status" },
@@ -53,7 +54,6 @@ export default function CollegeOCRBatch() {
     error_msg: boolean;
   } | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>("left");
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [searchInput, setSearchInput] = useState("");
   const [botModalContent, setBotModalContent] = useState("");
   const [resolutionModalContent, setResolutionModalContent] = useState("");
@@ -120,8 +120,8 @@ export default function CollegeOCRBatch() {
   };
 
   const showMessage = (type: "success" | "error", text: string) => {
-    setMessage({ type, text });
-    setTimeout(() => setMessage(null), 3000);
+    if (type === "success") alertsuccess(text);
+    else alerterror(text);
   };
 
   const handleSearch = (e: React.FormEvent) => {
@@ -511,18 +511,6 @@ export default function CollegeOCRBatch() {
             <Button type="submit" variant="outline" className="!py-1">Search</Button>
           </form>
         </div>
-
-        {message && (
-          <div
-            className={`mb-4 rounded-lg border px-4 py-2 ${
-              message.type === "success"
-                ? "border-green-200 bg-green-50 text-green-800 dark:border-green-800 dark:bg-green-900/30 dark:text-green-200"
-                : "border-red-200 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-900/30 dark:text-red-200"
-            }`}
-          >
-            {message.text}
-          </div>
-        )}
 
         {/* Status & Transcript Type */}
         <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">

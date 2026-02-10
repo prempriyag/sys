@@ -7,6 +7,7 @@ import Button from "../../components/ui/button/Button";
 import { api, API_BASE_URL } from "../../config/api";
 import { RefreshIcon, PlusIcon, PencilIcon, TrashBinIcon } from "../../icons";
 import { useAuth } from "../../context/AuthContext";
+import { alertsuccess, alerterror } from "../../utils/toast";
 
 export default function TermNameMapping() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -15,7 +16,6 @@ export default function TermNameMapping() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [formData, setFormData] = useState({ OCR_TERM_NAME: "", TERM_NAME: "" });
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const hasAddPermission = hasPermission("college_term_names", "ADD");
   const hasUpdatePermission = hasPermission("college_term_names", "UPDATE");
   const hasDeletePermission = hasPermission("college_term_names", "DELETE");
@@ -23,7 +23,6 @@ export default function TermNameMapping() {
   const handleAdd = () => {
     setFormData({ OCR_TERM_NAME: "", TERM_NAME: "" });
     setShowAddModal(true);
-    setMessage(null);
   };
 
   const handleEdit = async (id: number) => {
@@ -41,10 +40,9 @@ export default function TermNameMapping() {
         setFormData({ OCR_TERM_NAME: data.OCR_TERM_NAME || "", TERM_NAME: data.TERM_NAME || "" });
         setEditingId(id);
         setShowEditModal(true);
-        setMessage(null);
       }
     } catch (error: any) {
-      setMessage({ type: "error", text: error.message || "Error loading term name data" });
+      alerterror(error.message || "Error loading term name data");
     }
   };
 
@@ -61,13 +59,13 @@ export default function TermNameMapping() {
       });
       const data = await response.json();
       if (data.status === "Success") {
-        setMessage({ type: "success", text: "Term name deleted successfully" });
+        alertsuccess("Term name deleted successfully");
         setRefreshTrigger((prev) => prev + 1);
       } else {
-        setMessage({ type: "error", text: "Error deleting term name" });
+        alerterror("Error deleting term name");
       }
     } catch (error: any) {
-      setMessage({ type: "error", text: error.message || "Error deleting term name" });
+      alerterror(error.message || "Error deleting term name");
     }
   };
 
@@ -86,17 +84,17 @@ export default function TermNameMapping() {
       });
       const data = await response.json();
       if (data.status === 1) {
-        setMessage({ type: "success", text: data.message || "Success" });
+        alertsuccess(data.message || "Success");
         setShowAddModal(false);
         setShowEditModal(false);
         setFormData({ OCR_TERM_NAME: "", TERM_NAME: "" });
         setEditingId(null);
         setRefreshTrigger((prev) => prev + 1);
       } else {
-        setMessage({ type: "error", text: data.message || "Error saving term name" });
+        alerterror(data.message || "Error saving term name");
       }
     } catch (error: any) {
-      setMessage({ type: "error", text: error.message || "Error saving term name" });
+      alerterror(error.message || "Error saving term name");
     }
   };
 
@@ -114,11 +112,6 @@ export default function TermNameMapping() {
             <Button onClick={() => setRefreshTrigger((prev) => prev + 1)} variant="outline" startIcon={<RefreshIcon className="w-5 h-5" />}>Refresh Data</Button>
           </div>
         </div>
-        {message && (
-          <div className={`mb-4 p-4 rounded-lg ${message.type === "success" ? "bg-green-50 text-green-800 dark:bg-green-900/20 dark:text-green-400" : "bg-red-50 text-red-800 dark:bg-red-900/20 dark:text-red-400"}`}>
-            {message.text}
-          </div>
-        )}
         <DataTable
           refreshTrigger={refreshTrigger}
           ajaxUrl="/api/termnamemapping/ajaxlist"

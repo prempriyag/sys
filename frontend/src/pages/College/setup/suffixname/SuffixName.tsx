@@ -11,6 +11,7 @@ import { api } from "../../../../config/api";
 import { RefreshIcon, PlusIcon, PencilIcon, TrashBinIcon } from "../../../../icons";
 import { useAuth } from "../../../../context/AuthContext";
 import ConfirmationModal from "../../../../components/common/ConfirmationModal";
+import { alertsuccess, alerterror } from "../../../../utils/toast";
 
 export default function SuffixName() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -22,7 +23,6 @@ export default function SuffixName() {
   const [suffixToDelete, setSuffixToDelete] = useState<number | null>(null);
   const [formData, setFormData] = useState({ Suffix: "" });
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -34,7 +34,6 @@ export default function SuffixName() {
     setFormData({ Suffix: "" });
     setErrors({});
     setShowAddModal(true);
-    setMessage(null);
   };
 
   const handleEdit = async (id: number) => {
@@ -46,10 +45,9 @@ export default function SuffixName() {
         setErrors({});
         setEditingId(data.ID);
         setShowEditModal(true);
-        setMessage(null);
       }
     } catch (error: any) {
-      setMessage({ type: "error", text: error.response?.data?.detail || error.message || "Error loading suffix data" });
+      alerterror(error.response?.data?.detail || error.message || "Error loading suffix data");
     }
   };
 
@@ -69,23 +67,20 @@ export default function SuffixName() {
       const messageText = response.message || "Suffix deleted successfully";
 
       if (success) {
-        setMessage({ type: "success", text: messageText });
+        alertsuccess(messageText);
         setRefreshTrigger((prev) => prev + 1);
         setShowDeleteConfirmModal(false);
         setSuffixToDelete(null);
-        setTimeout(() => setMessage(null), 5000);
       } else {
-        setMessage({ type: "error", text: messageText });
+        alerterror(messageText);
         setShowDeleteConfirmModal(false);
         setSuffixToDelete(null);
-        setTimeout(() => setMessage(null), 5000);
       }
     } catch (error: any) {
       console.error("Delete suffix error:", error);
-      setMessage({ type: "error", text: error.response?.data?.detail || error.message || "Error deleting suffix" });
+      alerterror(error.response?.data?.detail || error.message || "Error deleting suffix");
       setShowDeleteConfirmModal(false);
       setSuffixToDelete(null);
-      setTimeout(() => setMessage(null), 5000);
     } finally {
       setIsDeleting(false);
     }
@@ -155,21 +150,18 @@ export default function SuffixName() {
       const messageText = response.message || (isEdit ? "Suffix updated successfully" : "Suffix added successfully");
 
       if (success) {
-        setMessage({ type: "success", text: messageText });
+        alertsuccess(messageText);
         setShowAddModal(false);
         setShowEditModal(false);
         setFormData({ Suffix: "" });
         setEditingId(null);
         setRefreshTrigger((prev) => prev + 1);
-        setTimeout(() => setMessage(null), 5000);
       } else {
-        setMessage({ type: "error", text: messageText || "Error saving suffix" });
-        setTimeout(() => setMessage(null), 5000);
+        alerterror(messageText || "Error saving suffix");
       }
     } catch (error: any) {
       console.error("Save suffix error:", error);
-      setMessage({ type: "error", text: error.response?.data?.detail || error.message || "Error saving suffix" });
-      setTimeout(() => setMessage(null), 5000);
+      alerterror(error.response?.data?.detail || error.message || "Error saving suffix");
     } finally {
       setLoading(false);
     }
@@ -189,25 +181,6 @@ export default function SuffixName() {
             <Button onClick={() => setRefreshTrigger((prev) => prev + 1)} variant="outline" startIcon={<RefreshIcon className="w-5 h-5" />}>Refresh Data</Button>
           </div>
         </div>
-
-        {/* Success/Error Message Banner */}
-        {message && (
-          <div className={`mb-4 p-4 rounded-lg border ${
-            message.type === "success" 
-              ? "bg-green-50 text-green-800 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800" 
-              : "bg-red-50 text-red-800 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800"
-          }`}>
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">{message.text}</span>
-              <button
-                onClick={() => setMessage(null)}
-                className={`ml-4 ${message.type === "success" ? "text-green-800 dark:text-green-300" : "text-red-800 dark:text-red-300"}`}
-              >
-                ×
-              </button>
-            </div>
-          </div>
-        )}
 
         <DataTable
           refreshTrigger={refreshTrigger}
@@ -231,7 +204,6 @@ export default function SuffixName() {
         {/* Add Modal */}
         <Modal isOpen={showAddModal} onClose={() => {
           setShowAddModal(false);
-          setMessage(null);
           setErrors({});
         }} className="max-w-md">
           {/* Modal Header */}
@@ -276,7 +248,6 @@ export default function SuffixName() {
                   variant="outline"
                   onClick={() => {
                     setShowAddModal(false);
-                    setMessage(null);
                     setErrors({});
                   }}
                   className="flex-1"
@@ -293,7 +264,6 @@ export default function SuffixName() {
         <Modal isOpen={showEditModal} onClose={() => {
           setShowEditModal(false);
           setEditingId(null);
-          setMessage(null);
           setErrors({});
         }} className="max-w-md">
           {/* Modal Header */}
@@ -339,7 +309,6 @@ export default function SuffixName() {
                   onClick={() => {
                     setShowEditModal(false);
                     setEditingId(null);
-                    setMessage(null);
                     setErrors({});
                   }}
                   className="flex-1"

@@ -7,6 +7,7 @@ import Button from "../../components/ui/button/Button";
 import { api, API_BASE_URL } from "../../config/api";
 import { RefreshIcon, PlusIcon, PencilIcon, TrashBinIcon } from "../../icons";
 import { useAuth } from "../../context/AuthContext";
+import { alertsuccess, alerterror } from "../../utils/toast";
 
 export default function TermMapping() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -17,8 +18,6 @@ export default function TermMapping() {
   const [formData, setFormData] = useState({
     TERM: "", TERM_CODE: "", TERM_START: "", TERM_END: "", IS_ACTIVE: "Y", GRACE_PERIOD: 0
   });
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
-
   const hasAddPermission = hasPermission("college_terms", "ADD");
   const hasUpdatePermission = hasPermission("college_terms", "UPDATE");
   const hasDeletePermission = hasPermission("college_terms", "DELETE");
@@ -26,7 +25,6 @@ export default function TermMapping() {
   const handleAdd = () => {
     setFormData({ TERM: "", TERM_CODE: "", TERM_START: "", TERM_END: "", IS_ACTIVE: "Y", GRACE_PERIOD: 0 });
     setShowAddModal(true);
-    setMessage(null);
   };
 
   const handleEdit = async (id: number) => {
@@ -53,10 +51,9 @@ export default function TermMapping() {
         });
         setEditingId(id);
         setShowEditModal(true);
-        setMessage(null);
       }
     } catch (error: any) {
-      setMessage({ type: "error", text: error.message || "Error loading term data" });
+      alerterror(error.message || "Error loading term data");
     }
   };
 
@@ -73,13 +70,13 @@ export default function TermMapping() {
       });
       const data = await response.json();
       if (data.status === "Success") {
-        setMessage({ type: "success", text: "Term deleted successfully" });
+        alertsuccess("Term deleted successfully");
         setRefreshTrigger((prev) => prev + 1);
       } else {
-        setMessage({ type: "error", text: "Error deleting term" });
+        alerterror("Error deleting term");
       }
     } catch (error: any) {
-      setMessage({ type: "error", text: error.message || "Error deleting term" });
+      alerterror(error.message || "Error deleting term");
     }
   };
 
@@ -98,17 +95,17 @@ export default function TermMapping() {
       });
       const data = await response.json();
       if (data.status === 1) {
-        setMessage({ type: "success", text: data.message || "Success" });
+        alertsuccess(data.message || "Success");
         setShowAddModal(false);
         setShowEditModal(false);
         setFormData({ TERM: "", TERM_CODE: "", TERM_START: "", TERM_END: "", IS_ACTIVE: "Y", GRACE_PERIOD: 0 });
         setEditingId(null);
         setRefreshTrigger((prev) => prev + 1);
       } else {
-        setMessage({ type: "error", text: data.message || "Error saving term" });
+        alerterror(data.message || "Error saving term");
       }
     } catch (error: any) {
-      setMessage({ type: "error", text: error.message || "Error saving term" });
+      alerterror(error.message || "Error saving term");
     }
   };
 
@@ -126,11 +123,6 @@ export default function TermMapping() {
             <Button onClick={() => setRefreshTrigger((prev) => prev + 1)} variant="outline" startIcon={<RefreshIcon className="w-5 h-5" />}>Refresh Data</Button>
           </div>
         </div>
-        {message && (
-          <div className={`mb-4 p-4 rounded-lg ${message.type === "success" ? "bg-green-50 text-green-800 dark:bg-green-900/20 dark:text-green-400" : "bg-red-50 text-red-800 dark:bg-red-900/20 dark:text-red-400"}`}>
-            {message.text}
-          </div>
-        )}
         <DataTable
           refreshTrigger={refreshTrigger}
           ajaxUrl="/api/termmapping/ajaxlist"

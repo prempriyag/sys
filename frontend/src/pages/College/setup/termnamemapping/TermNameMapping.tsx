@@ -14,6 +14,7 @@ import { Modal } from "../../../../components/ui/modal";
 import Input from "../../../../components/form/input/InputField";
 import Label from "../../../../components/form/Label";
 import ConfirmationModal from "../../../../components/common/ConfirmationModal";
+import { alertsuccess, alerterror } from "../../../../utils/toast";
 
 export default function TermNameMapping() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -26,7 +27,6 @@ export default function TermNameMapping() {
   const [termNameToDelete, setTermNameToDelete] = useState<number | null>(null);
   const [formData, setFormData] = useState({ OCR_TERM_NAME: "", TERM_NAME: "" });
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -38,7 +38,6 @@ export default function TermNameMapping() {
     setFormData({ OCR_TERM_NAME: "", TERM_NAME: "" });
     setErrors({});
     setShowAddModal(true);
-    setMessage(null);
   };
 
   const handleEdit = async (id: number) => {
@@ -50,10 +49,9 @@ export default function TermNameMapping() {
         setErrors({});
         setEditingId(id);
         setShowEditModal(true);
-        setMessage(null);
       }
     } catch (error: any) {
-      setMessage({ type: "error", text: error.response?.data?.detail || error.message || "Error loading term name data" });
+      alerterror(error.response?.data?.detail || error.message || "Error loading term name data");
     }
   };
 
@@ -73,23 +71,20 @@ export default function TermNameMapping() {
       const messageText = response.message || "Term name deleted successfully";
 
       if (success) {
-        setMessage({ type: "success", text: messageText });
+        alertsuccess(messageText);
         setRefreshTrigger((prev) => prev + 1);
         setShowDeleteConfirmModal(false);
         setTermNameToDelete(null);
-        setTimeout(() => setMessage(null), 5000);
       } else {
-        setMessage({ type: "error", text: messageText });
+        alerterror(messageText);
         setShowDeleteConfirmModal(false);
         setTermNameToDelete(null);
-        setTimeout(() => setMessage(null), 5000);
       }
     } catch (error: any) {
       console.error("Delete term name error:", error);
-      setMessage({ type: "error", text: error.response?.data?.detail || error.message || "Error deleting term name" });
+      alerterror(error.response?.data?.detail || error.message || "Error deleting term name");
       setShowDeleteConfirmModal(false);
       setTermNameToDelete(null);
-      setTimeout(() => setMessage(null), 5000);
     } finally {
       setIsDeleting(false);
     }
@@ -168,21 +163,18 @@ export default function TermNameMapping() {
       const messageText = response.message || (isEdit ? "Term name updated successfully" : "Term name added successfully");
 
       if (success) {
-        setMessage({ type: "success", text: messageText });
+        alertsuccess(messageText);
         setShowAddModal(false);
         setShowEditModal(false);
         setFormData({ OCR_TERM_NAME: "", TERM_NAME: "" });
         setEditingId(null);
         setRefreshTrigger((prev) => prev + 1);
-        setTimeout(() => setMessage(null), 5000);
       } else {
-        setMessage({ type: "error", text: messageText || "Error saving term name" });
-        setTimeout(() => setMessage(null), 5000);
+        alerterror(messageText || "Error saving term name");
       }
     } catch (error: any) {
       console.error("Save term name error:", error);
-      setMessage({ type: "error", text: error.response?.data?.detail || error.message || "Error saving term name" });
-      setTimeout(() => setMessage(null), 5000);
+      alerterror(error.response?.data?.detail || error.message || "Error saving term name");
     } finally {
       setLoading(false);
     }
@@ -202,25 +194,6 @@ export default function TermNameMapping() {
             <Button onClick={() => setRefreshTrigger((prev) => prev + 1)} variant="outline" startIcon={<RefreshIcon className="w-5 h-5" />}>Refresh Data</Button>
           </div>
         </div>
-
-        {/* Success/Error Message Banner */}
-        {message && (
-          <div className={`mb-4 p-4 rounded-lg border ${
-            message.type === "success" 
-              ? "bg-green-50 text-green-800 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800" 
-              : "bg-red-50 text-red-800 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800"
-          }`}>
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">{message.text}</span>
-              <button
-                onClick={() => setMessage(null)}
-                className={`ml-4 ${message.type === "success" ? "text-green-800 dark:text-green-300" : "text-red-800 dark:text-red-300"}`}
-              >
-                ×
-              </button>
-            </div>
-          </div>
-        )}
 
         <DataTable
           refreshTrigger={refreshTrigger}
@@ -245,7 +218,6 @@ export default function TermNameMapping() {
         {/* Add Modal */}
         <Modal isOpen={showAddModal} onClose={() => {
           setShowAddModal(false);
-          setMessage(null);
           setErrors({});
         }} className="max-w-md">
           {/* Modal Header */}
@@ -303,7 +275,6 @@ export default function TermNameMapping() {
                   variant="outline"
                   onClick={() => {
                     setShowAddModal(false);
-                    setMessage(null);
                     setErrors({});
                   }}
                   className="flex-1"
@@ -320,7 +291,6 @@ export default function TermNameMapping() {
         <Modal isOpen={showEditModal} onClose={() => {
           setShowEditModal(false);
           setEditingId(null);
-          setMessage(null);
           setErrors({});
         }} className="max-w-md">
           {/* Modal Header */}
@@ -379,7 +349,6 @@ export default function TermNameMapping() {
                   onClick={() => {
                     setShowEditModal(false);
                     setEditingId(null);
-                    setMessage(null);
                     setErrors({});
                   }}
                   className="flex-1"

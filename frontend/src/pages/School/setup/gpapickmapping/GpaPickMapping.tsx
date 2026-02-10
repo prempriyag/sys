@@ -11,6 +11,7 @@ import { api } from "../../../../config/api";
 import { RefreshIcon, PlusIcon, PencilIcon, TrashBinIcon } from "../../../../icons";
 import { useAuth } from "../../../../context/AuthContext";
 import ConfirmationModal from "../../../../components/common/ConfirmationModal";
+import { alertsuccess, alerterror } from "../../../../utils/toast";
 
 export default function GpaPickMapping() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -22,7 +23,6 @@ export default function GpaPickMapping() {
   const [gpaPickToDelete, setGpaPickToDelete] = useState<number | null>(null);
   const [formData, setFormData] = useState({ GPA_PICK: "" });
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -34,7 +34,6 @@ export default function GpaPickMapping() {
     setFormData({ GPA_PICK: "" });
     setErrors({});
     setShowAddModal(true);
-    setMessage(null);
   };
 
   const handleEdit = async (id: number) => {
@@ -46,10 +45,9 @@ export default function GpaPickMapping() {
         setErrors({});
         setEditingId(data.Id);
         setShowEditModal(true);
-        setMessage(null);
       }
     } catch (error: any) {
-      setMessage({ type: "error", text: error.response?.data?.detail || error.message || "Error loading GPA Pick data" });
+      alerterror(error.response?.data?.detail || error.message || "Error loading GPA Pick data");
     }
   };
 
@@ -69,23 +67,20 @@ export default function GpaPickMapping() {
       const messageText = response.message || "GPA Pick deleted successfully";
 
       if (success) {
-        setMessage({ type: "success", text: messageText });
+        alertsuccess(messageText);
         setRefreshTrigger((prev) => prev + 1);
         setShowDeleteConfirmModal(false);
         setGpaPickToDelete(null);
-        setTimeout(() => setMessage(null), 5000);
       } else {
-        setMessage({ type: "error", text: messageText });
+        alerterror(messageText);
         setShowDeleteConfirmModal(false);
         setGpaPickToDelete(null);
-        setTimeout(() => setMessage(null), 5000);
       }
     } catch (error: any) {
       console.error("Delete GPA Pick error:", error);
-      setMessage({ type: "error", text: error.response?.data?.detail || error.message || "Error deleting GPA Pick" });
+      alerterror(error.response?.data?.detail || error.message || "Error deleting GPA Pick");
       setShowDeleteConfirmModal(false);
       setGpaPickToDelete(null);
-      setTimeout(() => setMessage(null), 5000);
     } finally {
       setIsDeleting(false);
     }
@@ -152,21 +147,18 @@ export default function GpaPickMapping() {
       const messageText = response.message || (isEdit ? "GPA Pick updated successfully" : "GPA Pick added successfully");
 
       if (success) {
-        setMessage({ type: "success", text: messageText });
+        alertsuccess(messageText);
         setShowAddModal(false);
         setShowEditModal(false);
         setFormData({ GPA_PICK: "" });
         setEditingId(null);
         setRefreshTrigger((prev) => prev + 1);
-        setTimeout(() => setMessage(null), 5000);
       } else {
-        setMessage({ type: "error", text: messageText || "Error saving GPA Pick" });
-        setTimeout(() => setMessage(null), 5000);
+        alerterror(messageText || "Error saving GPA Pick");
       }
     } catch (error: any) {
       console.error("Save GPA Pick error:", error);
-      setMessage({ type: "error", text: error.response?.data?.detail || error.message || "Error saving GPA Pick" });
-      setTimeout(() => setMessage(null), 5000);
+      alerterror(error.response?.data?.detail || error.message || "Error saving GPA Pick");
     } finally {
       setLoading(false);
     }
@@ -186,25 +178,6 @@ export default function GpaPickMapping() {
             <Button onClick={() => setRefreshTrigger((prev) => prev + 1)} variant="outline" startIcon={<RefreshIcon className="w-5 h-5" />}>Refresh Data</Button>
           </div>
         </div>
-
-        {/* Success/Error Message Banner */}
-        {message && (
-          <div className={`mb-4 p-4 rounded-lg border ${
-            message.type === "success" 
-              ? "bg-green-50 text-green-800 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800" 
-              : "bg-red-50 text-red-800 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800"
-          }`}>
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">{message.text}</span>
-              <button
-                onClick={() => setMessage(null)}
-                className={`ml-4 ${message.type === "success" ? "text-green-800 dark:text-green-300" : "text-red-800 dark:text-red-300"}`}
-              >
-                ×
-              </button>
-            </div>
-          </div>
-        )}
 
         <DataTable
           refreshTrigger={refreshTrigger}
@@ -228,7 +201,6 @@ export default function GpaPickMapping() {
         {/* Add Modal */}
         <Modal isOpen={showAddModal} onClose={() => {
           setShowAddModal(false);
-          setMessage(null);
           setErrors({});
         }} className="max-w-md">
           {/* Modal Header */}
@@ -273,7 +245,6 @@ export default function GpaPickMapping() {
                   variant="outline"
                   onClick={() => {
                     setShowAddModal(false);
-                    setMessage(null);
                     setErrors({});
                   }}
                   className="flex-1"
@@ -290,7 +261,6 @@ export default function GpaPickMapping() {
         <Modal isOpen={showEditModal} onClose={() => {
           setShowEditModal(false);
           setEditingId(null);
-          setMessage(null);
           setErrors({});
         }} className="max-w-md">
           {/* Modal Header */}
@@ -336,7 +306,6 @@ export default function GpaPickMapping() {
                   onClick={() => {
                     setShowEditModal(false);
                     setEditingId(null);
-                    setMessage(null);
                     setErrors({});
                   }}
                   className="flex-1"

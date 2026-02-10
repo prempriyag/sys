@@ -7,6 +7,7 @@ import Button from "../../components/ui/button/Button";
 import { API_BASE_URL } from "../../config/api";
 import { RefreshIcon, PlusIcon, PencilIcon, TrashBinIcon } from "../../icons";
 import { useAuth } from "../../context/AuthContext";
+import { alertsuccess, alerterror } from "../../utils/toast";
 
 export default function BotSchedule() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -15,7 +16,6 @@ export default function BotSchedule() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [formData, setFormData] = useState({ PROJECT: "", BOTNAME: "", STARTIST: "", AVERAGETIME: "", FREQUENCY: "", FINISHFIRSTRUN: "", SERVERIP: "", USERNAME: "" });
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const hasAddPermission = hasPermission("bot_schedule", "ADD");
   const hasUpdatePermission = hasPermission("bot_schedule", "UPDATE");
   const hasDeletePermission = hasPermission("bot_schedule", "DELETE");
@@ -23,7 +23,6 @@ export default function BotSchedule() {
   const handleAdd = () => {
     setFormData({ PROJECT: "", BOTNAME: "", STARTIST: "", AVERAGETIME: "", FREQUENCY: "", FINISHFIRSTRUN: "", SERVERIP: "", USERNAME: "" });
     setShowAddModal(true);
-    setMessage(null);
   };
 
   const handleEdit = async (id: number) => {
@@ -42,10 +41,9 @@ export default function BotSchedule() {
         });
         setEditingId(data.Id);
         setShowEditModal(true);
-        setMessage(null);
       }
     } catch (error: any) {
-      setMessage({ type: "error", text: error.message || "Error loading bot schedule data" });
+      alerterror(error.message || "Error loading bot schedule data");
     }
   };
 
@@ -59,13 +57,13 @@ export default function BotSchedule() {
       });
       const data = await response.json();
       if (data.status === "Success") {
-        setMessage({ type: "success", text: "Bot schedule deleted successfully" });
+        alertsuccess("Bot schedule deleted successfully");
         setRefreshTrigger((prev) => prev + 1);
       } else {
-        setMessage({ type: "error", text: "Error deleting bot schedule" });
+        alerterror("Error deleting bot schedule");
       }
     } catch (error: any) {
-      setMessage({ type: "error", text: error.message || "Error deleting bot schedule" });
+      alerterror(error.message || "Error deleting bot schedule");
     }
   };
 
@@ -81,17 +79,17 @@ export default function BotSchedule() {
       });
       const data = await response.json();
       if (data.status === 1) {
-        setMessage({ type: "success", text: data.message || "Success" });
+        alertsuccess(data.message || "Success");
         setShowAddModal(false);
         setShowEditModal(false);
         setFormData({ PROJECT: "", BOTNAME: "", STARTIST: "", AVERAGETIME: "", FREQUENCY: "", FINISHFIRSTRUN: "", SERVERIP: "", USERNAME: "" });
         setEditingId(null);
         setRefreshTrigger((prev) => prev + 1);
       } else {
-        setMessage({ type: "error", text: data.message || "Error saving bot schedule" });
+        alerterror(data.message || "Error saving bot schedule");
       }
     } catch (error: any) {
-      setMessage({ type: "error", text: error.message || "Error saving bot schedule" });
+      alerterror(error.message || "Error saving bot schedule");
     }
   };
 
@@ -109,11 +107,6 @@ export default function BotSchedule() {
             <Button onClick={() => setRefreshTrigger((prev) => prev + 1)} variant="outline" startIcon={<RefreshIcon className="w-5 h-5" />}>Refresh Data</Button>
           </div>
         </div>
-        {message && (
-          <div className={`mb-4 p-4 rounded-lg ${message.type === "success" ? "bg-green-50 text-green-800 dark:bg-green-900/20 dark:text-green-400" : "bg-red-50 text-red-800 dark:bg-red-900/20 dark:text-red-400"}`}>
-            {message.text}
-          </div>
-        )}
         <DataTable
           refreshTrigger={refreshTrigger}
           ajaxUrl="/api/botschedule/ajaxlist"

@@ -126,19 +126,6 @@ export default function InstitutionMapping({ instType = "" }: InstitutionMapping
           return "Institution Name must be at least 2 characters";
         }
         return "";
-      case "SLATE_INSTITUTION_ID":
-        if (!value || value.trim() === "") {
-          return "Slate Institution ID is required";
-        }
-        return "";
-      case "SLATE_INSTITUTION_NAME":
-        if (!value || value.trim() === "") {
-          return "Slate Institution Name is required";
-        }
-        if (value.trim().length < 2) {
-          return "Slate Institution Name must be at least 2 characters";
-        }
-        return "";
       case "EXTERNAL_INSTITUTION_NAME":
         if (!value || value.trim() === "") {
           return "External Institution Name is required";
@@ -184,8 +171,6 @@ export default function InstitutionMapping({ instType = "" }: InstitutionMapping
     const newErrors: Record<string, string> = {};
     newErrors.INSTITUTION_ID = validateField("INSTITUTION_ID", formData.INSTITUTION_ID);
     newErrors.INSTITUTION_NAME = validateField("INSTITUTION_NAME", formData.INSTITUTION_NAME);
-    newErrors.SLATE_INSTITUTION_ID = validateField("SLATE_INSTITUTION_ID", formData.SLATE_INSTITUTION_ID);
-    newErrors.SLATE_INSTITUTION_NAME = validateField("SLATE_INSTITUTION_NAME", formData.SLATE_INSTITUTION_NAME);
     newErrors.EXTERNAL_INSTITUTION_NAME = validateField("EXTERNAL_INSTITUTION_NAME", formData.EXTERNAL_INSTITUTION_NAME);
 
     // If there are errors, set them and return
@@ -236,23 +221,22 @@ export default function InstitutionMapping({ instType = "" }: InstitutionMapping
       <PageContainer>
         <div className="mb-3 flex items-center justify-between">
           <h3 className="font-semibold text-gray-800 text-theme-xl dark:text-white/90 sm:text-2xl">View Institutions</h3>
-          <Button onClick={() => setRefreshTrigger((prev) => prev + 1)} variant="outline" startIcon={<RefreshIcon className="w-5 h-5" />}>Refresh Data</Button>
-        </div>
-        {hasAddPermission && (
-          <div className="mb-4 flex justify-center">
-            <Button onClick={handleAdd}>Add Institution</Button>
+          <div className="flex items-center gap-2">
+            {hasAddPermission && (
+              <Button onClick={handleAdd}>Add Institution</Button>
+            )}
+            <Button onClick={() => setRefreshTrigger((prev) => prev + 1)} variant="outline" startIcon={<RefreshIcon className="w-5 h-5" />}>Refresh Data</Button>
           </div>
-        )}
+        </div>
 
         <DataTable
           refreshTrigger={refreshTrigger}
           ajaxUrl={`/api/institutionmapping/ajaxlist?inst_type=${instType}`}
           columns={[
-            { data: "SOURCE_TYPE", name: "Source Type", searchable: true, orderable: true },
             { data: "INSTITUTION_TYPE", name: "Institution Type", searchable: true, orderable: true },
             { 
               data: "INSTITUTION_ID", 
-              name: "Institution ID", 
+              name: "Banner Institution ID", 
               searchable: true, 
               orderable: true,
               render: (data: any) => {
@@ -269,13 +253,10 @@ export default function InstitutionMapping({ instType = "" }: InstitutionMapping
                 );
               }
             },
-            { data: "INSTITUTION_NAME", name: "Institution Name", searchable: true, orderable: true },
-            { data: "INSTITUTION_ZIPCODE", name: "Institution Zipcode", searchable: true, orderable: true },
-            { data: "EXTERNAL_INSTITUTION_NAME", name: "External Institution Name", searchable: true, orderable: true },
-            // REMOVED: Slate Institution ID & Slate Institution Name columns (commented per requirement)
-            // { data: "SLATE_INSTITUTION_ID", name: "Slate Institution ID", searchable: true, orderable: true },
-            // { data: "SLATE_INSTITUTION_NAME", name: "Slate Institution Name", searchable: true, orderable: true },
-            { data: "EXTERNAL_INSTITUTION_ZIPCODE", name: "External Institution Zipcode", searchable: true, orderable: true },
+            { data: "INSTITUTION_NAME", name: "Banner Institution Name", searchable: true, orderable: true },
+            { data: "INSTITUTION_ZIPCODE", name: "Banner Institution Zipcode", searchable: true, orderable: true },
+            { data: "EXTERNAL_INSTITUTION_NAME", name: "Transcript Institution Name", searchable: true, orderable: true },
+            { data: "EXTERNAL_INSTITUTION_ZIPCODE", name: "Transcript Institution Zipcode", searchable: true, orderable: true },
             { data: "UPDATED_BY", name: "Updated By", searchable: true, orderable: true },
             { data: "LAST_UPDATED_DATETIME", name: "Updated On", searchable: false, orderable: true },
             ...(hasUpdatePermission || hasDeletePermission ? [{
@@ -315,12 +296,12 @@ export default function InstitutionMapping({ instType = "" }: InstitutionMapping
                   />
                 </div>
                 <div>
-                  <Label>Institution ID *</Label>
+                  <Label>Banner Institution ID *</Label>
                   <Input
                     value={formData.INSTITUTION_ID}
                     onChange={(e) => handleFieldChange("INSTITUTION_ID", e.target.value)}
                     onBlur={(e) => handleBlur("INSTITUTION_ID", e.target.value)}
-                    placeholder="Enter Institution ID"
+                    placeholder="Enter Banner Institution ID"
                     error={!!errors.INSTITUTION_ID}
                   />
                   {errors.INSTITUTION_ID && (
@@ -328,12 +309,12 @@ export default function InstitutionMapping({ instType = "" }: InstitutionMapping
                   )}
                 </div>
                 <div>
-                  <Label>Institution Name *</Label>
+                  <Label>Banner Institution Name *</Label>
                   <Input
                     value={formData.INSTITUTION_NAME}
                     onChange={(e) => handleFieldChange("INSTITUTION_NAME", e.target.value)}
                     onBlur={(e) => handleBlur("INSTITUTION_NAME", e.target.value)}
-                    placeholder="Enter Institution Name"
+                    placeholder="Enter Banner Institution Name"
                     error={!!errors.INSTITUTION_NAME}
                   />
                   {errors.INSTITUTION_NAME && (
@@ -341,46 +322,20 @@ export default function InstitutionMapping({ instType = "" }: InstitutionMapping
                   )}
                 </div>
                 <div>
-                  <Label>Institution Zipcode</Label>
+                  <Label>Banner Institution Zipcode</Label>
                   <Input
                     value={formData.INSTITUTION_ZIPCODE}
                     onChange={(e) => handleFieldChange("INSTITUTION_ZIPCODE", e.target.value)}
-                    placeholder="Enter Institution Zipcode"
+                    placeholder="Enter Banner Institution Zipcode"
                   />
                 </div>
                 <div>
-                  <Label>Slate Institution ID *</Label>
-                  <Input
-                    value={formData.SLATE_INSTITUTION_ID}
-                    onChange={(e) => handleFieldChange("SLATE_INSTITUTION_ID", e.target.value)}
-                    onBlur={(e) => handleBlur("SLATE_INSTITUTION_ID", e.target.value)}
-                    placeholder="Enter Slate Institution ID"
-                    error={!!errors.SLATE_INSTITUTION_ID}
-                  />
-                  {errors.SLATE_INSTITUTION_ID && (
-                    <p className="mt-1 text-xs text-red-500">{errors.SLATE_INSTITUTION_ID}</p>
-                  )}
-                </div>
-                <div>
-                  <Label>Slate Institution Name *</Label>
-                  <Input
-                    value={formData.SLATE_INSTITUTION_NAME}
-                    onChange={(e) => handleFieldChange("SLATE_INSTITUTION_NAME", e.target.value)}
-                    onBlur={(e) => handleBlur("SLATE_INSTITUTION_NAME", e.target.value)}
-                    placeholder="Enter Slate Institution Name"
-                    error={!!errors.SLATE_INSTITUTION_NAME}
-                  />
-                  {errors.SLATE_INSTITUTION_NAME && (
-                    <p className="mt-1 text-xs text-red-500">{errors.SLATE_INSTITUTION_NAME}</p>
-                  )}
-                </div>
-                <div>
-                  <Label>External Institution Name *</Label>
+                  <Label>Transcript Institution Name *</Label>
                   <Input
                     value={formData.EXTERNAL_INSTITUTION_NAME}
                     onChange={(e) => handleFieldChange("EXTERNAL_INSTITUTION_NAME", e.target.value)}
                     onBlur={(e) => handleBlur("EXTERNAL_INSTITUTION_NAME", e.target.value)}
-                    placeholder="Enter External Institution Name"
+                    placeholder="Enter Transcript Institution Name"
                     error={!!errors.EXTERNAL_INSTITUTION_NAME}
                   />
                   {errors.EXTERNAL_INSTITUTION_NAME && (
@@ -388,11 +343,11 @@ export default function InstitutionMapping({ instType = "" }: InstitutionMapping
                   )}
                 </div>
                 <div>
-                  <Label>External Institution Zipcode</Label>
+                  <Label>Transcript Institution Zipcode</Label>
                   <Input
                     value={formData.EXTERNAL_INSTITUTION_ZIPCODE}
                     onChange={(e) => handleFieldChange("EXTERNAL_INSTITUTION_ZIPCODE", e.target.value)}
-                    placeholder="Enter External Institution Zipcode"
+                    placeholder="Enter Transcript Institution Zipcode"
                   />
                 </div>
               </div>
@@ -453,12 +408,12 @@ export default function InstitutionMapping({ instType = "" }: InstitutionMapping
                   />
                 </div>
                 <div>
-                  <Label>Institution ID *</Label>
+                  <Label>Banner Institution ID *</Label>
                   <Input
                     value={formData.INSTITUTION_ID}
                     onChange={(e) => handleFieldChange("INSTITUTION_ID", e.target.value)}
                     onBlur={(e) => handleBlur("INSTITUTION_ID", e.target.value)}
-                    placeholder="Enter Institution ID"
+                    placeholder="Enter Banner Institution ID"
                     error={!!errors.INSTITUTION_ID}
                   />
                   {errors.INSTITUTION_ID && (
@@ -466,12 +421,12 @@ export default function InstitutionMapping({ instType = "" }: InstitutionMapping
                   )}
                 </div>
                 <div>
-                  <Label>Institution Name *</Label>
+                  <Label>Banner Institution Name *</Label>
                   <Input
                     value={formData.INSTITUTION_NAME}
                     onChange={(e) => handleFieldChange("INSTITUTION_NAME", e.target.value)}
                     onBlur={(e) => handleBlur("INSTITUTION_NAME", e.target.value)}
-                    placeholder="Enter Institution Name"
+                    placeholder="Enter Banner Institution Name"
                     error={!!errors.INSTITUTION_NAME}
                   />
                   {errors.INSTITUTION_NAME && (
@@ -479,46 +434,20 @@ export default function InstitutionMapping({ instType = "" }: InstitutionMapping
                   )}
                 </div>
                 <div>
-                  <Label>Institution Zipcode</Label>
+                  <Label>Banner Institution Zipcode</Label>
                   <Input
                     value={formData.INSTITUTION_ZIPCODE}
                     onChange={(e) => handleFieldChange("INSTITUTION_ZIPCODE", e.target.value)}
-                    placeholder="Enter Institution Zipcode"
+                    placeholder="Enter Banner Institution Zipcode"
                   />
                 </div>
                 <div>
-                  <Label>Slate Institution ID *</Label>
-                  <Input
-                    value={formData.SLATE_INSTITUTION_ID}
-                    onChange={(e) => handleFieldChange("SLATE_INSTITUTION_ID", e.target.value)}
-                    onBlur={(e) => handleBlur("SLATE_INSTITUTION_ID", e.target.value)}
-                    placeholder="Enter Slate Institution ID"
-                    error={!!errors.SLATE_INSTITUTION_ID}
-                  />
-                  {errors.SLATE_INSTITUTION_ID && (
-                    <p className="mt-1 text-xs text-red-500">{errors.SLATE_INSTITUTION_ID}</p>
-                  )}
-                </div>
-                <div>
-                  <Label>Slate Institution Name *</Label>
-                  <Input
-                    value={formData.SLATE_INSTITUTION_NAME}
-                    onChange={(e) => handleFieldChange("SLATE_INSTITUTION_NAME", e.target.value)}
-                    onBlur={(e) => handleBlur("SLATE_INSTITUTION_NAME", e.target.value)}
-                    placeholder="Enter Slate Institution Name"
-                    error={!!errors.SLATE_INSTITUTION_NAME}
-                  />
-                  {errors.SLATE_INSTITUTION_NAME && (
-                    <p className="mt-1 text-xs text-red-500">{errors.SLATE_INSTITUTION_NAME}</p>
-                  )}
-                </div>
-                <div>
-                  <Label>External Institution Name *</Label>
+                  <Label>Transcript Institution Name *</Label>
                   <Input
                     value={formData.EXTERNAL_INSTITUTION_NAME}
                     onChange={(e) => handleFieldChange("EXTERNAL_INSTITUTION_NAME", e.target.value)}
                     onBlur={(e) => handleBlur("EXTERNAL_INSTITUTION_NAME", e.target.value)}
-                    placeholder="Enter External Institution Name"
+                    placeholder="Enter Transcript Institution Name"
                     error={!!errors.EXTERNAL_INSTITUTION_NAME}
                   />
                   {errors.EXTERNAL_INSTITUTION_NAME && (
@@ -526,11 +455,11 @@ export default function InstitutionMapping({ instType = "" }: InstitutionMapping
                   )}
                 </div>
                 <div>
-                  <Label>External Institution Zipcode</Label>
+                  <Label>Transcript Institution Zipcode</Label>
                   <Input
                     value={formData.EXTERNAL_INSTITUTION_ZIPCODE}
                     onChange={(e) => handleFieldChange("EXTERNAL_INSTITUTION_ZIPCODE", e.target.value)}
-                    placeholder="Enter External Institution Zipcode"
+                    placeholder="Enter Transcript Institution Zipcode"
                   />
                 </div>
               </div>

@@ -187,13 +187,13 @@ export default function TermNameMapping() {
       <PageContainer>
         <div className="mb-3 flex items-center justify-between">
           <h3 className="font-semibold text-gray-800 text-theme-xl dark:text-white/90 sm:text-2xl">View Term Names</h3>
-          <Button onClick={() => setRefreshTrigger((prev) => prev + 1)} variant="outline" startIcon={<RefreshIcon className="w-5 h-5" />}>Refresh Data</Button>
-        </div>
-        {hasAddPermission && (
-          <div className="mb-4 flex justify-center">
-            <Button onClick={() => setShowAddModal(true)}>Add Term Name</Button>
+          <div className="flex items-center gap-2">
+            {hasAddPermission && (
+              <Button onClick={() => setShowAddModal(true)}>Add Term Name</Button>
+            )}
+            <Button onClick={() => setRefreshTrigger((prev) => prev + 1)} variant="outline" startIcon={<RefreshIcon className="w-5 h-5" />}>Refresh Data</Button>
           </div>
-        )}
+        </div>
 
         <DataTable
           refreshTrigger={refreshTrigger}

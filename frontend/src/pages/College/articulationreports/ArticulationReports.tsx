@@ -582,28 +582,6 @@ export default function ArticulationReports(props?: ArticulationReportsProps) {
                 return <span>{data || "-"}</span>;
               }
             },
-            { 
-              data: "COURSE_ATTRIBUTE", 
-              name: "Course Attribute", 
-              searchable: false, 
-              orderable: false,
-              width: "130px",
-              render: (data: any, row: any) => {
-                const searchField = row._search_field || "";
-                if ((searchField === "Failed" || searchField === "Phase_2") && hasUpdatePermission) {
-                  return (
-                    <input 
-                      type="text" 
-                      className="courseAttribute rounded border border-gray-300 bg-white px-2 py-1 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                      maxLength={9}
-                      defaultValue={data || ""}
-                      disabled
-                    />
-                  );
-                }
-                return <span>{data || "-"}</span>;
-              }
-            },
             { data: "LEVEL", name: "Level", searchable: false, orderable: false, width: "80px" },
             { data: "ATTENDANCE_PERIOD", name: "Attendance Period", searchable: false, orderable: false, width: "140px" },
             { data: "TERM", name: "Term", searchable: false, orderable: false, width: "100px" },

@@ -239,13 +239,13 @@ export default function StudentView() {
     const selectedId = student.STUDENT_ID || student.STUDENT_FULL_NAME;
     console.log("[StudentView] Setting student ID to:", selectedId);
     setStudentId(selectedId);
-    const params: Record<string, string> = { student_id: selectedId };
-    if (selectedType) params.type = selectedType;
-    if (selectedInstitution) params.institution_id = selectedInstitution;
-    if (selectedBatch) params.batch_id = selectedBatch;
-    if (selectedPageType) params.page = selectedPageType;
+    // Reset previous selection so the old table disappears
+    setSelectedType("");
+    setSelectedInstitution("");
+    setSelectedBatch("");
+    setSelectedPageType("transcript");
     
-    setSearchParams(params);
+    setSearchParams({ student_id: selectedId });
     setSearchQuery("");
     setIsInputFocused(false); // Close dropdown after selection
   };
@@ -477,379 +477,130 @@ export default function StudentView() {
                   </div>
                 </div>
 
-                {/* Tree Structure - matching CI3 lines 46-156 */}
+                {/* Tree View Structure - matching CI3 horizontal tree layout */}
                 {loading ? (
-                  <div className="mt-4">
-                    <div className="space-y-3">
-                      {/* Skeleton loader for tree structure */}
-                      {[1, 2, 3].map((i) => (
-                        <div key={i} className="animate-pulse">
-                          <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded border mb-2"></div>
-                          <div className="ml-4 space-y-2">
-                            <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded"></div>
-                            <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded"></div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="mt-4 flex items-center justify-center py-4">
-                      <div className="text-center">
-                        <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-brand-500 border-r-transparent"></div>
-                        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Loading tree structure...</p>
-                      </div>
+                  <div className="mt-4 flex items-center justify-center py-8">
+                    <div className="text-center">
+                      <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-brand-500 border-r-transparent"></div>
+                      <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Loading...</p>
                     </div>
                   </div>
                 ) : studentData && studentData.institution_name.length > 0 ? (
-                  <div className="mt-4 student-tree">
-                    <ul className="tree">
-                      {/* Outer tree-parent firstul open - always open (matching CI3 line 61) */}
-                      <ul className="tree-parent firstul open">
-                        {studentData.institution_name.map((institution, instIndex) => {
-                          const batches = studentData.batch_details[institution.INSTITUTION_ID] || [];
-                          console.log(`[StudentView] Processing institution ${institution.INSTITUTION_ID} with batches:`, batches);
-                          
-                          return batches.length > 0 ? (
-                            batches.map((batchId, batchIndex) => {
-                              const menuWithBatch = getMenuItems(institution.INSTITUTION_ID, batchId);
-                              const key = `${institution.INSTITUTION_ID}-${batchId}`;
-                              const isExpanded = expandedBatches.has(key);
-                              const uniqueBatchKey = `${institution.INSTITUTION_ID}-${batchId}-${batchIndex}`;
+                  <div className="mt-4 overflow-x-auto">
+                    {studentData.institution_name.map((institution, instIndex) => {
+                      const batches = studentData.batch_details[institution.INSTITUTION_ID] || [];
+                      
+                      return batches.map((batchId, batchIndex) => {
+                        const menuWithBatch = getMenuItems(institution.INSTITUTION_ID, batchId);
+                        const batchMeta = studentData.batch_metadata?.[institution.INSTITUTION_ID]?.[batchId];
+                        const ocrDate = formatDate(batchMeta?.OCR_EXTRACTED_DATE);
+                        const batchTitle = ocrDate 
+                          ? `${institution.INSTITUTION_NAME} - ${institution.INSTITUTION_ID} - ${batchId} - ${ocrDate}`
+                          : `${institution.INSTITUTION_NAME} - ${institution.INSTITUTION_ID} - ${batchId}`;
+                        const uniqueBatchKey = `${institution.INSTITUTION_ID}-${batchId}-${batchIndex}`;
+                        const animationDelay = (instIndex * 50) + (batchIndex * 30);
 
-                              // Get batch metadata (OCR_EXTRACTED_DATE) matching CI3 line 69
-                              const batchMeta = studentData.batch_metadata?.[institution.INSTITUTION_ID]?.[batchId];
-                              const ocrDate = formatDate(batchMeta?.OCR_EXTRACTED_DATE);
-                              // Format batch title like CI3: "INSTITUTION_NAME - INSTITUTION_ID - BATCH_ID - OCR_EXTRACTED_DATE"
-                              const batchTitle = ocrDate 
-                                ? `${institution.INSTITUTION_NAME} - ${institution.INSTITUTION_ID} - ${batchId} - ${ocrDate}`
-                                : `${institution.INSTITUTION_NAME} - ${institution.INSTITUTION_ID} - ${batchId}`;
+                        // Collect status items to render
+                        const statusItems: Array<{
+                          key: string;
+                          label: string;
+                          count: number;
+                          type: string;
+                          pageType: "transcript" | "articulation";
+                          icon: "document" | "folder";
+                        }> = [];
 
-                              // Check if should be expanded (matching CI3 line 78-80)
-                              const shouldExpand = 
-                                (menuWithBatch["Failed"] > 0 || 
-                                 menuWithBatch["Articulation-Kickouts"] > 0 || 
-                                 menuWithBatch["Rerun"] > 0 || 
-                                 menuWithBatch["articulation_Failed"] > 0 || 
-                                 menuWithBatch["articulation_Rerun"] > 0) ||
-                                (batchId === selectedBatch && institution.INSTITUTION_ID === selectedInstitution);
-                              const isExpandedNow = isExpanded || shouldExpand;
+                        if (menuWithBatch["Failed"] > 0) {
+                          statusItems.push({ key: "Failed-t", label: "Transcript Kickouts", count: menuWithBatch["Failed"], type: "Failed", pageType: "transcript", icon: "document" });
+                        }
+                        if (menuWithBatch["Articulation-Kickouts"] > 0 && !menuWithBatch["articulation_Failed"]) {
+                          statusItems.push({ key: "ArtKick-t", label: "Articulation-Kickouts", count: menuWithBatch["Articulation-Kickouts"], type: "Articulation-Kickouts", pageType: "transcript", icon: "document" });
+                        }
+                        if (menuWithBatch["Processed"] > 0) {
+                          const processedLabel = `Transcript Processed${batchMeta?.LAST_UPDATED_DATETIME ? ` - ${formatDate(batchMeta.LAST_UPDATED_DATETIME)}` : ""}${batchMeta?.OCR_EXTRACTED_DATE && batchMeta?.LAST_UPDATED_DATETIME ? `  (${calculateDays(batchMeta.OCR_EXTRACTED_DATE, batchMeta.LAST_UPDATED_DATETIME)} Days)` : ""}`;
+                          statusItems.push({ key: "Processed-t", label: processedLabel, count: menuWithBatch["Processed"], type: "Processed", pageType: "transcript", icon: "document" });
+                        }
+                        if (menuWithBatch["Rerun"] > 0) {
+                          statusItems.push({ key: "Rerun-t", label: "Transcript Rerun", count: menuWithBatch["Rerun"], type: "Rerun", pageType: "transcript", icon: "document" });
+                        }
+                        if (menuWithBatch["articulation_Failed"] > 0) {
+                          statusItems.push({ key: "Failed-a", label: "Articulation Course Kickouts", count: menuWithBatch["articulation_Failed"], type: "Failed", pageType: "articulation", icon: "document" });
+                        }
+                        if (menuWithBatch["articulation_Processed"] > 0) {
+                          statusItems.push({ key: "Processed-a", label: "Articulation Course Processed", count: menuWithBatch["articulation_Processed"], type: "Processed", pageType: "articulation", icon: "document" });
+                        }
+                        if (menuWithBatch["articulation_Rerun"] > 0) {
+                          statusItems.push({ key: "Rerun-a", label: "Articulation Course Rerun", count: menuWithBatch["articulation_Rerun"], type: "Rerun", pageType: "articulation", icon: "document" });
+                        }
 
-                              // Check if there are any menu items to show
-                              const hasMenuItems = Object.keys(menuWithBatch).length > 0;
-
-                              // Calculate animation delay for progressive rendering (step by step)
-                              const animationDelay = (instIndex * 50) + (batchIndex * 30);
-
-                              return (
-                                <li 
-                                  key={uniqueBatchKey} 
-                                  className="tree-item mb-2"
-                                  style={{
-                                    animation: `fadeInUp 0.4s ease-out ${animationDelay}ms both`
-                                  }}
-                                >
-                                  {/* Batch trigger - matching CI3 line 71-74 */}
-                                  <button 
-                                    className={`trigger w-full text-left px-3 py-2 rounded border flex items-center gap-2 ${
-                                      isExpandedNow ? 'bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800' : 'bg-gray-50 border-gray-200 dark:bg-gray-900 dark:border-gray-700'
-                                    } hover:bg-blue-100 dark:hover:bg-gray-800 transition-colors`}
-                                    title={batchTitle}
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      toggleBatch(institution.INSTITUTION_ID, batchId);
-                                    }}
-                                  >
-                                    <svg
-                                      className={`w-4 h-4 transition-transform ${isExpandedNow ? "rotate-90" : ""}`}
-                                      fill="none"
-                                      stroke="currentColor"
-                                      viewBox="0 0 24 24"
-                                    >
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                    </svg>
-                                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{batchTitle}</span>
-                                  </button>
-                                  
-                                  {/* Child status list - matching CI3 line 78-80 */}
-                                  {isExpandedNow && (
-                                    <ul className="tree-parent lastChildul child mt-1 ml-4 space-y-1">
-                                      {/* Show message if no menu items */}
-                                      {!hasMenuItems ? (
-                                        <li className="tree-item view">
-                                          <div className="w-full text-left px-3 py-1.5 rounded text-sm text-gray-500 dark:text-gray-400 italic">
-                                            No transcripts found for this batch
-                                          </div>
-                                        </li>
-                                      ) : (
-                                        <>
-                                          {/* Transcript Status Items - matching CI3 lines 81-153 */}
-                                          {menuWithBatch["Failed"] > 0 && (
-                                            <li className="tree-item view">
-                                              <button
-                                                className={`w-full text-left px-3 py-1.5 rounded text-sm flex items-center justify-between ${
-                                                  isActive("Failed", institution.INSTITUTION_ID, batchId, "transcript") 
-                                                    ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300" 
-                                                    : "hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
-                                                }`}
-                                                onClick={(e) => {
-                                                  e.preventDefault();
-                                                  handleViewPageLoad(
-                                                    studentId,
-                                                    "Failed",
-                                                    institution.INSTITUTION_ID,
-                                                    batchId,
-                                                    "transcript"
-                                                  );
-                                                }}
-                                              >
-                                                <span className="flex items-center gap-2">
-                                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                                  </svg>
-                                                  Transcript Kickouts
-                                                </span>
-                                                {menuWithBatch["Failed"] > 1 && (
-                                                  <span className="inline-flex items-center justify-center rounded-full bg-red-500 h-5 w-5 text-xs font-medium text-white">
-                                                    {menuWithBatch["Failed"]}
-                                                  </span>
-                                                )}
-                                              </button>
-                                            </li>
-                                          )}
-
-                                          {/* Articulation-Kickouts - matching CI3 lines 91-99 */}
-                                          {menuWithBatch["Articulation-Kickouts"] > 0 &&
-                                            !menuWithBatch["articulation_Failed"] && (
-                                              <li className="tree-item view">
-                                                <button
-                                                  className={`w-full text-left px-3 py-1.5 rounded text-sm flex items-center justify-between ${
-                                                    isActive("Articulation-Kickouts", institution.INSTITUTION_ID, batchId, "transcript") 
-                                                      ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300" 
-                                                      : "hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
-                                                  }`}
-                                                  onClick={(e) => {
-                                                    e.preventDefault();
-                                                    handleViewPageLoad(
-                                                      studentId,
-                                                      "Articulation-Kickouts",
-                                                      institution.INSTITUTION_ID,
-                                                      batchId,
-                                                      "transcript"
-                                                    );
-                                                  }}
-                                                >
-                                                  <span className="flex items-center gap-2">
-                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                                    </svg>
-                                                    Articulation-Kickouts
-                                                  </span>
-                                                  {menuWithBatch["Articulation-Kickouts"] > 1 && (
-                                                    <span className="inline-flex items-center justify-center rounded-full bg-red-500 h-5 w-5 text-xs font-medium text-white">
-                                                      {menuWithBatch["Articulation-Kickouts"]}
-                                                    </span>
-                                                  )}
-                                                </button>
-                                              </li>
-                                            )}
-
-                                          {/* Transcript Processed - matching CI3 lines 100-112 */}
-                                          {menuWithBatch["Articulation-Kickouts"] === 0 && menuWithBatch["Processed"] > 0 && (
-                                            <li className="tree-item view">
-                                              <button
-                                                className={`w-full text-left px-3 py-1.5 rounded text-sm flex items-center justify-between ${
-                                                  isActive("Processed", institution.INSTITUTION_ID, batchId, "transcript") 
-                                                    ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300" 
-                                                    : "hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
-                                                }`}
-                                                onClick={(e) => {
-                                                  e.preventDefault();
-                                                  handleViewPageLoad(
-                                                    studentId,
-                                                    "Processed",
-                                                    institution.INSTITUTION_ID,
-                                                    batchId,
-                                                    "transcript"
-                                                  );
-                                                }}
-                                              >
-                                                <span className="flex items-center gap-2">
-                                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                                  </svg>
-                                                  Transcript Processed
-                                                  {batchMeta?.LAST_UPDATED_DATETIME && ` - ${formatDate(batchMeta.LAST_UPDATED_DATETIME)}`}
-                                                  {batchMeta?.OCR_EXTRACTED_DATE && batchMeta?.LAST_UPDATED_DATETIME && (
-                                                    <span className="text-xs text-gray-500 ml-1">
-                                                      ({calculateDays(batchMeta.OCR_EXTRACTED_DATE, batchMeta.LAST_UPDATED_DATETIME)} days)
-                                                    </span>
-                                                  )}
-                                                </span>
-                                                {menuWithBatch["Processed"] > 1 && (
-                                                  <span className="inline-flex items-center justify-center rounded-full bg-red-500 h-5 w-5 text-xs font-medium text-white">
-                                                    {menuWithBatch["Processed"]}
-                                                  </span>
-                                                )}
-                                              </button>
-                                            </li>
-                                          )}
-
-                                          {/* Transcript Rerun - matching CI3 lines 114-122 */}
-                                          {menuWithBatch["Rerun"] > 0 && (
-                                            <li className="tree-item view">
-                                              <button
-                                                className={`w-full text-left px-3 py-1.5 rounded text-sm flex items-center justify-between ${
-                                                  isActive("Rerun", institution.INSTITUTION_ID, batchId, "transcript") 
-                                                    ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300" 
-                                                    : "hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
-                                                }`}
-                                                onClick={(e) => {
-                                                  e.preventDefault();
-                                                  handleViewPageLoad(
-                                                    studentId,
-                                                    "Rerun",
-                                                    institution.INSTITUTION_ID,
-                                                    batchId,
-                                                    "transcript"
-                                                  );
-                                                }}
-                                              >
-                                                <span className="flex items-center gap-2">
-                                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                                  </svg>
-                                                  Transcript Rerun
-                                                </span>
-                                                {menuWithBatch["Rerun"] > 1 && (
-                                                  <span className="inline-flex items-center justify-center rounded-full bg-red-500 h-5 w-5 text-xs font-medium text-white">
-                                                    {menuWithBatch["Rerun"]}
-                                                  </span>
-                                                )}
-                                              </button>
-                                            </li>
-                                          )}
-
-                                          {/* Articulation Status Items - matching CI3 lines 124-150 */}
-                                          {menuWithBatch["articulation_Failed"] > 0 && (
-                                            <li className="tree-item view">
-                                              <button
-                                                className={`w-full text-left px-3 py-1.5 rounded text-sm flex items-center justify-between ${
-                                                  isActive("Failed", institution.INSTITUTION_ID, batchId, "articulation") 
-                                                    ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300" 
-                                                    : "hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
-                                                }`}
-                                                onClick={(e) => {
-                                                  e.preventDefault();
-                                                  handleViewPageLoad(
-                                                    studentId,
-                                                    "Failed",
-                                                    institution.INSTITUTION_ID,
-                                                    batchId,
-                                                    "articulation"
-                                                  );
-                                                }}
-                                              >
-                                                <span className="flex items-center gap-2">
-                                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                                  </svg>
-                                                  Articulation Course Kickouts
-                                                </span>
-                                                <span className="inline-flex items-center justify-center rounded-full bg-red-500 h-5 w-5 text-xs font-medium text-white">
-                                                  {menuWithBatch["articulation_Failed"]}
-                                                </span>
-                                              </button>
-                                            </li>
-                                          )}
-
-                                          {menuWithBatch["articulation_Processed"] > 0 && (
-                                            <li className="tree-item view">
-                                              <button
-                                                className={`w-full text-left px-3 py-1.5 rounded text-sm flex items-center justify-between ${
-                                                  isActive("Processed", institution.INSTITUTION_ID, batchId, "articulation") 
-                                                    ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300" 
-                                                    : "hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
-                                                }`}
-                                                onClick={(e) => {
-                                                  e.preventDefault();
-                                                  handleViewPageLoad(
-                                                    studentId,
-                                                    "Processed",
-                                                    institution.INSTITUTION_ID,
-                                                    batchId,
-                                                    "articulation"
-                                                  );
-                                                }}
-                                              >
-                                                <span className="flex items-center gap-2">
-                                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                                  </svg>
-                                                  Articulation Course Processed
-                                                </span>
-                                                <span className="inline-flex items-center justify-center rounded-full bg-red-500 h-5 w-5 text-xs font-medium text-white">
-                                                  {menuWithBatch["articulation_Processed"]}
-                                                </span>
-                                              </button>
-                                            </li>
-                                          )}
-
-                                          {menuWithBatch["articulation_Rerun"] > 0 && (
-                                            <li className="tree-item view">
-                                              <button
-                                                className={`w-full text-left px-3 py-1.5 rounded text-sm flex items-center justify-between ${
-                                                  isActive("Rerun", institution.INSTITUTION_ID, batchId, "articulation") 
-                                                    ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300" 
-                                                    : "hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
-                                                }`}
-                                                onClick={(e) => {
-                                                  e.preventDefault();
-                                                  handleViewPageLoad(
-                                                    studentId,
-                                                    "Rerun",
-                                                    institution.INSTITUTION_ID,
-                                                    batchId,
-                                                    "articulation"
-                                                  );
-                                                }}
-                                              >
-                                                <span className="flex items-center gap-2">
-                                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                                  </svg>
-                                                  Articulation Course Rerun
-                                                </span>
-                                                <span className="inline-flex items-center justify-center rounded-full bg-red-500 h-5 w-5 text-xs font-medium text-white">
-                                                  {menuWithBatch["articulation_Rerun"]}
-                                                </span>
-                                              </button>
-                                            </li>
-                                          )}
-                                        </>
-                                      )}
-                                    </ul>
-                                  )}
-                                </li>
-                              );
-                            })
-                          ) : (
-                            <li key={`${institution.INSTITUTION_ID}-no-batches`} className="tree-item mb-2">
-                              <div className="w-full text-left px-3 py-2 rounded border bg-gray-50 border-gray-200 dark:bg-gray-900 dark:border-gray-700">
-                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                  {institution.INSTITUTION_NAME} - {institution.INSTITUTION_ID}
-                                </span>
-                                <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">No batches found</span>
+                        return (
+                          <div 
+                            key={uniqueBatchKey} 
+                            className="htree-wrapper mb-6"
+                            style={{ animation: `fadeInUp 0.4s ease-out ${animationDelay}ms both` }}
+                          >
+                            {/* Horizontal Tree */}
+                            <div className="htree">
+                              {/* Parent Node - Institution/Batch */}
+                              <div className="htree-parent">
+                                <div className="htree-node htree-node-parent">
+                                  <svg className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
+                                  </svg>
+                                  <span className="htree-node-text">{batchTitle}</span>
+                                </div>
                               </div>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    </ul>
+
+                              {/* Children Nodes - Status Items */}
+                              {statusItems.length > 0 && (
+                                <div className="htree-children">
+                                  <div className="htree-connector"></div>
+                                  <div className="htree-children-list">
+                                    {statusItems.map((item) => {
+                                      const isActiveItem = isActive(item.type, institution.INSTITUTION_ID, batchId, item.pageType);
+                                      return (
+                                        <div key={item.key} className="htree-child">
+                                          <div className="htree-child-connector"></div>
+                                          <button
+                                            className={`htree-node htree-node-child ${isActiveItem ? 'htree-node-active' : ''}`}
+                                            onClick={(e) => {
+                                              e.preventDefault();
+                                              handleViewPageLoad(
+                                                studentId,
+                                                item.type,
+                                                institution.INSTITUTION_ID,
+                                                batchId,
+                                                item.pageType
+                                              );
+                                            }}
+                                          >
+                                            <svg className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                            </svg>
+                                            <span className="htree-node-text">{item.label}</span>
+                                            {item.count > 0 && (
+                                              <span className="htree-badge">
+                                                {item.count}
+                                              </span>
+                                            )}
+                                          </button>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      });
+                    })}
                   </div>
-                ) : (
+                ) : studentData ? (
                   <div className="mt-4 text-center text-gray-500 dark:text-gray-400">
                     No institution data available for this student
                   </div>
-                )}
+                ) : null}
               </div>
             )}
           </div>
@@ -984,14 +735,196 @@ export default function StudentView() {
       </PageContainer>
       <style>{`
         @keyframes fadeInUp {
-          from {
-            opacity: 0;
-            transform: translateY(10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ===== Horizontal Tree View ===== */
+        .htree {
+          display: flex;
+          align-items: center;
+        }
+
+        .htree-parent {
+          flex-shrink: 0;
+        }
+
+        /* Shared node styles */
+        .htree-node {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 9px 18px;
+          border-radius: 8px;
+          border: 2px solid #cbd5e1;
+          background: #fff;
+          white-space: nowrap;
+          font-size: 13px;
+          font-weight: 600;
+          color: #334155;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+          transition: all 0.2s ease;
+        }
+        .dark .htree-node {
+          background: #1e293b;
+          border-color: #475569;
+          color: #e2e8f0;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        }
+
+        /* Parent node - institution */
+        .htree-node-parent {
+          border-color: #f59e0b;
+          background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+          box-shadow: 0 2px 8px rgba(245, 158, 11, 0.15);
+        }
+        .dark .htree-node-parent {
+          background: linear-gradient(135deg, rgba(245,158,11,0.12) 0%, rgba(245,158,11,0.06) 100%);
+          border-color: #d97706;
+        }
+
+        /* Child node - status items */
+        .htree-node-child {
+          cursor: pointer;
+          border-color: #93c5fd;
+          background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+          box-shadow: 0 1px 4px rgba(59, 130, 246, 0.1);
+          font-weight: 500;
+        }
+        .htree-node-child:hover {
+          border-color: #3b82f6;
+          background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+          box-shadow: 0 3px 12px rgba(59, 130, 246, 0.2);
+          transform: translateX(2px);
+        }
+        .dark .htree-node-child {
+          background: linear-gradient(135deg, rgba(59,130,246,0.1) 0%, rgba(59,130,246,0.05) 100%);
+          border-color: #1d4ed8;
+        }
+        .dark .htree-node-child:hover {
+          background: linear-gradient(135deg, rgba(59,130,246,0.2) 0%, rgba(59,130,246,0.1) 100%);
+          border-color: #3b82f6;
+        }
+
+        .htree-node-active {
+          border-color: #2563eb !important;
+          background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%) !important;
+          box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15), 0 2px 8px rgba(37, 99, 235, 0.2) !important;
+        }
+        .dark .htree-node-active {
+          background: linear-gradient(135deg, rgba(37,99,235,0.3) 0%, rgba(37,99,235,0.15) 100%) !important;
+          border-color: #60a5fa !important;
+        }
+
+        /* Children wrapper */
+        .htree-children {
+          display: flex;
+          align-items: center;
+        }
+
+        /* Horizontal line from parent to the vertical rail */
+        .htree-connector {
+          width: 40px;
+          height: 2px;
+          background: #94a3b8;
+          flex-shrink: 0;
+        }
+        .dark .htree-connector {
+          background: #64748b;
+        }
+
+        /* Vertical list of children */
+        .htree-children-list {
+          display: flex;
+          flex-direction: column;
+          position: relative;
+        }
+
+        /* Each child row */
+        .htree-child {
+          display: flex;
+          align-items: center;
+          padding: 5px 0;
+          position: relative;
+        }
+
+        /* Vertical line segments drawn per-child for perfect alignment */
+        /* Top half of vertical line (connects to sibling above) */
+        .htree-child::before {
+          content: '';
+          position: absolute;
+          left: 0;
+          top: 0;
+          bottom: 50%;
+          width: 2px;
+          background: #94a3b8;
+        }
+        .dark .htree-child::before {
+          background: #64748b;
+        }
+
+        /* Bottom half of vertical line (connects to sibling below) */
+        .htree-child::after {
+          content: '';
+          position: absolute;
+          left: 0;
+          top: 50%;
+          bottom: 0;
+          width: 2px;
+          background: #94a3b8;
+        }
+        .dark .htree-child::after {
+          background: #64748b;
+        }
+
+        /* First child: no line going up */
+        .htree-child:first-child::before {
+          display: none;
+        }
+
+        /* Last child: no line going down */
+        .htree-child:last-child::after {
+          display: none;
+        }
+
+        /* Only child: no vertical line at all */
+        .htree-child:only-child::before,
+        .htree-child:only-child::after {
+          display: none;
+        }
+
+        /* Horizontal connector from vertical rail to child node */
+        .htree-child-connector {
+          width: 28px;
+          height: 2px;
+          background: #94a3b8;
+          flex-shrink: 0;
+          margin-left: 2px;
+        }
+        .dark .htree-child-connector {
+          background: #64748b;
+        }
+
+        /* Node text */
+        .htree-node-text {
+          line-height: 1.4;
+        }
+
+        /* Badge count */
+        .htree-badge {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          min-width: 22px;
+          height: 22px;
+          padding: 0 6px;
+          border-radius: 9999px;
+          background: #dc2626;
+          color: #fff;
+          font-size: 11px;
+          font-weight: 700;
+          margin-left: 8px;
+          flex-shrink: 0;
         }
       `}</style>
     </PageWrapper>

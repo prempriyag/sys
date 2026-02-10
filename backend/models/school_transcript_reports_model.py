@@ -62,6 +62,78 @@ class SchoolTranscriptReportsModel:
                 k.LAST_UPDATED_DATETIME like'%{search_safe}%' or 
                 lower(k.UPDATED_BY) like'%{search_lower}%') """)
 
+        # Column-specific search (individual column search boxes)
+        columns = request_data.get("columns", [])
+        if columns:
+            for col in columns:
+                col_search = col.get("search", {})
+                col_search_value = col_search.get("value", "").strip() if col_search else ""
+                
+                if col_search_value:
+                    col_data = col.get("data", "")
+                    col_search_safe = check_special_name(col_search_value)
+                    col_search_lower = check_special_name(col_search_value.lower())
+                    
+                    # Map column data names to database fields
+                    if col_data == "INSTITUTION_NAME":
+                        search_conditions.append(
+                            f"lower((SELECT TOP 1 INSTITUTION_NAME FROM {TBL_INSTITUTION_MAPPING} as m WHERE m.INSTITUTION_ID = k.INSTITUTION_ID)) LIKE '%{col_search_lower}%'"
+                        )
+                    elif col_data == "INSTITUTION_ID":
+                        search_conditions.append(f"k.INSTITUTION_ID like '%{col_search_safe}%'")
+                    elif col_data == "STUDENT_ID":
+                        search_conditions.append(f"lower(k.STUDENT_ID) like '%{col_search_lower}%'")
+                    elif col_data == "STUDENT_FULL_NAME":
+                        search_conditions.append(f"lower(k.STUDENT_FULL_NAME) like '%{col_search_lower}%'")
+                    elif col_data == "BATCH_ID":
+                        search_conditions.append(f"k.BATCH_ID like '%{col_search_safe}%'")
+                    elif col_data == "STATUS_BANNER":
+                        search_conditions.append(f"lower(k.STATUS_SOAPCOL) like '%{col_search_lower}%'")
+                    elif col_data == "STATUS_BDMS":
+                        search_conditions.append(f"lower(k.STATUS_BDMS) like '%{col_search_lower}%'")
+                    elif col_data == "ERROR_REASON":
+                        search_conditions.append(f"lower(k.ERROR_REASON) like '%{col_search_lower}%'")
+                    elif col_data == "TRANSCRIPT_STATUS_FLAG":
+                        search_conditions.append(f"lower(k.TRANSCRIPT_STATUS_FLAG) like '%{col_search_lower}%'")
+                    elif col_data == "ARTICULATION_STATUS_FLAG":
+                        search_conditions.append(f"lower(k.ARTICULATION_STATUS_FLAG) like '%{col_search_lower}%'")
+                    elif col_data == "LAST_UPDATED_DATETIME":
+                        search_conditions.append(f"k.LAST_UPDATED_DATETIME like '%{col_search_safe}%'")
+                    elif col_data == "UPDATED_BY":
+                        search_conditions.append(f"lower(k.UPDATED_BY) like '%{col_search_lower}%'")
+                    elif col_data == "PROCESS_STATUS":
+                        search_conditions.append(f"lower(k.PROCESS_STATUS) like '%{col_search_lower}%'")
+                    elif col_data == "EXTERNAL_INSTITUTION_ZIPCODE":
+                        search_conditions.append(f"h.EXTERNAL_INSTITUTION_ZIPCODE like '%{col_search_safe}%'")
+                    elif col_data == "STUDENT_FIRST_NAME":
+                        search_conditions.append(f"lower(h.STUDENT_FIRST_NAME) like '%{col_search_lower}%'")
+                    elif col_data == "STUDENT_LAST_NAME":
+                        search_conditions.append(f"lower(h.STUDENT_LAST_NAME) like '%{col_search_lower}%'")
+                    elif col_data == "DATE_OF_BIRTH":
+                        search_conditions.append(f"CAST(h.DATE_OF_BIRTH AS VARCHAR) like '%{col_search_safe}%'")
+                    elif col_data == "SSN":
+                        search_conditions.append(f"h.SSN like '%{col_search_safe}%'")
+                    elif col_data == "CGPA":
+                        search_conditions.append(f"CAST(h.CGPA AS VARCHAR) like '%{col_search_safe}%'")
+                    elif col_data == "TOTAL_CREDITS_EARNED":
+                        search_conditions.append(f"CAST(h.TOTAL_CREDITS_EARNED AS VARCHAR) like '%{col_search_safe}%'")
+                    elif col_data == "TOTAL_CREDITS_ATTENDED":
+                        search_conditions.append(f"CAST(h.TOTAL_CREDITS_ATTENDED AS VARCHAR) like '%{col_search_safe}%'")
+                    elif col_data == "DEGREE_CD":
+                        search_conditions.append(f"lower(h.DEGREE_CD) like '%{col_search_lower}%'")
+                    elif col_data == "DEGREE_RECEIVED_DATE":
+                        search_conditions.append(f"CAST(h.DEGREE_RECEIVED_DATE AS VARCHAR) like '%{col_search_safe}%'")
+                    elif col_data == "SECOND_DEGREE_CD":
+                        search_conditions.append(f"lower(h.SECOND_DEGREE_CD) like '%{col_search_lower}%'")
+                    elif col_data == "SECOND_DEGREE_RECEIVED_DATE":
+                        search_conditions.append(f"CAST(h.SECOND_DEGREE_RECEIVED_DATE AS VARCHAR) like '%{col_search_safe}%'")
+                    elif col_data == "SCENARIO":
+                        search_conditions.append(f"lower(k.SCENARIO) like '%{col_search_lower}%'")
+                    elif col_data == "COMMENTS":
+                        search_conditions.append(f"lower(k.COMMENTS) like '%{col_search_lower}%'")
+                    elif col_data == "SOURCE_TYPE":
+                        search_conditions.append(f"lower(d.SOURCE_TYPE) like '%{col_search_lower}%'")
+
         # Search_Field filters (matches CI3 lines 393-429)
         search_field = request_data.get("Search_Field", "")
 

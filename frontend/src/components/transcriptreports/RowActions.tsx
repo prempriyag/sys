@@ -11,6 +11,7 @@ interface RowActionsProps {
   onCommentChange: (batchId: string, comment: string) => void;
   onScenarioChange: (batchId: string, scenario: string) => void;
   rowChanges?: Map<string, any>;
+  module?: "college" | "school";
 }
 
 export default function RowActions({
@@ -21,6 +22,7 @@ export default function RowActions({
   onCommentChange,
   onScenarioChange,
   rowChanges,
+  module = "college",
 }: RowActionsProps) {
   const [transcriptAction, setTranscriptAction] = useState<string>("0");
   const [articulationAction, setArticulationAction] = useState<string>("0");
@@ -133,8 +135,11 @@ export default function RowActions({
   };
 
 
-  // Only show action dropdowns if not Processed, equivalenthours, or empty
-  const showActions = type !== "Processed" && type !== "equivalenthours" && type !== "";
+  // Only show action dropdowns if not equivalenthours or empty
+  // For School module, also show actions on Processed page (to allow rerun)
+  // For College module, hide actions on Processed page (matching CI3 behavior)
+  const showActions = type !== "equivalenthours" && type !== "" && 
+    (module === "school" || type !== "Processed");
 
   return (
     <div className="flex flex-col gap-2" style={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>
@@ -150,6 +155,7 @@ export default function RowActions({
                 searchField={searchField}
                 articulationStatus={articulationStatus}
                 onActionChange={handleArticulationActionChange}
+                module={module}
               />
             )
           ) : (
@@ -160,6 +166,7 @@ export default function RowActions({
               currentStatus={row.TRANSCRIPT_STATUS_FLAG}
               searchField={searchField}
               onActionChange={handleTranscriptActionChange}
+              module={module}
             />
           )}
         </div>

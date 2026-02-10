@@ -11,7 +11,7 @@ import { api } from "../../../../config/api";
 import { RefreshIcon, PlusIcon, PencilIcon, TrashBinIcon, CopyIcon } from "../../../../icons";
 import { useAuth } from "../../../../context/AuthContext";
 import ConfirmationModal from "../../../../components/common/ConfirmationModal";
-import { alertsuccess } from "../../../../utils/toast";
+import { alertsuccess, alerterror } from "../../../../utils/toast";
 
 export default function OverrideEditMapping() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);

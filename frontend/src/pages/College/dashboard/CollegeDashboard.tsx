@@ -391,9 +391,13 @@ export default function CollegeDashboard() {
     },
   });
 
-  // CI3 colors for "Transcripts Processed In Banner" chart
-  // Order: Downloaded, SOAPCOL, SHATAEQ, BDMS, Rerun, Failed
-  const bannerProcessedColors = ["#86f886", "#b1a2ff", "#ffa6e2", "#7cffeb", "#A9B1BC", "#ff8f8f"];
+
+  /** Resolve donut colours from label names via LABEL_COLORS */
+  const getDonutColors = (labels: string[] | undefined): string[] => {
+    const fallback = ["#e57124", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899"];
+    if (!labels || labels.length === 0) return fallback;
+    return labels.map((l, i) => LABEL_COLORS[l] ?? fallback[i % fallback.length]);
+  };
 
   const donutChartOptions = (labels: string[]): ApexOptions => ({
     chart: { 
@@ -429,7 +433,7 @@ export default function CollegeDashboard() {
         return safeFormatter(seriesName);
       }
     },
-    colors: ["#e57124", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899"],
+    colors: getDonutColors(labels),
     tooltip: {
       theme: "light",
       style: {
@@ -754,7 +758,7 @@ export default function CollegeDashboard() {
                   <div className="rounded-lg bg-white/80 p-3 shadow-inner dark:bg-gray-900/50">
                     {hasChartData(dashboardData.transcriptSources?.labels, dashboardData.transcriptSources?.datasets) ? (
                       <Chart 
-                        options={getLineChartOptions(dashboardData.transcriptSources?.labels || [])} 
+                        options={getLineChartOptions(dashboardData.transcriptSources?.labels || [], getColorsForDatasets(dashboardData.transcriptSources?.datasets))} 
                         series={dashboardData.transcriptSources?.datasets || []} 
                         type="line" 
                         height={280} 
@@ -780,7 +784,7 @@ export default function CollegeDashboard() {
                   <div className="rounded-lg bg-white/80 p-3 shadow-inner dark:bg-gray-900/50">
                     {hasChartData(dashboardData.transcriptStatus?.labels, dashboardData.transcriptStatus?.datasets) ? (
                       <Chart 
-                        options={getBarChartOptions(dashboardData.transcriptStatus?.labels || [])} 
+                        options={getBarChartOptions(dashboardData.transcriptStatus?.labels || [], getColorsForDatasets(dashboardData.transcriptStatus?.datasets))} 
                         series={dashboardData.transcriptStatus?.datasets || []} 
                         type="bar" 
                         height={280} 
@@ -806,7 +810,7 @@ export default function CollegeDashboard() {
                   <div className="rounded-lg bg-white/80 p-3 shadow-inner dark:bg-gray-900/50">
                     {hasChartData(dashboardData.transcriptProcessed?.labels, dashboardData.transcriptProcessed?.datasets) ? (
                       <Chart 
-                        options={getBarChartOptions(dashboardData.transcriptProcessed?.labels || [], bannerProcessedColors)} 
+                        options={getBarChartOptions(dashboardData.transcriptProcessed?.labels || [], getColorsForDatasets(dashboardData.transcriptProcessed?.datasets))} 
                         series={dashboardData.transcriptProcessed?.datasets || []} 
                         type="bar" 
                         height={320} 
@@ -829,7 +833,7 @@ export default function CollegeDashboard() {
                   <div className="rounded-lg bg-white/80 p-3 shadow-inner dark:bg-gray-900/50">
                     {hasChartData(dashboardData.initialKickouts?.labels, dashboardData.initialKickouts?.datasets) ? (
                       <Chart 
-                        options={getBarChartOptions(dashboardData.initialKickouts?.labels || [])} 
+                        options={getBarChartOptions(dashboardData.initialKickouts?.labels || [], getColorsForDatasets(dashboardData.initialKickouts?.datasets))} 
                         series={dashboardData.initialKickouts?.datasets || []} 
                         type="bar" 
                         height={250} 
@@ -849,7 +853,7 @@ export default function CollegeDashboard() {
                   <div className="rounded-lg bg-white/80 p-3 shadow-inner dark:bg-gray-900/50">
                     {hasChartData(dashboardData.transcriptKickouts?.labels, dashboardData.transcriptKickouts?.datasets) ? (
                       <Chart 
-                        options={getBarChartOptions(dashboardData.transcriptKickouts?.labels || [])} 
+                        options={getBarChartOptions(dashboardData.transcriptKickouts?.labels || [], getColorsForDatasets(dashboardData.transcriptKickouts?.datasets))} 
                         series={dashboardData.transcriptKickouts?.datasets || []} 
                         type="bar" 
                         height={250} 
@@ -869,7 +873,7 @@ export default function CollegeDashboard() {
                   <div className="rounded-lg bg-white/80 p-3 shadow-inner dark:bg-gray-900/50">
                     {hasChartData(dashboardData.articulationKickouts?.labels, dashboardData.articulationKickouts?.datasets) ? (
                       <Chart 
-                        options={getBarChartOptions(dashboardData.articulationKickouts?.labels || [])} 
+                        options={getBarChartOptions(dashboardData.articulationKickouts?.labels || [], getColorsForDatasets(dashboardData.articulationKickouts?.datasets))} 
                         series={dashboardData.articulationKickouts?.datasets || []} 
                         type="bar" 
                         height={250} 
@@ -889,7 +893,7 @@ export default function CollegeDashboard() {
                   <div className="rounded-lg bg-white/80 p-3 shadow-inner dark:bg-gray-900/50">
                     {hasChartData(dashboardData.articulationCoursesKickouts?.labels, dashboardData.articulationCoursesKickouts?.datasets) ? (
                       <Chart 
-                        options={getBarChartOptions(dashboardData.articulationCoursesKickouts?.labels || [])} 
+                        options={getBarChartOptions(dashboardData.articulationCoursesKickouts?.labels || [], getColorsForDatasets(dashboardData.articulationCoursesKickouts?.datasets))} 
                         series={dashboardData.articulationCoursesKickouts?.datasets || []} 
                         type="bar" 
                         height={250} 

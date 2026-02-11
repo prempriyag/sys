@@ -9,7 +9,7 @@ import StatusBadge from "../../../components/common/StatusBadge";
 import { api, API_ENDPOINTS, API_BASE_URL, getAuthToken } from "../../../config/api";
 import { useAuth } from "../../../context/AuthContext";
 import { useToast } from "../../../context/ToastContext";
-import { PencilIcon, TrashBinIcon, LockIcon } from "../../../icons";
+import { PencilIcon, TrashBinIcon, LockIcon, RefreshIcon } from "../../../icons";
 import ResetPasswordModal from "./ResetPasswordModal";
 import AddUserModal from "./AddUserModal";
 import EditUserModal from "./EditUserModal";
@@ -158,17 +158,6 @@ export default function UserManagement() {
       <PageBreadcrumb pageTitle="User Management" />
 
       <PageContainer>
-        {/* Header */}
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="font-semibold text-gray-800 text-theme-xl dark:text-white/90 sm:text-2xl">
-            User Management
-          </h3>
-          <Button
-            onClick={() => setShowAddUserModal(true)}
-          >
-            Add User
-          </Button>
-        </div>
 
         {/* Error Message */}
         {error && (
@@ -186,6 +175,7 @@ export default function UserManagement() {
         {/* Users DataTable */}
         <DataTable
           refreshTrigger={refreshTrigger}
+          toolbarActions={<><Button size="sm" onClick={() => setShowAddUserModal(true)}>Add User</Button><button onClick={() => setRefreshTrigger((prev) => prev + 1)} className="inline-flex items-center gap-1.5 rounded border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700"><RefreshIcon className="w-4 h-4" /> Refresh</button></>}
           columns={[
             { data: "name", name: "Name", searchable: true, orderable: true, width: "150px" },
             { data: "email", name: "Email", searchable: true, orderable: true, width: "220px" },

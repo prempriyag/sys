@@ -184,7 +184,7 @@ body, html {
   --shadow-theme-xl: 0px 20px 24px -4px rgba(16, 24, 40, 0.08),
     0px 8px 8px -4px rgba(16, 24, 40, 0.03);
   --shadow-datepicker: -5px 0 0 #262d3c, 5px 0 0 #262d3c;
-  --shadow-focus-ring: 0px 0px 0px 4px rgba(70, 95, 255, 0.12);
+  --shadow-focus-ring: 0px 0px 0px 4px rgba(229, 113, 36, 0.12);
   --shadow-slider-navigation: 0px 1px 2px 0px rgba(16, 24, 40, 0.1),
     0px 1px 3px 0px rgba(16, 24, 40, 0.1);
   --shadow-tooltip: 0px 4px 6px -2px rgba(16, 24, 40, 0.05),
@@ -247,34 +247,44 @@ body, html {
   }
 }
 
+/* ──────────────────────────────────────────────────────────
+   Sidebar menu utilities
+   Primary: #e57124 (brand-500)  |  Secondary: #000000 (black)
+   ────────────────────────────────────────────────────────── */
+
 @utility menu-item {
-  @apply relative flex items-center w-full gap-3 px-3 py-2 font-medium rounded-lg text-theme-sm;
+  @apply relative flex items-center w-full gap-3 px-3 py-2.5 font-medium rounded-lg text-theme-sm
+         transition-all duration-200 ease-out;
 }
 
 @utility menu-item-active {
-  @apply bg-brand-500 text-white dark:bg-gray-900 dark:text-white;
+  @apply bg-brand-50 text-brand-700 font-semibold
+         dark:bg-brand-500/15 dark:text-brand-300;
 }
 
 @utility menu-item-inactive {
-  @apply text-gray-700 hover:bg-gray-100 group-hover:text-gray-700 dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-gray-300;
+  @apply text-gray-800 dark:text-gray-300
+         hover:bg-brand-50/60 hover:text-black
+         dark:hover:bg-brand-500/10 dark:hover:text-white;
 }
 
 @utility menu-item-icon {
-  @apply text-gray-500 group-hover:text-gray-700 dark:text-gray-400;
+  @apply text-gray-600 group-hover:text-brand-500 dark:text-gray-400
+         transition-colors duration-200;
 }
 
 @utility menu-item-icon-active {
-  @apply text-white;
+  @apply text-brand-600 dark:text-brand-400;
 }
 
 @utility menu-item-icon-size {
-  & svg {
-    @apply !size-6;
-  }
+  @apply transition-transform duration-200;
 }
 
 @utility menu-item-icon-inactive {
-  @apply text-gray-500 group-hover:text-gray-700 dark:text-gray-400 dark:group-hover:text-gray-300;
+  @apply text-gray-500 group-hover:text-brand-500
+         dark:text-gray-400 dark:group-hover:text-brand-400
+         transition-colors duration-200;
 }
 
 @utility menu-item-arrow {
@@ -286,23 +296,28 @@ body, html {
 }
 
 @utility menu-item-arrow-inactive {
-  @apply text-gray-500 group-hover:text-gray-700 dark:text-gray-400 dark:group-hover:text-gray-300;
+  @apply text-gray-400 group-hover:text-brand-500 dark:text-gray-500 dark:group-hover:text-brand-400
+         transition-colors duration-200;
 }
 
 @utility menu-dropdown-item {
-  @apply relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-theme-sm font-medium;
+  @apply relative flex items-center gap-3 rounded-lg px-3 py-2 text-theme-sm font-medium
+         transition-all duration-200 ease-out;
 }
 
 @utility menu-dropdown-item-active {
-  @apply bg-brand-500 text-white dark:bg-gray-900 dark:text-white;
+  @apply bg-brand-50 text-brand-700 font-semibold
+         dark:bg-brand-500/15 dark:text-brand-300;
 }
 
 @utility menu-dropdown-item-inactive {
-  @apply text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/5;
+  @apply text-gray-700 dark:text-gray-400
+         hover:bg-brand-50/50 hover:text-black
+         dark:hover:bg-brand-500/10 dark:hover:text-white;
 }
 
 @utility menu-dropdown-badge {
-  @apply block rounded-full px-2.5 py-0.5 text-xs font-medium uppercase text-brand-500 dark:text-brand-400;
+  @apply block rounded-full px-2.5 py-0.5 text-xs font-medium uppercase text-brand-600 dark:text-brand-400;
 }
 
 @utility menu-dropdown-badge-active {
@@ -312,6 +327,85 @@ body, html {
 @utility menu-dropdown-badge-inactive {
   @apply bg-brand-50 group-hover:bg-brand-100 dark:bg-brand-500/15 dark:group-hover:bg-brand-500/20;
 }
+
+/* Icon SVG sizing (plain CSS — avoids nesting issues in @utility) */
+.menu-item-icon-size svg {
+  width: 1.25rem !important;
+  height: 1.25rem !important;
+}
+
+/* ── Pseudo-element decorations (plain CSS for Tailwind v4 compat) ── */
+
+/* Active menu item — left orange accent bar */
+.menu-item-active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 1.5rem;
+  border-radius: 0 9999px 9999px 0;
+  background-color: var(--color-brand-500);
+}
+
+/* Inactive menu item — accent bar grows on hover */
+.menu-item-inactive::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 0;
+  border-radius: 0 9999px 9999px 0;
+  background-color: var(--color-brand-400);
+  opacity: 0.6;
+  transition: height 0.2s ease;
+}
+.menu-item-inactive:hover::before {
+  height: 1rem;
+}
+
+/* Active dropdown sub-item — orange dot */
+.menu-dropdown-item-active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: 9999px;
+  background-color: var(--color-brand-500);
+}
+
+/* Inactive dropdown sub-item — faint dot on hover */
+.menu-dropdown-item-inactive::before {
+  content: "";
+  position: absolute;
+  left: 0.125rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0.25rem;
+  height: 0.25rem;
+  border-radius: 9999px;
+  background-color: transparent;
+  transition: background-color 0.2s ease;
+}
+.menu-dropdown-item-inactive:hover::before {
+  background-color: var(--color-brand-400);
+  opacity: 0.5;
+}
+
+/* Dark mode overrides for accent bars/dots */
+:is(.dark .menu-item-active)::before {
+  background-color: var(--color-brand-400);
+}
+:is(.dark .menu-dropdown-item-active)::before {
+  background-color: var(--color-brand-400);
+}
+
 @utility no-scrollbar {
   /* Chrome, Safari and Opera */
   &::-webkit-scrollbar {
@@ -600,13 +694,12 @@ span.flatpickr-weekday,
 .flatpickr-day.selected.nextMonthDay,
 .flatpickr-day.startRange.nextMonthDay,
 .flatpickr-day.endRange.nextMonthDay {
-  background: #465fff;
   @apply !border-brand-500 !bg-brand-500 hover:!border-brand-500 hover:!bg-brand-500;
 }
 .flatpickr-day.selected.startRange + .endRange:not(:nth-child(7n + 1)),
 .flatpickr-day.startRange.startRange + .endRange:not(:nth-child(7n + 1)),
 .flatpickr-day.endRange.startRange + .endRange:not(:nth-child(7n + 1)) {
-  box-shadow: -10px 0 0 #465fff;
+  box-shadow: -10px 0 0 var(--color-brand-500, #e57124);
 }
 
 .flatpickr-months .flatpickr-prev-month svg,
@@ -1022,6 +1115,14 @@ body,
 }
 
 /* Landscape orientation adjustments for mobile */
+/* DataTable: constrain form elements inside table cells to column width */
+table td input,
+table td select,
+table td textarea {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
 @media (max-width: 768px) and (orientation: landscape) {
   /* Adjustments for landscape mobile view */
   .app-sidebar {

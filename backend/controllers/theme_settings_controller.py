@@ -67,7 +67,7 @@ async def get_settings(
     """
     # Default values
     defaults = {
-        "primaryColor": "#465fff",
+        "primaryColor": "#e57124",
         "logoUrl": "/images/logo/logo.svg",
         "logoIconUrl": "/images/logo/logo-icon.svg",
         "logoLightUrl": "/images/logo/connors-color.png",

@@ -172,18 +172,10 @@ export default function TransferGradesMapping() {
       <PageMeta title="Transfer Grades Mapping | College Module" description="Manage transfer grades mappings" />
       <PageBreadcrumb pageTitle="Transfer Grades Mapping" />
       <PageContainer>
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="font-semibold text-gray-800 text-theme-xl dark:text-white/90 sm:text-2xl">View Transfer Grades</h3>
-          <div className="flex items-center gap-2">
-            {hasAddPermission && (
-              <Button onClick={handleAdd}>Add Grade</Button>
-            )}
-            <Button onClick={() => setRefreshTrigger((prev) => prev + 1)} variant="outline" startIcon={<RefreshIcon className="w-5 h-5" />}>Refresh Data</Button>
-          </div>
-        </div>
 
         <DataTable
           refreshTrigger={refreshTrigger}
+          toolbarActions={<>{hasAddPermission && <Button size="sm" onClick={handleAdd}>Add Grade</Button>}<button onClick={() => setRefreshTrigger((prev) => prev + 1)} className="inline-flex items-center gap-1.5 rounded border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700"><RefreshIcon className="w-4 h-4" /> Refresh</button></>}
           ajaxUrl="/api/transfergrades/ajaxlist"
           columns={[
             { data: "TRANSFER_GRADE", name: "Transfer Grade", searchable: true, orderable: true },

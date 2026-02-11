@@ -49,7 +49,7 @@ export const collegeMenu: MenuConfig = {
     },
     {
       name: "Articulation",
-      icon: "settings",
+      icon: "link",
       permissions: ["articulation_kickouts", "articulation_phase2_kickouts", "articulation_processed", "articulation_rerun","college_digiscript_reports"],
       subItems: [
         {
@@ -132,13 +132,13 @@ export const collegeMenu: MenuConfig = {
           name: "Equivalent Roll Mismatch",
           path: "/college/transcriptequivalenthours",
           permission: "college_digiscript_reports",
-          icon: "alert",
+          icon: "table",
         },
         {
           name: "Articulation",
           path: "/college/articulationreports",
           permission: "college_digiscript_reports",
-          icon: "settings",
+          icon: "link",
         },
         {
           name: "DigiScript",
@@ -178,7 +178,7 @@ export const collegeMenu: MenuConfig = {
           name: "Degree",
           path: "/college/degreemapping",
           permission: "college_degree",
-          icon: "page",
+          icon: "docs",
         },
         {
           name: "Terms",
@@ -202,7 +202,7 @@ export const collegeMenu: MenuConfig = {
           name: "Skip Keywords",
           path: "/college/osuskipkeywords",
           permission: "osu_skip_keywords",
-          icon: "pencil",
+          icon: "alert",
         },
         {
           name: "Accepted Grades",
@@ -214,7 +214,7 @@ export const collegeMenu: MenuConfig = {
           name: "Accredited Institution",
           path: "/college/accreditedInstitution",
           permission: "accredited_institution",
-          icon: "box",
+          icon: "folder",
         },
         {
           name: "Transfer Grades",
@@ -244,7 +244,7 @@ export const collegeMenu: MenuConfig = {
           name: "Skip/Exclude Courses",
           path: "/college/skipcourses",
           permission: "skip_exclude_courses",
-          icon: "list",
+          icon: "alert",
         },
         {
           name: "Override Edit Mapping",
@@ -256,13 +256,13 @@ export const collegeMenu: MenuConfig = {
           name: "Suffix Names",
           path: "/college/suffixname",
           permission: "suffix_names",
-          icon: "file-text",
+          icon: "list",
         },
         {
           name: "Prefix Names",
           path: "/college/prefixname",
           permission: "prefix_words",
-          icon: "file-text",
+          icon: "list",
         },
         {
           name: "Combined Names",
@@ -274,11 +274,13 @@ export const collegeMenu: MenuConfig = {
           name: "Bot Schedule",
           path: "/college/botschedule",
           permission: "bot_schedule",
+          icon: "bot",
         },
         {
           name: "Bot Status Report",
           path: "/college/botstatusreport",
           permission: "bot_status_report",
+          icon: "bar-chart",
         },
       ],
     },
@@ -292,11 +294,13 @@ export const collegeMenu: MenuConfig = {
           name: "Transcript Header OCR",
           path: "/college/transcripthdrocr",
           permission: "college_transcript_header_ocr",
+          icon: "file-text",
         },
         {
           name: "Transcript Line OCR",
           path: "/college/transcriptlineocr",
           permission: "college_transcript_line_ocr",
+          icon: "list",
         },
       ],
     },
@@ -310,17 +314,19 @@ export const collegeMenu: MenuConfig = {
           name: "Transcript Header DATA",
           path: "/college/transcripthdrdata",
           permission: "college_transcript_header_data",
+          icon: "file-text",
         },
         {
           name: "Transcript Line DATA",
           path: "/college/transcriptlinedata",
           permission: "college_transcript_line_data",
+          icon: "table",
         },
       ],
     },
     {
       name: "Audit Log [P3]",
-      icon: "file-text",
+      icon: "clipboard",
       // PHP uses checkallpermission with transcript_log and articulation_log
       permissions: ["transcript_log", "articulation_log"],
       subItems: [
@@ -328,11 +334,13 @@ export const collegeMenu: MenuConfig = {
           name: "Transcript Log",
           path: "/college/digiscriptbotlog",
           permission: "transcript_log",
+          icon: "file-text",
         },
         {
           name: "Articulation Log",
           path: "/college/articulationbotlog",
           permission: "articulation_log",
+          icon: "link",
         },
       ],
     },
@@ -352,15 +360,18 @@ export const collegeMenu: MenuConfig = {
           name: "Permissions",
           path: "/college/permissions",
           permission: "permissions",
+          icon: "check-circle",
         },
         {
           name: "Roles",
           path: "/college/roles",
           permission: "role",
+          icon: "users",
         },
         {
           name: "Error Logs",
           path: "/college/Error_log",
+          icon: "alert",
         },
       ],
     },

@@ -27,7 +27,7 @@ type ThemeColorContextType = {
 const ThemeColorContext = createContext<ThemeColorContextType | undefined>(undefined);
 
 export const ThemeColorProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [primaryColor, setPrimaryColorState] = useState<string>("#465fff"); // Default brand-500
+  const [primaryColor, setPrimaryColorState] = useState<string>("#e57124"); // Default brand-500
   const [logoUrl, setLogoUrlState] = useState<string>("/images/logo/logo.svg");
   const [logoIconUrl, setLogoIconUrlState] = useState<string>("/images/logo/logo-icon.svg");
   const [logoLightUrl, setLogoLightUrlState] = useState<string>("/images/logo/connors-color.png");
@@ -73,12 +73,16 @@ export const ThemeColorProvider: React.FC<{ children: ReactNode }> = ({ children
     const savedSidebarBg = localStorage.getItem("sidebarBgColor");
     const savedSidebarText = localStorage.getItem("sidebarTextColor");
     
-    if (savedColor) {
+    if (savedColor && savedColor !== "#465fff") {
+      // Use saved color (skip old blue default)
       setPrimaryColorState(savedColor);
       updateCSSVariables(savedColor);
     } else {
-      // Initialize with default color if no saved color
-      updateCSSVariables("#465fff");
+      // Initialize with default color if no saved color or old blue default
+      const defaultColor = "#e57124";
+      setPrimaryColorState(defaultColor);
+      localStorage.setItem("themeColor", defaultColor);
+      updateCSSVariables(defaultColor);
     }
     
     if (savedLogo) setLogoUrlState(savedLogo);

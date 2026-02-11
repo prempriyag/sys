@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from "react";
 import { useNavigate } from "react-router";
 import { api, API_ENDPOINTS, setAuthToken, removeAuthToken, getAuthToken } from "../config/api";
 import { alerterror } from "../utils/toast";
@@ -66,8 +66,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [twoWayPending, setTwoWayPending] = useState<TwoWayAuthPending | null>(null);
   const navigate = useNavigate();
 
+  // Use ref for navigate to avoid dependency changes triggering re-execution
+  const navigateRef = useRef(navigate);
+  useEffect(() => {
+    navigateRef.current = navigate;
+  }, [navigate]);
+
+  // Ref to prevent StrictMode double-execution of verifySession
+  const sessionVerified = useRef(false);
+
   // Check if user is already logged in and verify session
   useEffect(() => {
+    // Prevent double execution in StrictMode
+    if (sessionVerified.current) return;
+    sessionVerified.current = true;
+
     const verifySession = async () => {
       const token = getAuthToken();
       const storedUser = localStorage.getItem("user");
@@ -105,7 +118,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             // Only redirect if not already on login page
             const currentPath = window.location.pathname;
             if (currentPath !== "/login" && !currentPath.includes("/login")) {
-              navigate("/login");
+              navigateRef.current("/login");
             }
           }
         } catch (error) {
@@ -118,7 +131,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
 
     verifySession();
-  }, [navigate]);
+  }, []); // Empty deps - run only once on mount
 
   const _handleLoginSuccess = (response: any) => {
     setAuthToken(response.access_token);
@@ -266,7 +279,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setPermissions(null);
         alerterror("You have been inactive for 30 minutes. Please login again.", false);
         setTimeout(() => {
-          navigate("/login");
+          navigateRef.current("/login");
         }, 1000);
       }, IDLE_TIMEOUT);
     };
@@ -325,7 +338,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       });
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [user, navigate]);
+  }, [user]); // navigateRef is stable, no need in deps
+
+  // Use ref for logout to avoid dependency changes
+  const logoutRef = useRef(logout);
+  useEffect(() => {
+    logoutRef.current = logout;
+  }, [logout]);
 
   // Periodic session verification (every 10 minutes) - only when user is active
   // This checks if the session is still valid on the server side
@@ -335,7 +354,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const verifyInterval = setInterval(async () => {
       const token = getAuthToken();
       if (!token) {
-        logout();
+        logoutRef.current();
         return;
       }
 
@@ -352,7 +371,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           setPermissions(null);
           alerterror("Your session has expired. Please login again.", false);
           setTimeout(() => {
-            navigate("/login");
+            navigateRef.current("/login");
           }, 1000);
         }
         // For network errors, don't logout - just log the error
@@ -361,7 +380,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }, 10 * 60 * 1000); // Check every 10 minutes (only when user is active)
 
     return () => clearInterval(verifyInterval);
-  }, [user, navigate, logout]);
+  }, [user]); // refs are stable, only re-run when user changes
 
   // Check if user has a specific permission (similar to checkpermission in PHP)
   // API returns permissions as strings ("0", "1"), so we check both number and string

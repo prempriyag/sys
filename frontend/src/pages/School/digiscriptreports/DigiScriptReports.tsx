@@ -167,19 +167,25 @@ export default function DigiScriptReports() {
               width: "120px",
               render: (data: any) => {
                 if (!data) return "-";
-                if (hasUpdatePermission) {
-                  return (
+                return (
+                  <span className="inline-flex items-center whitespace-nowrap">
                     <span 
-                      className="cursor-pointer hover:text-brand-500 inline-flex items-center" 
+                      className="cursor-pointer hover:text-brand-500 flex-shrink-0 me-1" 
                       onClick={() => copyToClipboard(data)}
                       title="Click to copy"
                     >
-                      <CopyIcon className="w-4 h-4 me-1" />
-                      {data}
+                      <CopyIcon className="w-4 h-4" />
                     </span>
-                  );
-                }
-                return <span>{data}</span>;
+                    <a 
+                      href={`/school/studentview?student_id=${data}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-brand-500 hover:underline"
+                    >
+                      {data}
+                    </a>
+                  </span>
+                );
               }
             },
             { data: "STUDENT_FULL_NAME", name: "Student Name", searchable: true, orderable: true, width: "180px" },

@@ -139,7 +139,16 @@ export default function CollegeHeaderData() {
               orderable: true,
               render: (data: string) => {
                 if (!data) return "-";
-                return <span>{data}</span>;
+                return (
+                  <a 
+                    href={`/college/studentview?student_id=${data}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-brand-500 hover:underline"
+                  >
+                    {data}
+                  </a>
+                );
               },
             },
             { data: "INSTITUTION_NAME", name: "Institution Name", searchable: true, orderable: true },

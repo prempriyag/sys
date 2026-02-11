@@ -167,19 +167,25 @@ export default function DigiScriptReports() {
               width: "120px",
               render: (data: any) => {
                 if (!data) return "-";
-                if (hasUpdatePermission) {
-                  return (
+                return (
+                  <span className="inline-flex items-center whitespace-nowrap">
                     <span 
-                      className="cursor-pointer hover:text-brand-500 inline-flex items-center" 
+                      className="cursor-pointer hover:text-brand-500 flex-shrink-0 me-1" 
                       onClick={() => copyToClipboard(data)}
                       title="Click to copy"
                     >
-                      <CopyIcon className="w-4 h-4 me-1" />
-                      {data}
+                      <CopyIcon className="w-4 h-4" />
                     </span>
-                  );
-                }
-                return <span>{data}</span>;
+                    <a 
+                      href={`/college/studentview?student_id=${data}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-brand-500 hover:underline"
+                    >
+                      {data}
+                    </a>
+                  </span>
+                );
               }
             },
             { data: "STUDENT_FULL_NAME", name: "Student Name", searchable: true, orderable: true, width: "180px" },
@@ -257,13 +263,13 @@ export default function DigiScriptReports() {
                 return <StatusBadge status={data} size="sm" />;
               }
             },
-            { data: "DEGREE_CD", name: "Degree", searchable: false, orderable: false, width: "80px", render: (data: any) => data || "-" },
+            { data: "DEGREE_CD", name: "Degree", searchable: true, orderable: true, width: "80px", render: (data: any) => data || "-" },
             { data: "DEGREE_RECEIVED_DATE", name: "Degree Date", searchable: false, orderable: false, width: "110px", render: (data: any) => data || "-" },
             { data: "SECOND_DEGREE_CD", name: "Second Degree", searchable: false, orderable: false, width: "110px", render: (data: any) => data || "-" },
             { data: "SECOND_DEGREE_RECEIVED_DATE", name: "Second Degree Date", searchable: false, orderable: false, width: "130px", render: (data: any) => data || "-" },
             { data: "EFFECTIVE_TERM", name: "Effective Term", searchable: false, orderable: false, width: "110px", render: (data: any) => data || "-" },
-            { data: "OCR_MIN_START_TERM", name: "Start Term", searchable: false, orderable: false, width: "100px", render: (data: any) => data || "-" },
-            { data: "OCR_MAX_END_TERM", name: "End Term", searchable: false, orderable: false, width: "100px", render: (data: any) => data || "-" },
+            { data: "OCR_MIN_START_TERM", name: "Start Term", searchable: true, orderable: true, width: "100px", render: (data: any) => data || "-" },
+            { data: "OCR_MAX_END_TERM", name: "End Term", searchable: true, orderable: true, width: "100px", render: (data: any) => data || "-" },
             { data: "LEVEL", name: "Level", searchable: false, orderable: false, width: "70px", render: (data: any) => data || "-" },
             { data: "COMMENTS", name: "Comments", searchable: false, orderable: false, width: "300px", render: (data: any) => data || "-" },
             { data: "OCR_EXTRACTED_DATE", name: "OCR Date", searchable: false, orderable: true, width: "120px", render: (data: any) => data || "-" },

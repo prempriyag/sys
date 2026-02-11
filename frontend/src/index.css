@@ -1129,3 +1129,577 @@ table td textarea {
     /* Sidebar adjustments for landscape */
   }
 }
+
+/* ============================================
+   Auth Page — Animated Background + Glassmorphism
+   ============================================ */
+
+/* ---------- Main container ---------- */
+.auth-animated-bg {
+  position: relative;
+  width: 100%;
+  min-height: 100vh;
+  overflow: hidden;
+  background: #0a1628;
+}
+
+/* ---------- Background image ---------- */
+.auth-bg-image {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: url("/images/auth-bg.png") center center / cover no-repeat;
+  animation: authBgPan 30s ease-in-out infinite alternate;
+}
+
+@keyframes authBgPan {
+  0% { transform: scale(1.05) translate(0, 0); }
+  25% { transform: scale(1.1) translate(-1%, -0.5%); }
+  50% { transform: scale(1.08) translate(0.5%, 0.5%); }
+  75% { transform: scale(1.12) translate(-0.5%, 0.3%); }
+  100% { transform: scale(1.05) translate(0.3%, -0.3%); }
+}
+
+/* ---------- Dark overlay with animated gradient ---------- */
+.auth-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(
+    135deg,
+    rgba(10, 22, 40, 0.55) 0%,
+    rgba(15, 30, 60, 0.45) 30%,
+    rgba(10, 20, 50, 0.35) 50%,
+    rgba(20, 40, 80, 0.45) 70%,
+    rgba(10, 22, 40, 0.55) 100%
+  );
+  background-size: 400% 400%;
+  animation: authOverlayShift 12s ease infinite;
+}
+
+@keyframes authOverlayShift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+/* ---------- Floating orbs ---------- */
+.auth-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  z-index: 2;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+.auth-orb-1 {
+  width: 350px;
+  height: 350px;
+  background: radial-gradient(circle, rgba(229, 113, 36, 0.25) 0%, transparent 70%);
+  top: -5%;
+  right: -5%;
+  animation: authOrbFloat1 8s ease-in-out infinite;
+}
+.auth-orb-2 {
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(circle, rgba(56, 152, 236, 0.2) 0%, transparent 70%);
+  bottom: -8%;
+  left: -5%;
+  animation: authOrbFloat2 10s ease-in-out infinite;
+}
+.auth-orb-3 {
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle, rgba(100, 220, 200, 0.15) 0%, transparent 70%);
+  top: 40%;
+  left: 15%;
+  animation: authOrbFloat3 12s ease-in-out infinite;
+}
+.auth-orb-4 {
+  width: 250px;
+  height: 250px;
+  background: radial-gradient(circle, rgba(180, 100, 255, 0.12) 0%, transparent 70%);
+  top: 20%;
+  right: 20%;
+  animation: authOrbFloat4 9s ease-in-out infinite;
+}
+
+@keyframes authOrbFloat1 {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.7; }
+  50% { transform: translate(-30px, 30px) scale(1.15); opacity: 1; }
+}
+@keyframes authOrbFloat2 {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.6; }
+  50% { transform: translate(25px, -25px) scale(1.1); opacity: 0.9; }
+}
+@keyframes authOrbFloat3 {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.5; }
+  50% { transform: translate(20px, 15px) scale(1.2); opacity: 0.8; }
+}
+@keyframes authOrbFloat4 {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.4; }
+  50% { transform: translate(-15px, -20px) scale(1.1); opacity: 0.7; }
+}
+
+/* ---------- Particles ---------- */
+.auth-particle {
+  position: absolute;
+  z-index: 3;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.9) 0%, rgba(100, 180, 255, 0.5) 100%);
+  pointer-events: none;
+  animation: authParticleFloat 6s ease-in-out infinite;
+  will-change: transform, opacity;
+  box-shadow: 0 0 6px 1px rgba(100, 180, 255, 0.3);
+}
+
+@keyframes authParticleFloat {
+  0%, 100% {
+    transform: translateY(0) translateX(0) scale(1);
+    opacity: 0.3;
+  }
+  25% {
+    transform: translateY(-15px) translateX(8px) scale(1.3);
+    opacity: 0.8;
+  }
+  50% {
+    transform: translateY(-8px) translateX(-5px) scale(1);
+    opacity: 0.5;
+  }
+  75% {
+    transform: translateY(-20px) translateX(10px) scale(1.2);
+    opacity: 0.9;
+  }
+}
+
+/* ---------- Horizontal scanline effect ---------- */
+.auth-scanline {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    transparent 48%,
+    rgba(100, 180, 255, 0.03) 49%,
+    rgba(100, 180, 255, 0.06) 50%,
+    rgba(100, 180, 255, 0.03) 51%,
+    transparent 52%,
+    transparent 100%
+  );
+  background-size: 100% 8px;
+  animation: authScanline 4s linear infinite;
+  opacity: 0.4;
+}
+
+@keyframes authScanline {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100%); }
+}
+
+/* ---------- Glassmorphism card ---------- */
+.auth-glass-card {
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 1.25rem;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset,
+    0 1px 0 rgba(255, 255, 255, 0.1) inset;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Subtle top-edge highlight */
+.auth-glass-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 10%;
+  right: 10%;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.25),
+    transparent
+  );
+}
+
+/* ---------- Fade-in animation for the card ---------- */
+.auth-fade-in {
+  animation: authCardFadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes authCardFadeIn {
+  0% {
+    opacity: 0;
+    transform: translateY(30px) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ---------- Form container ---------- */
+.auth-form-container {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+/* ---------- SSO buttons ---------- */
+.auth-sso-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.65rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0.625rem;
+  transition: all 0.25s ease;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+}
+.auth-sso-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.25);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+/* ---------- Input fields ---------- */
+.auth-input {
+  width: 100%;
+  padding: 0.625rem 1rem;
+  font-size: 0.875rem;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 0.625rem;
+  outline: none;
+  transition: all 0.25s ease;
+  backdrop-filter: blur(4px);
+}
+.auth-input::placeholder {
+  color: rgba(255, 255, 255, 0.35);
+}
+.auth-input:focus {
+  border-color: rgba(229, 113, 36, 0.6);
+  box-shadow: 0 0 0 3px rgba(229, 113, 36, 0.15), 0 0 20px rgba(229, 113, 36, 0.08);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* ---------- Submit button glow ---------- */
+.auth-submit-btn {
+  position: relative;
+  overflow: hidden;
+}
+.auth-submit-btn::after {
+  content: "";
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    45deg,
+    transparent 40%,
+    rgba(255, 255, 255, 0.1) 50%,
+    transparent 60%
+  );
+  animation: authBtnShine 3s ease-in-out infinite;
+}
+
+@keyframes authBtnShine {
+  0%, 100% { transform: translateX(-100%) rotate(45deg); }
+  50% { transform: translateX(100%) rotate(45deg); }
+}
+
+/* ---------- Responsive tweaks ---------- */
+@media (max-width: 640px) {
+  .auth-glass-card {
+    margin: 0.5rem;
+    padding: 1.5rem !important;
+  }
+  .auth-orb { filter: blur(60px); }
+  .auth-orb-1 { width: 200px; height: 200px; }
+  .auth-orb-2 { width: 180px; height: 180px; }
+  .auth-orb-3 { width: 120px; height: 120px; }
+  .auth-orb-4 { width: 150px; height: 150px; }
+}
+
+/* ============================================
+   Animated Login Page Styles
+   ============================================ */
+
+/* --- Full-screen animated background --- */
+.auth-animated-bg {
+  position: relative;
+  min-height: 100vh;
+  width: 100%;
+  overflow: hidden;
+  background: linear-gradient(135deg, #0a0e27 0%, #0d1b3e 25%, #0a1628 50%, #0f1f3d 75%, #080d20 100%);
+  background-size: 400% 400%;
+  animation: authGradientShift 15s ease infinite;
+}
+
+@keyframes authGradientShift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* --- Floating gradient orbs --- */
+.auth-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.35;
+  pointer-events: none;
+  z-index: 1;
+}
+.auth-orb-1 {
+  width: 420px;
+  height: 420px;
+  background: radial-gradient(circle, #e57124 0%, transparent 70%);
+  top: -10%;
+  left: -8%;
+  animation: authOrbFloat1 12s ease-in-out infinite;
+}
+.auth-orb-2 {
+  width: 350px;
+  height: 350px;
+  background: radial-gradient(circle, #3b82f6 0%, transparent 70%);
+  bottom: -8%;
+  right: -6%;
+  animation: authOrbFloat2 14s ease-in-out infinite;
+}
+.auth-orb-3 {
+  width: 280px;
+  height: 280px;
+  background: radial-gradient(circle, #06b6d4 0%, transparent 70%);
+  top: 50%;
+  right: 20%;
+  animation: authOrbFloat3 10s ease-in-out infinite;
+}
+.auth-orb-4 {
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle, #8b5cf6 0%, transparent 70%);
+  bottom: 20%;
+  left: 15%;
+  animation: authOrbFloat4 16s ease-in-out infinite;
+}
+
+@keyframes authOrbFloat1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%      { transform: translate(60px, 40px) scale(1.1); }
+  66%      { transform: translate(-30px, 80px) scale(0.95); }
+}
+@keyframes authOrbFloat2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%      { transform: translate(-50px, -60px) scale(1.15); }
+  66%      { transform: translate(40px, -30px) scale(0.9); }
+}
+@keyframes authOrbFloat3 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50%      { transform: translate(-70px, 50px) scale(1.08); }
+}
+@keyframes authOrbFloat4 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50%      { transform: translate(50px, -40px) scale(1.12); }
+}
+
+/* --- Floating particles --- */
+.auth-particle {
+  position: absolute;
+  border-radius: 50%;
+  background: #ffffff;
+  pointer-events: none;
+  z-index: 2;
+  animation: authParticleFloat linear infinite;
+}
+
+@keyframes authParticleFloat {
+  0% {
+    transform: translateY(0) translateX(0) scale(1);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.6;
+  }
+  50% {
+    transform: translateY(-40px) translateX(20px) scale(1.3);
+    opacity: 0.8;
+  }
+  90% {
+    opacity: 0.4;
+  }
+  100% {
+    transform: translateY(-80px) translateX(-15px) scale(0.8);
+    opacity: 0;
+  }
+}
+
+/* --- Subtle grid overlay --- */
+.auth-grid-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  opacity: 0.04;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.3) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.3) 1px, transparent 1px);
+  background-size: 60px 60px;
+  animation: authGridPulse 8s ease-in-out infinite;
+}
+
+@keyframes authGridPulse {
+  0%, 100% { opacity: 0.03; }
+  50%      { opacity: 0.06; }
+}
+
+/* --- Glassmorphism card --- */
+.auth-glass-card {
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 1.25rem;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  animation: authCardAppear 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes authCardAppear {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Subtle shimmer border on the card */
+.auth-glass-card::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: 1.25rem;
+  padding: 1px;
+  background: linear-gradient(
+    135deg,
+    rgba(229, 113, 36, 0.3) 0%,
+    transparent 40%,
+    transparent 60%,
+    rgba(59, 130, 246, 0.3) 100%
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  animation: authBorderShimmer 6s ease-in-out infinite;
+}
+
+@keyframes authBorderShimmer {
+  0%, 100% { opacity: 0.5; }
+  50%      { opacity: 1; }
+}
+
+/* --- Form container --- */
+.auth-form-container {
+  position: relative;
+  z-index: 1;
+}
+
+/* --- SSO buttons --- */
+.auth-sso-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0.5rem;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: all 0.25s ease;
+  cursor: pointer;
+}
+.auth-sso-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.25);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* --- Input fields --- */
+.auth-input {
+  width: 100%;
+  padding: 0.625rem 1rem;
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 0.5rem;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  outline: none;
+  transition: all 0.25s ease;
+}
+.auth-input::placeholder {
+  color: rgba(255, 255, 255, 0.35);
+}
+.auth-input:focus {
+  border-color: rgba(229, 113, 36, 0.6);
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 0 0 3px rgba(229, 113, 36, 0.15);
+}
+
+/* --- Submit button override --- */
+.auth-submit-btn {
+  background: linear-gradient(135deg, #e57124 0%, #f68319 100%) !important;
+  border: none !important;
+  color: #ffffff !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.02em;
+  transition: all 0.3s ease !important;
+  box-shadow: 0 4px 15px rgba(229, 113, 36, 0.35);
+}
+.auth-submit-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(229, 113, 36, 0.5) !important;
+}
+.auth-submit-btn:disabled {
+  opacity: 0.6;
+}
+
+/* --- Responsive tweaks for login page --- */
+@media (max-width: 640px) {
+  .auth-glass-card {
+    margin: 1rem;
+    padding: 1.5rem !important;
+  }
+  .auth-orb {
+    filter: blur(60px);
+    opacity: 0.25;
+  }
+}

@@ -2,8 +2,6 @@ import { useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import PageMeta from "../../components/common/PageMeta";
 import AuthLayout from "./AuthPageLayout";
-import Label from "../../components/form/Label";
-import Input from "../../components/form/input/InputField";
 import Button from "../../components/ui/button/Button";
 import { EyeCloseIcon, EyeIcon } from "../../icons";
 import { API_BASE_URL, API_ENDPOINTS } from "../../config/api";
@@ -106,18 +104,18 @@ export default function ForgotPassword() {
       <>
         <PageMeta title="Check your email | DigiScript" description="Password reset" />
         <AuthLayout>
-          <div className="flex flex-col justify-center flex-1 w-full max-w-md mx-auto">
-            <div className="p-6 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
-              <h2 className="mb-2 text-lg font-semibold text-green-800 dark:text-green-400">
+          <div className="auth-form-container">
+            <div className="p-6 rounded-lg bg-green-500/15 border border-green-500/30">
+              <h2 className="mb-2 text-lg font-semibold text-green-300">
                 Check your email
               </h2>
-              <p className="mb-4 text-green-700 dark:text-green-300">
+              <p className="mb-4 text-green-200/80 text-sm">
                 If your email is registered, you will receive a password reset link shortly. The link
                 expires in 30 minutes.
               </p>
               <Link
                 to="/login"
-                className="text-sm font-medium text-brand-500 hover:text-brand-600 dark:text-brand-400"
+                className="text-sm font-medium text-brand-400 hover:text-brand-300"
               >
                 Return to login
               </Link>
@@ -135,12 +133,12 @@ export default function ForgotPassword() {
         description="DigiScript password reset"
       />
       <AuthLayout>
-        <div className="flex flex-col justify-center flex-1 w-full max-w-md mx-auto">
-          <div className="mb-5 sm:mb-8">
-            <h1 className="mb-2 font-semibold text-gray-800 text-title-sm dark:text-white/90 sm:text-title-md">
+        <div className="auth-form-container">
+          <div className="mb-5 sm:mb-8 text-center">
+            <h1 className="mb-2 text-2xl font-semibold text-white sm:text-3xl">
               {isResetMode ? "Reset Password" : "Forgot Password"}
             </h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
+            <p className="text-sm text-white/60">
               {isResetMode
                 ? "Enter your new password below."
                 : "Enter your email address and we'll send you a link to reset your password."}
@@ -148,7 +146,7 @@ export default function ForgotPassword() {
           </div>
 
           {error && (
-            <div className="p-3 mb-4 text-sm text-red-700 rounded-lg bg-red-50 dark:bg-red-900/20 dark:text-red-400">
+            <div className="p-3 mb-4 text-sm text-red-300 bg-red-500/20 rounded-lg border border-red-500/30">
               {error}
             </div>
           )}
@@ -156,41 +154,42 @@ export default function ForgotPassword() {
           {isResetMode ? (
             <form onSubmit={handleResetPassword} className="space-y-4">
               <div>
-                <Label>New Password</Label>
+                <label className="block mb-1.5 text-sm font-medium text-white/80">New Password</label>
                 <div className="relative">
-                  <Input
+                  <input
                     type={showPassword ? "text" : "password"}
                     placeholder="Enter new password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="pr-10"
+                    className="auth-input pr-10"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute p-2 text-gray-500 -translate-y-1/2 right-1 top-1/2 hover:text-gray-700 dark:hover:text-gray-300"
+                    className="absolute p-2 text-white/50 -translate-y-1/2 right-1 top-1/2 hover:text-white/80"
                   >
                     {showPassword ? <EyeCloseIcon className="size-5" /> : <EyeIcon className="size-5" />}
                   </button>
                 </div>
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                <p className="mt-1 text-xs text-white/40">
                   Min 8 characters with uppercase, lowercase, number, and special character
                 </p>
               </div>
               <div>
-                <Label>Confirm Password</Label>
-                <Input
+                <label className="block mb-1.5 text-sm font-medium text-white/80">Confirm Password</label>
+                <input
                   type="password"
                   placeholder="Confirm new password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="auth-input"
                 />
               </div>
               <div className="flex gap-3">
-                <Button type="submit" className="flex-1" size="sm" disabled={loading}>
+                <Button type="submit" className="flex-1 auth-submit-btn" size="sm" disabled={loading}>
                   {loading ? "Updating..." : "Update Password"}
                 </Button>
-                <Link to="/login" className="flex items-center justify-center px-4 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200">
+                <Link to="/login" className="flex items-center justify-center px-4 text-sm text-white/60 hover:text-white/90">
                   Cancel
                 </Link>
               </div>
@@ -198,22 +197,23 @@ export default function ForgotPassword() {
           ) : (
             <form onSubmit={handleRequestReset} className="space-y-4">
               <div>
-                <Label>Email</Label>
-                <Input
+                <label className="block mb-1.5 text-sm font-medium text-white/80">Email</label>
+                <input
                   type="email"
                   placeholder="Enter your email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   autoComplete="email"
+                  className="auth-input"
                 />
               </div>
               <div className="flex gap-3">
-                <Button type="submit" className="flex-1" size="sm" disabled={loading}>
+                <Button type="submit" className="flex-1 auth-submit-btn" size="sm" disabled={loading}>
                   {loading ? "Sending..." : "Send Reset Link"}
                 </Button>
                 <Link
                   to="/login"
-                  className="flex items-center justify-center px-4 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+                  className="flex items-center justify-center px-4 text-sm text-white/60 hover:text-white/90"
                 >
                   Back to login
                 </Link>
@@ -221,13 +221,13 @@ export default function ForgotPassword() {
             </form>
           )}
 
-          <p className="mt-6 text-center text-sm text-gray-500 dark:text-gray-400">
-            <strong>DigiScript</strong> - Powered by{" "}
+          <p className="mt-6 text-center text-sm text-white/40">
+            <strong className="text-white/60">DigiScript</strong> - Powered by{" "}
             <a
               href="https://www.ktechproducts.com"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-brand-500 hover:underline"
+              className="text-brand-400 hover:underline"
             >
               KTech Products
             </a>

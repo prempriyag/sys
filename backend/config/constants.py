@@ -144,6 +144,9 @@ TBL_BATCH_ASSIGN_STG = 'PORTAL_ASSIGN_BATCHS'
 # Error Log Table
 TBL_Error_Log = 'Error_Log'
 
+# Notification Table
+TBL_NOTIFICATIONS = 'PORTAL_NOTIFICATIONS'
+
 # GPA Mapping Tables
 TBL_GPA_PICK_MAPPING = 'GPA_PICK_MAPPING'
 TBL_GPA_SCALE_MAPPING = 'GPA_SCALE_MAPPING_70_100'
@@ -241,6 +244,9 @@ TABLES = {
     
     # Error Log
     'ERROR_LOG': TBL_Error_Log,
+    
+    # Notifications
+    'NOTIFICATIONS': TBL_NOTIFICATIONS,
     
     # GPA Mapping
     'GPA_PICK_MAPPING': TBL_GPA_PICK_MAPPING,

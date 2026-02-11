@@ -6,7 +6,7 @@ import PageContainer, { PageWrapper } from "../../components/common/PageContaine
 import DataTable from "../../components/ui/DataTable";
 import Button from "../../components/ui/button/Button";
 import { API_ENDPOINTS, api } from "../../config/api";
-import { RefreshIcon, CopyIcon } from "../../icons";
+import { RefreshIcon, CopyIcon, FilterIcon } from "../../icons";
 import { useAuth } from "../../context/AuthContext";
 import StatusBadge from "../../components/common/StatusBadge";
 import { alertsuccess } from "../../utils/toast";
@@ -81,24 +81,7 @@ export default function SchoolAssignedBatches() {
       <PageBreadcrumb pageTitle="School Assigned Batches" />
 
       <PageContainer>
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="font-semibold text-gray-800 text-theme-xl dark:text-white/90 sm:text-2xl">
-            School Assigned Batches
-          </h3>
-          <div className="flex items-center gap-2">
-            <Button
-              onClick={() => setRefreshTrigger((prev) => prev + 1)}
-              variant="outline"
-              startIcon={<RefreshIcon className="w-5 h-5" />}
-            >
-              Refresh Data
-            </Button>
-            <Button onClick={() => setShowFilters(!showFilters)} variant="outline">
-              {showFilters ? "Hide Filters" : "Filters"}
-            </Button>
-          </div>
-        </div>
-
+        {/* Filter panel - shown/hidden via toggle */}
         {showFilters && (
           <div className="mb-6 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-900/50">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -183,6 +166,22 @@ export default function SchoolAssignedBatches() {
 
         <DataTable
           refreshTrigger={refreshTrigger}
+          toolbarActions={
+            <>
+              <button
+                onClick={() => setRefreshTrigger((prev) => prev + 1)}
+                className="inline-flex items-center gap-1.5 rounded border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700"
+              >
+                <RefreshIcon className="w-4 h-4" /> Refresh
+              </button>
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className="inline-flex items-center gap-1.5 rounded border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700"
+              >
+                <FilterIcon className="w-4 h-4" /> Filter
+              </button>
+            </>
+          }
           ajaxUrl={API_ENDPOINTS.OCR_SCHOOL_OCR_AJAX_VERIFIER_BATCH_LIST}
           ajaxData={ajaxData}
           columns={[

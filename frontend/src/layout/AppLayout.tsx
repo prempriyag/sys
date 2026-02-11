@@ -1,3 +1,4 @@
+import { useRef, useEffect } from "react";
 import { SidebarProvider, useSidebar } from "../context/SidebarContext";
 import { ModuleProvider } from "../context/ModuleContext";
 import { MenuLayoutProvider, useMenuLayout } from "../context/MenuLayoutContext";
@@ -12,6 +13,20 @@ const LayoutContent: React.FC = () => {
   const { isExpanded, isHovered, isMobileOpen } = useSidebar();
   const { menuLayout } = useMenuLayout();
   const location = useLocation();
+
+  // Fade-in on route change for smoother page transitions
+  const pageRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = pageRef.current;
+    if (!el) return;
+    el.style.opacity = "0";
+    el.style.transform = "translateY(6px)";
+    // Force reflow so the transition fires
+    void el.offsetHeight;
+    el.style.transition = "opacity 0.2s ease-out, transform 0.2s ease-out";
+    el.style.opacity = "1";
+    el.style.transform = "translateY(0)";
+  }, [location.pathname]);
   
   // Determine if we should show SubMenuTabs based on current route
   const parentMenuName = (() => {
@@ -53,7 +68,9 @@ const LayoutContent: React.FC = () => {
           </div>
           <div className="flex-1 p-4 mx-auto max-w-(--breakpoint-2xl) md:p-4" style={{ zIndex: 1, position: 'relative', width: '100%', maxWidth: '100%', overflowX: 'hidden' }}>
             {parentMenuName && <SubMenuTabs parentMenuName={parentMenuName} />}
-            <Outlet />
+            <div ref={pageRef}>
+              <Outlet />
+            </div>
           </div>
         </div>
         <BottomNavigation />
@@ -77,7 +94,9 @@ const LayoutContent: React.FC = () => {
         <AppHeader />
         {parentMenuName && <SubMenuTabs parentMenuName={parentMenuName} />}
         <div className="p-4 mx-auto max-w-(--breakpoint-2xl) md:p-4 pb-20 md:pb-4" style={{ width: '100%', maxWidth: '100%', overflowX: 'hidden' }}>
-          <Outlet />
+          <div ref={pageRef}>
+            <Outlet />
+          </div>
         </div>
         <BottomNavigation />
       </div>

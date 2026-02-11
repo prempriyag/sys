@@ -144,6 +144,18 @@ export const API_ENDPOINTS = {
   OCR_SCHOOL_HDR_UPDATE_BATCH_HDR: "/api/ocrverify/schoolhdrdata/updatebatchdatahdr",
   OCR_UPDATE_BATCH_DATA_HDR: "/api/ocrverify/updatebatchdatahdr",
   
+  // Profile endpoints
+  PROFILE: "/api/profile",
+  PROFILE_UPDATE: "/api/profile/update",
+  PROFILE_CHANGE_PASSWORD: "/api/profile/change-password",
+
+  // Notification endpoints
+  NOTIFICATIONS_LIST: "/api/notifications/list",
+  NOTIFICATIONS_UNREAD_COUNT: "/api/notifications/unread-count",
+  NOTIFICATIONS_MARK_READ: "/api/notifications/mark-read",
+  NOTIFICATIONS_MARK_ALL_READ: "/api/notifications/mark-all-read",
+  NOTIFICATIONS_TRIGGER_NOW: "/api/notifications/trigger-now",
+
   // Profiler endpoints (for debugging - KTech users only)
   PROFILER_DATA: "/api/profiler/data",
   PROFILER_STATUS: "/api/profiler/status",
@@ -267,8 +279,18 @@ export const apiRequest = async (
     try {
       const errorData = await response.clone().json();
       if (errorData.detail) {
-        errorMessage = errorData.detail;
-        errorDetail = errorData.detail;
+        // FastAPI 422 returns detail as an array of validation errors - normalize to string
+        if (Array.isArray(errorData.detail)) {
+          const msgs = errorData.detail.map((e: any) => e.msg || JSON.stringify(e)).join("; ");
+          errorMessage = msgs;
+          errorDetail = msgs;
+        } else if (typeof errorData.detail === "string") {
+          errorMessage = errorData.detail;
+          errorDetail = errorData.detail;
+        } else {
+          errorMessage = JSON.stringify(errorData.detail);
+          errorDetail = errorMessage;
+        }
       } else if (errorData.message) {
         errorMessage = errorData.message;
         errorDetail = errorData.message;
@@ -283,6 +305,11 @@ export const apiRequest = async (
       } catch {
         // If text parsing also fails, use default message
       }
+    }
+    
+    // Ensure errorDetail is always a string before calling string methods
+    if (typeof errorDetail !== "string") {
+      errorDetail = String(errorDetail);
     }
     
     // Check for database connection errors

@@ -340,4 +340,202 @@ def password_form_validation(password: str) -> bool:
     return True
 
 
+# ---------------------------------------------------------------------------
+# updatePathToProcess  (CI3 common_helper.php)
+# ---------------------------------------------------------------------------
+import logging as _logging
+
+_ftp_logger = _logging.getLogger("helpers.common_helper.ftp")
+
+
+def _convert_ftp_to_share_path(ftp_path: str, batch_id: str) -> str:
+    """
+    Generic conversion of an FTP FILE_PATH to a network-share "Processed" path.
+
+    Example input:
+        ftp://10.128.144.48/csc_uat/CSC_COLLEGE_TRANSCRIPT/ToBeProcessed/Scanned/transcript.pdf
+    Example output:
+        //10.128.144.48/csc_uat/CSC_COLLEGE_TRANSCRIPT/Processed/Scanned/Batch HF_ID2619977/transcript.pdf
+
+    Logic (mirrors the CI3 HDR_FILE_PATH_UPDATE SQL):
+      1. Strip the ``ftp:`` prefix  → ``//host/folder/.../ToBeProcessed/rest``
+      2. Replace ``/ToBeProcessed/`` with ``/Processed/``
+      3. In the portion after ``/Processed/``, replace every ``/`` with
+         ``/Batch HF_ID{BATCH_ID}/`` (so a sub-folder is inserted before the
+         filename).
+    """
+    if not ftp_path:
+        return ftp_path
+
+    # Step 1 – strip "ftp:" prefix
+    path = ftp_path
+    if path.lower().startswith("ftp:"):
+        path = path[4:]  # "ftp://host/..." -> "//host/..."
+
+    # Step 2 – swap ToBeProcessed → Processed
+    tbp = "/ToBeProcessed/"
+    idx = path.find(tbp)
+    if idx == -1:
+        # No "ToBeProcessed" segment – nothing to convert
+        _ftp_logger.warning(
+            "_convert_ftp_to_share_path: no /ToBeProcessed/ in path %r", ftp_path
+        )
+        return path
+
+    prefix = path[: idx + len("/Processed/")]  # keep up to ".../Processed/"
+    prefix = path[: idx] + "/Processed/"
+    rest = path[idx + len(tbp):]  # everything after ToBeProcessed/
+
+    # Step 3 – in the "rest" portion, insert "Batch HF_ID{BATCH_ID}/" before
+    # the filename.  CI3 does REPLACE(rest, '/', '/Batch HF_ID'+BATCH_ID+'/')
+    # which means every "/" in `rest` gets the batch folder inserted.
+    if "/" in rest:
+        rest = rest.replace("/", f"/Batch HF_ID{batch_id}/")
+    else:
+        # rest is just a filename – prepend the batch folder
+        rest = f"Batch HF_ID{batch_id}/{rest}"
+
+    converted = prefix + rest
+    _ftp_logger.info(
+        "_convert_ftp_to_share_path: %r -> %r", ftp_path, converted
+    )
+    return converted
+
+
+def update_path_to_process(db: Session) -> bool:
+    """
+    Bulk-convert FTP-prefixed FILE_PATH values in TRANSCRIPT_HDR_OCR.
+
+    First tries the CI3 ``HDR_FILE_PATH_UPDATE`` SQL (works when .env host/
+    folder values match the database).  Then does a generic Python fallback
+    for any remaining ``ftp:`` rows so it works even when the .env values
+    differ from what the database contains.
+
+    Also back-fills empty BATCH_ID on TRANSCRIPT_DOWNLOAD.
+    """
+    from config.constants import (
+        HDR_FILE_PATH_UPDATE,
+        TBL_DOWNLOAD,
+        TBL_TRANSCRIPTHDROCR,
+    )
+
+    try:
+        # ---- Step 1: CI3 SQL-based bulk update (fast, but host-specific) ----
+        _ftp_logger.info("update_path_to_process: running HDR_FILE_PATH_UPDATE ...")
+        result = db.execute(text(HDR_FILE_PATH_UPDATE))
+        _ftp_logger.info(
+            "update_path_to_process: HDR_FILE_PATH_UPDATE affected %s row(s)",
+            result.rowcount,
+        )
+
+        # ---- Step 2: generic fallback for rows the SQL missed ----
+        remaining = db.execute(
+            text(
+                f"SELECT BATCH_ID, FILE_PATH FROM {TBL_TRANSCRIPTHDROCR} "
+                f"WHERE FILE_PATH LIKE 'ftp:%'"
+            )
+        ).fetchall()
+
+        if remaining:
+            _ftp_logger.info(
+                "update_path_to_process: %d row(s) still have ftp: paths – applying Python fallback",
+                len(remaining),
+            )
+            for row in remaining:
+                bid = str(row.BATCH_ID)
+                old_path = row.FILE_PATH or ""
+                new_path = _convert_ftp_to_share_path(old_path, bid)
+                if new_path and new_path != old_path:
+                    db.execute(
+                        text(
+                            f"UPDATE {TBL_TRANSCRIPTHDROCR} "
+                            f"SET FILE_PATH = :new_path WHERE BATCH_ID = :bid"
+                        ),
+                        {"new_path": new_path, "bid": bid},
+                    )
+            _ftp_logger.info("update_path_to_process: Python fallback applied")
+
+        # ---- Step 3: back-fill missing BATCH_ID on TRANSCRIPT_DOWNLOAD ----
+        batch_miss_sql = f"""
+            UPDATE DOWN
+            SET  DOWN.BATCH_ID = H.BATCH_ID
+            FROM [dbo].[{TBL_DOWNLOAD}] DOWN, {TBL_TRANSCRIPTHDROCR} H
+            WHERE  upper(right(H.FILE_PATH, CHARINDEX('/', REVERSE(H.FILE_PATH), 1) - 1))
+                   = UPPER(DOWN.FORMATTED_FILENAME)
+               AND CHARINDEX('/', REVERSE(H.FILE_PATH), 1) - 1 > 0
+               AND ISNULL(DOWN.BATCH_ID, '') = ''
+        """
+        result2 = db.execute(text(batch_miss_sql))
+        _ftp_logger.info(
+            "update_path_to_process: batch_miss affected %s row(s)", result2.rowcount
+        )
+
+        db.commit()
+        _ftp_logger.info("update_path_to_process: committed successfully")
+        return True
+    except Exception as e:
+        _ftp_logger.error("update_path_to_process FAILED: %s", e, exc_info=True)
+        db.rollback()
+        return False
+
+
+def build_transcript_url(db: Session, file_path: str, batch_id: str, project_id: int) -> str:
+    """
+    Given a FILE_PATH from TRANSCRIPT_HDR_OCR, return a URL string for the
+    ``/api/viewfile/transcript_file?pdf=…`` endpoint.
+
+    If the FILE_PATH still starts with ``ftp:``, this function converts it
+    to a network-share path (updating the DB), then encrypts it.
+
+    Returns an empty string when no valid URL can be built.
+    """
+    from config.constants import TBL_TRANSCRIPTHDROCR
+
+    if not file_path:
+        return ""
+
+    # If the path is an FTP URL, convert it
+    if file_path.lower().startswith("ftp:"):
+        _ftp_logger.info(
+            "build_transcript_url: batch=%s has ftp path %r",
+            batch_id, file_path,
+        )
+
+        # Try the bulk SQL + generic fallback
+        update_path_to_process(db)
+
+        # Re-read the (now corrected) FILE_PATH for this specific batch
+        row = db.execute(
+            text(
+                f"SELECT FILE_PATH FROM {TBL_TRANSCRIPTHDROCR} WITH(NOLOCK) "
+                f"WHERE BATCH_ID = :bid AND PROJECT_ID = :pid"
+            ),
+            {"bid": batch_id, "pid": project_id},
+        ).fetchone()
+        file_path = (row.FILE_PATH if row else "") or ""
+        _ftp_logger.info(
+            "build_transcript_url: batch=%s updated FILE_PATH = %r",
+            batch_id, file_path,
+        )
+
+        if not file_path or file_path.lower().startswith("ftp:"):
+            _ftp_logger.warning(
+                "build_transcript_url: batch=%s path still ftp after update!",
+                batch_id,
+            )
+            return ""
+
+    if not file_path:
+        return ""
+
+    try:
+        from helpers.encryption_helper import get_encrypt_file_path
+
+        encrypted = get_encrypt_file_path(file_path)
+        url = f"/api/viewfile/transcript_file?pdf={encrypted}"
+        _ftp_logger.info("build_transcript_url: batch=%s url built OK", batch_id)
+        return url
+    except Exception as e:
+        _ftp_logger.error("build_transcript_url encrypt failed: %s", e, exc_info=True)
+        return ""
 

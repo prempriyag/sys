@@ -224,33 +224,12 @@ export default function CollegeOCRBatch() {
     type: TabType,
     row: LineRow,
     getValues: () => Record<string, string>
-  ) => {
-    if (!batchId) return;
+  ): Promise<boolean> => {
+    if (!batchId) return false;
     const v = getValues();
-    
-    // Validate required fields for new rows (matching CI3 behavior)
-    const isNewRow = row.AUTO_SEQNO == null;
-    if (isNewRow) {
-      const requiredFields = [
-        { key: "SUBJECT", label: "Subject" },
-        { key: "COURSE_ID", label: "Course ID" },
-        { key: "COURSE_TITLE", label: "Course Title" },
-        { key: "START_TERM", label: "Start Term" },
-        { key: "END_TERM", label: "End Term" },
-        { key: "CREDIT_HOURS_EARNED", label: "Credit Hours" },
-        { key: "GRADE", label: "Grade" },
-        { key: "PAGE_NBR", label: "Page Number" },
-      ];
-      for (const field of requiredFields) {
-        if (!v[field.key]?.trim()) {
-          showMessage("error", `${field.label} is required for new rows`);
-          return;
-        }
-      }
-    }
 
     try {
-      const res = await api.post(API_ENDPOINTS.OCR_UPDATE_BATCH_DATA_LINE, {
+      await api.post(API_ENDPOINTS.OCR_UPDATE_BATCH_DATA_LINE, {
         BATCH_ID: batchId,
         AUTO_SEQNO: row.AUTO_SEQNO ?? "",
         SUBJECT: v.SUBJECT ?? "",
@@ -267,8 +246,10 @@ export default function CollegeOCRBatch() {
       showMessage("success", "Line saved");
       if (row.AUTO_SEQNO == null) setNewRows([]);
       fetchBatch();
+      return true;
     } catch {
       showMessage("error", "Failed to save line");
+      return false;
     }
   };
 
@@ -318,6 +299,7 @@ export default function CollegeOCRBatch() {
     const courseTitles = Array.from(form.querySelectorAll('input[name="COURSE_TITLE[]"]')).map((el) => (el as HTMLInputElement).value);
     const startTerms = Array.from(form.querySelectorAll('input[name="START_TERM[]"]')).map((el) => (el as HTMLInputElement).value);
     const endTerms = Array.from(form.querySelectorAll('input[name="END_TERM[]"]')).map((el) => (el as HTMLInputElement).value);
+    const extInstNames = Array.from(form.querySelectorAll('input[name="EXTERNAL_INSTITUTION_NAME[]"]')).map((el) => (el as HTMLInputElement).value);
     const creditHours = Array.from(form.querySelectorAll('input[name="CREDIT_HOURS_EARNED[]"]')).map((el) => (el as HTMLInputElement).value);
     const grades = Array.from(form.querySelectorAll('input[name="GRADE[]"]')).map((el) => (el as HTMLInputElement).value);
     const pageNbrs = Array.from(form.querySelectorAll('input[name="PAGE_NBR[]"]')).map((el) => (el as HTMLInputElement).value);
@@ -331,6 +313,7 @@ export default function CollegeOCRBatch() {
         COURSE_TITLE: courseTitles,
         START_TERM: startTerms,
         END_TERM: endTerms,
+        EXTERNAL_INSTITUTION_NAME: extInstNames,
         CREDIT_HOURS_EARNED: creditHours,
         GRADE: grades,
         PAGE_NBR: pageNbrs,
@@ -658,9 +641,11 @@ export default function CollegeOCRBatch() {
             {transcriptUrl && (
               <a
                 href={transcriptUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="rounded px-3 py-2 bg-brand-600 text-white text-sm hover:bg-brand-700 text-center"
+                onClick={(e) => {
+                  e.preventDefault();
+                  window.open(transcriptUrl, "popUpWindow", "height=500,width=700,left=100,top=10,scrollbars=yes,menubar=no");
+                }}
+                className="rounded px-3 py-2 bg-brand-600 text-white text-sm hover:bg-brand-700 text-center cursor-pointer"
               >
                 View Transcript
               </a>
@@ -728,7 +713,7 @@ export default function CollegeOCRBatch() {
           )}
         </div>
 
-        <form id="line_bulk_form" onSubmit={handleBulkUpdate} className={bulkEditMode ? "" : "contents"}>
+        <form id="line_bulk_form" onSubmit={(e) => { if (bulkEditMode) { handleBulkUpdate(e); } else { e.preventDefault(); } }}>
           <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
             <table className="w-full text-sm">
               <thead>
@@ -943,22 +928,17 @@ function LineRowEditor({
   bulkEditMode?: boolean;
   selected?: boolean;
   onToggleSelect?: () => void;
-  onSave: (tab: TabType, row: LineRow, getValues: () => Record<string, string>) => void;
+  onSave: (tab: TabType, row: LineRow, getValues: () => Record<string, string>) => Promise<boolean>;
   onDelete: (tab: TabType, autoSeqno: number) => void;
   onBotViewMore: (text: string) => void;
   onCancelNew?: () => void;
 }) {
   // New rows (no AUTO_SEQNO) should automatically be in edit mode
   const isNewRow = line.AUTO_SEQNO == null;
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(isNewRow);
+  const [saving, setSaving] = useState(false);
   const id = line.AUTO_SEQNO ?? `new-${(line as any)._tempId ?? "x"}`;
 
-  // Auto-enable editing for new rows
-  useEffect(() => {
-    if (isNewRow) {
-      setEditing(true);
-    }
-  }, [isNewRow]);
   const botVer = (line.BOT_Verification ?? "").toUpperCase();
   const rowClass = botVer === "TOBEVERIFIED" ? "bg-amber-50 dark:bg-amber-900/20" : botVer === "VERIFIED" ? "bg-green-50 dark:bg-green-900/20" : "";
 
@@ -976,6 +956,15 @@ function LineRowEditor({
     };
   };
 
+  const handleSaveClick = async () => {
+    setSaving(true);
+    const ok = await onSave(type, line, getValues);
+    setSaving(false);
+    if (ok && !isNewRow) {
+      setEditing(false);
+    }
+  };
+
   const botText = line.BOT_OCR_VERIFICATION ?? "";
   const botShort = botText.length > 30 ? `${botText.slice(0, 30)}... ` : botText;
 
@@ -987,7 +976,9 @@ function LineRowEditor({
           {line.AUTO_SEQNO ?? ""}
         </td>
         <td className="p-2">—</td>
-        <td className="p-2">{line.EXTERNAL_INSTITUTION_NAME ?? ""}</td>
+        <td className="p-2">
+          <input name="EXTERNAL_INSTITUTION_NAME[]" defaultValue={line.EXTERNAL_INSTITUTION_NAME ?? ""} className="w-full rounded border px-1 py-0.5 text-sm dark:bg-gray-900 dark:text-white" />
+        </td>
         <td className="p-2">
           <input name="SUBJECT[]" defaultValue={line.SUBJECT ?? ""} className="w-full rounded border px-1 py-0.5 text-sm dark:bg-gray-900 dark:text-white" />
         </td>
@@ -1016,9 +1007,16 @@ function LineRowEditor({
     );
   }
 
+  // Prevent Enter key from submitting the parent form when editing a single row
+  const preventFormSubmit = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+    }
+  };
+
   if (editing) {
     return (
-      <tr className={`border-b border-gray-100 dark:border-gray-700 ${rowClass}`}>
+      <tr className={`border-b border-gray-100 dark:border-gray-700 ${rowClass}`} onKeyDown={preventFormSubmit}>
         <td className="p-2">
           {line.AUTO_SEQNO != null && (
             <input type="checkbox" checked={selected} onChange={onToggleSelect} className="rounded border-gray-300" />
@@ -1053,15 +1051,17 @@ function LineRowEditor({
         <td className="p-2">
           <input id={`PAGE_${type}_${id}`} defaultValue={line.PAGE_NBR ?? ""} className="w-full rounded border px-1 py-0.5 text-sm dark:bg-gray-900 dark:text-white" />
         </td>
-        <td className="p-2">
-          <button type="button" onClick={() => { onSave(type, line, getValues); setEditing(false); }} className="text-green-600 hover:underline mr-2">Save</button>
+        <td className="p-2 whitespace-nowrap">
+          <button type="button" onClick={handleSaveClick} disabled={saving} className="text-green-600 hover:underline mr-2 disabled:opacity-50">
+            {saving ? "Saving..." : "Save"}
+          </button>
           <button type="button" onClick={() => { 
             if (isNewRow && onCancelNew) {
               onCancelNew();
             } else {
               setEditing(false);
             }
-          }} className="text-gray-600 hover:underline">Cancel</button>
+          }} className="text-gray-600 hover:underline" disabled={saving}>Cancel</button>
         </td>
       </tr>
     );

@@ -719,6 +719,27 @@ if profiler_controller is not None:
     app.include_router(profiler_controller.router)
     print("[MAIN] Successfully registered profiler_controller router")
 
+# Import notification controller
+try:
+    from controllers import notification_controller
+    app.include_router(notification_controller.router)
+    print("[MAIN] Successfully registered notification_controller router")
+except Exception as e:
+    print(f"[MAIN] ERROR importing notification_controller: {e}")
+    import traceback
+    traceback.print_exc()
+    notification_controller = None
+
+# Import and start notification scheduler (APScheduler for daily jobs)
+try:
+    from helpers.notification_scheduler import start_scheduler
+    start_scheduler(app)
+    print("[MAIN] Notification scheduler started")
+except Exception as e:
+    print(f"[MAIN] ERROR starting notification scheduler: {e}")
+    import traceback
+    traceback.print_exc()
+
 
 @app.get("/")
 async def root():

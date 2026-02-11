@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router";
 import PageBreadcrumb from "../../../components/common/PageBreadCrumb";
 import PageMeta from "../../../components/common/PageMeta";
 import PageContainer, { PageWrapper } from "../../../components/common/PageContainer";
 import Button from "../../../components/ui/button/Button";
-import { API_BASE_URL, API_ENDPOINTS } from "../../../config/api";
+import { api, API_BASE_URL, API_ENDPOINTS } from "../../../config/api";
 import DatePicker from "../../../components/form/date-picker";
 import Chart from "react-apexcharts";
 import { RefreshIcon } from "../../../icons";
@@ -45,6 +46,7 @@ const initialDashboardData: DashboardData = {
 type CollegeOption = { INSTITUTION_NAME: string; INSTITUTION_ID: string };
 
 export default function CollegeDashboard() {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [collegesList, setCollegesList] = useState<CollegeOption[]>([]);
   const [filters, setFilters] = useState({
@@ -146,20 +148,11 @@ export default function CollegeDashboard() {
 
   const fetchCollegesList = async () => {
     try {
-      const response = await fetch(
-        `${API_BASE_URL}${API_ENDPOINTS.DASHBOARD_COLLEGES_LIST}?q=`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
-          },
-        }
-      );
-      if (response.ok) {
-        const data = await response.json();
-        setCollegesList(Array.isArray(data) ? data : []);
-      }
+      const data = await api.get(`${API_ENDPOINTS.DASHBOARD_COLLEGES_LIST}?q=`);
+      setCollegesList(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Error fetching colleges list:", error);
+      setCollegesList([]);
     }
   };
 
@@ -625,7 +618,7 @@ export default function CollegeDashboard() {
       <PageContainer>
         {/* Glassmorphic Filter Section */}
         <div
-          className="mb-8 rounded-2xl naveen border border-gray-200 bg-white p-4 sm:p-6 shadow-md backdrop-blur-xl transition-all duration-300 animate-fade-in overflow-visible z-10 dark:border-gray-800 dark:bg-gray-900"
+          className="mb-8 rounded-2xl naveen border border-gray-200 bg-white p-4 sm:p-6 shadow-md backdrop-blur-xl transition-all duration-300 animate-fade-in overflow-visible relative z-[60] dark:border-gray-800 dark:bg-gray-900"
           style={{
             background: filterGradient,
             backdropFilter: "blur(20px)",
@@ -689,6 +682,18 @@ export default function CollegeDashboard() {
               >
                 Refresh
               </Button>
+              {/* <Button
+                onClick={() => navigate("/college/advanceddashboard")}
+                variant="outline"
+                className="transition-all duration-200 hover:scale-105 whitespace-nowrap"
+                startIcon={
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5m.75-9l3-3 2.148 2.148A12.061 12.061 0 0116.5 7.605" />
+                  </svg>
+                }
+              >
+                Advanced Dashboard
+              </Button> */}
             </div>
           </div>
         </div>
@@ -704,7 +709,7 @@ export default function CollegeDashboard() {
             />
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-4 relative z-0">
             {/* Statistics Cards */}
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <StatCard

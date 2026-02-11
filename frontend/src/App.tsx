@@ -27,6 +27,7 @@ import ToastContainer from "./components/ui/toast/ToastContainer";
 import CollegeDashboard from "./pages/College/dashboard/CollegeDashboard";
 import Dashboard2 from "./pages/College/dashboard/dashboard2";
 import Dashboard3 from "./pages/College/dashboard/dashboard3";
+import CollegeAdvancedDashboard from "./pages/College/dashboard/CollegeAdvancedDashboard";
 import TranscriptReports from "./pages/College/transcriptreports/TranscriptReports";
 import ArticulationReports from "./pages/College/articulationreports/ArticulationReports";
 import DigiScriptReports from "./pages/College/digiscriptreports/DigiScriptReports";
@@ -94,6 +95,7 @@ import SchoolTranscriptsList from "./pages/School/transcripts/TranscriptsList";
 import SchoolInstitutionMapping from "./pages/School/setup/institutionmapping/InstitutionMapping";
 import SchoolGpaPickMapping from "./pages/School/setup/gpapickmapping/GpaPickMapping";
 import SchoolGpaScaleMapping from "./pages/School/setup/gpascalemapping/GpaScaleMapping";
+import SchoolHelp from "./pages/School/Help";
 
 // Admin/System Pages
 import Profiler from "./pages/Admin/Profiler";
@@ -145,6 +147,7 @@ export default function App() {
           <Route path="/college/dashboard" element={<CollegeDashboard />} />
           <Route path="/college/dashboard2" element={<Dashboard2 />} />
           <Route path="/college/dashboard3" element={<Dashboard3 />} />
+          <Route path="/college/advanceddashboard" element={<CollegeAdvancedDashboard />} />
 
           {/* College - User Management */}
           <Route
@@ -185,6 +188,7 @@ export default function App() {
             <Route path="/college/dashboard" element={<CollegeDashboard />} />
             <Route path="/college/dashboard2" element={<Dashboard2 />} />
             <Route path="/college/dashboard3" element={<Dashboard3 />} />
+            <Route path="/college/advanceddashboard" element={<CollegeAdvancedDashboard />} />
             
                     {/* College - User Management */}
                     <Route 
@@ -409,6 +413,9 @@ export default function App() {
 
           {/* College - User Manual */}
           <Route path="/college/Help" element={<Help />} />
+
+          {/* School - User Manual */}
+          <Route path="/school/Help" element={<SchoolHelp />} />
 
           {/* School module routes */}
           <Route path="/school/dashboard" element={<SchoolDashboard />} />

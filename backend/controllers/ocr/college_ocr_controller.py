@@ -21,6 +21,12 @@ from config.constants import (
     TBL_TRANSCRIPT_LINE_OCR_MIDDLE,
 )
 
+from helpers.common_helper import build_transcript_url
+
+import logging
+
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api/ocrverify", tags=["ocr-college"])
 
 
@@ -81,7 +87,7 @@ class ChangeBatchVerifyStatusRequest(BaseModel):
 
 class ChangeAdditionalStatusRequest(BaseModel):
     status: str
-    type: str
+    type: Optional[str] = None
     traType: str  # YES = TRANSCRIPT_TYPE, else STATUS_FLAG
     batch_id: str
 
@@ -110,16 +116,24 @@ async def collegeocrbatch(
         hdr_data = dict(hdr._mapping) if hdr else None
         if not hdr_data:
             return {"batch_id": batch_id, "hdr_data": None, "error_msg": True}
+
         file_path = hdr_data.get("FILE_PATH") or ""
-        if file_path:
-            try:
-                from helpers.encryption_helper import get_encrypt_file_path
-                encrypted_path = get_encrypt_file_path(file_path)
-                hdr_data["TRANSCRIPT_URL"] = f"/api/viewfile/transcript_file?pdf={encrypted_path}"
-            except Exception:
-                hdr_data["TRANSCRIPT_URL"] = ""
-        else:
-            hdr_data["TRANSCRIPT_URL"] = ""
+
+        # Build TRANSCRIPT_URL (handles FTP→share-path conversion automatically)
+        hdr_data["TRANSCRIPT_URL"] = build_transcript_url(
+            db, file_path, batch_id, COLLEGE_PROJECT_ID
+        )
+        # If build_transcript_url updated the DB (ftp→processed), re-read hdr
+        # so the rest of the response reflects the corrected FILE_PATH.
+        if file_path.lower().startswith("ftp:"):
+            hdr_refreshed = db.execute(
+                text(f"SELECT * FROM {TBL_TRANSCRIPTHDROCR} WITH(NOLOCK) WHERE BATCH_ID = :bid AND PROJECT_ID = :pid"),
+                {"bid": batch_id, "pid": COLLEGE_PROJECT_ID},
+            ).fetchone()
+            if hdr_refreshed:
+                transcript_url = hdr_data["TRANSCRIPT_URL"]  # preserve the URL we just built
+                hdr_data = dict(hdr_refreshed._mapping)
+                hdr_data["TRANSCRIPT_URL"] = transcript_url
 
         # Left, right, middle line data
         left_data = db.execute(
@@ -191,20 +205,22 @@ async def updatebatchdataline(
     """Update or insert one line. CI: updatebatchdataline."""
     try:
         table = CollegeVerifierModel.get_table_for_type(body.Type)
-        data = {
-            "SUBJECT": _null_if_empty(body.SUBJECT),
-            "COURSE_ID": _null_if_empty(body.COURSE_ID),
-            "COURSE_TITLE": _null_if_empty(body.COURSE_TITLE),
-            "START_TERM": _null_if_empty(body.START_TERM),
-            "END_TERM": _null_if_empty(body.END_TERM),
-            "EXTERNAL_INSTITUTION_NAME": _null_if_empty(getattr(body, "EXTERNAL_INSTITUTION_NAME", None)),
-            "CREDIT_HOURS_EARNED": _null_if_empty(body.CREDIT_HOURS_EARNED),
-            "GRADE": _null_if_empty(body.GRADE),
-            "PAGE_NBR": _null_if_empty(body.PAGE_NBR),
-        }
-        data = {k: v for k, v in data.items() if v is not None}
         auto_seq = body.AUTO_SEQNO
-        if auto_seq is not None and auto_seq != "":
+        is_update = auto_seq is not None and auto_seq != ""
+
+        if is_update:
+            # For UPDATE: include all fields, set empty/null as None so column gets SET to NULL
+            data = {
+                "SUBJECT": _null_if_empty(body.SUBJECT),
+                "COURSE_ID": _null_if_empty(body.COURSE_ID),
+                "COURSE_TITLE": _null_if_empty(body.COURSE_TITLE),
+                "START_TERM": _null_if_empty(body.START_TERM),
+                "END_TERM": _null_if_empty(body.END_TERM),
+                "EXTERNAL_INSTITUTION_NAME": _null_if_empty(getattr(body, "EXTERNAL_INSTITUTION_NAME", None)),
+                "CREDIT_HOURS_EARNED": _null_if_empty(body.CREDIT_HOURS_EARNED),
+                "GRADE": _null_if_empty(body.GRADE),
+                "PAGE_NBR": _null_if_empty(body.PAGE_NBR),
+            }
             try:
                 seq_int = int(auto_seq)
             except (TypeError, ValueError):
@@ -214,6 +230,19 @@ async def updatebatchdataline(
             )
             return auto_seq
         else:
+            # For INSERT: exclude None values so only provided columns are inserted
+            data = {
+                "SUBJECT": _null_if_empty(body.SUBJECT),
+                "COURSE_ID": _null_if_empty(body.COURSE_ID),
+                "COURSE_TITLE": _null_if_empty(body.COURSE_TITLE),
+                "START_TERM": _null_if_empty(body.START_TERM),
+                "END_TERM": _null_if_empty(body.END_TERM),
+                "EXTERNAL_INSTITUTION_NAME": _null_if_empty(getattr(body, "EXTERNAL_INSTITUTION_NAME", None)),
+                "CREDIT_HOURS_EARNED": _null_if_empty(body.CREDIT_HOURS_EARNED),
+                "GRADE": _null_if_empty(body.GRADE),
+                "PAGE_NBR": _null_if_empty(body.PAGE_NBR),
+            }
+            data = {k: v for k, v in data.items() if v is not None}
             data["BATCH_ID"] = body.BATCH_ID
             new_id = CollegeVerifierModel.save_line_ocr_data(db, table, data)
             return new_id

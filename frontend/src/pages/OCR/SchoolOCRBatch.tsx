@@ -642,9 +642,11 @@ export default function SchoolOCRBatch() {
             {transcriptUrl && (
               <a
                 href={transcriptUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="rounded px-3 py-2 bg-brand-600 text-white text-sm hover:bg-brand-700 text-center"
+                onClick={(e) => {
+                  e.preventDefault();
+                  window.open(transcriptUrl, "popUpWindow", "height=500,width=700,left=100,top=10,scrollbars=yes,menubar=no");
+                }}
+                className="rounded px-3 py-2 bg-brand-600 text-white text-sm hover:bg-brand-700 text-center cursor-pointer"
               >
                 View Transcript
               </a>

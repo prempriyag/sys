@@ -7,8 +7,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from database.connection import get_db
-from models import User
+from models import User, Role
 from config.settings import settings
+from pydantic import BaseModel, Field
+from typing import Optional
 from schemas.auth import (
     LoginRequest, LoginResponse, VerifyCodeRequest,
     MessageResponse, UserResponse, TwoWayAuthResponse,
@@ -487,6 +489,130 @@ async def get_current_user_info(
         ocr_perm=current_user.ocr_perm,
         last_login=current_user.last_login,
         permissions=user_permissions
+    )
+
+
+# --- Profile Endpoints ---
+
+class ProfileUpdateRequest(BaseModel):
+    """Profile update request - users can only update their own name"""
+    name: str = Field(..., min_length=1)
+
+
+class ChangePasswordRequest(BaseModel):
+    """Change password request - requires current password verification"""
+    current_password: str = Field(..., min_length=1)
+    new_password: str = Field(..., min_length=8, max_length=15)
+    confirm_password: str = Field(..., min_length=8, max_length=15)
+
+
+@router.get("/profile")
+async def get_profile(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get current user's profile data for the profile page.
+    Returns user details along with role name.
+    """
+    role_name = ""
+    if current_user.role_id:
+        role = db.query(Role).filter(Role.ID == current_user.role_id).first()
+        if role:
+            role_name = role.ROLE_NAME or ""
+    
+    return {
+        "id": current_user.id,
+        "name": current_user.name or "",
+        "email": current_user.email or "",
+        "role_id": current_user.role_id or 0,
+        "role_name": role_name,
+        "college_perm": current_user.college_perm or 0,
+        "hs_perm": current_user.hs_perm or 0,
+        "ocr_perm": current_user.ocr_perm or 0,
+        "status": current_user.status if current_user.status is not None else 1,
+        "last_login": current_user.last_login.strftime('%Y-%m-%d %H:%M:%S') if current_user.last_login else None,
+        "created_at": current_user.created_at.strftime('%Y-%m-%d %H:%M:%S') if current_user.created_at else None,
+    }
+
+
+@router.put("/profile/update", response_model=MessageResponse)
+async def update_profile(
+    profile_data: ProfileUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Update current user's own profile (name only).
+    Users cannot change their own email, role, or permissions.
+    """
+    user = db.query(User).filter(User.id == current_user.id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    user.name = profile_data.name.strip()
+    user.updated_at = datetime.now()
+    user.updated_by = current_user.name
+    
+    db.commit()
+    
+    # Update the stored user in localStorage will be handled by frontend
+    return MessageResponse(
+        message="Profile updated successfully",
+        success=True
+    )
+
+
+@router.post("/profile/change-password", response_model=MessageResponse)
+async def change_password(
+    password_data: ChangePasswordRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Change current user's own password.
+    Requires verification of current password before allowing change.
+    """
+    # Validate new passwords match
+    if password_data.new_password != password_data.confirm_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New passwords do not match"
+        )
+    
+    # Validate password format
+    if not password_form_validation(password_data.new_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must contain at least 8 characters with uppercase, lowercase, number, and special character."
+        )
+    
+    user = db.query(User).filter(User.id == current_user.id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    # Verify current password
+    from helpers.auth_helper import verify_password
+    if not verify_password(password_data.current_password, user.password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect"
+        )
+    
+    # Update password
+    user.password = hash_password(password_data.new_password)
+    user.updated_at = datetime.now()
+    db.commit()
+    
+    return MessageResponse(
+        message="Password changed successfully",
+        success=True
     )
 
 

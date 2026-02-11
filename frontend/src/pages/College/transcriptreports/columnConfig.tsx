@@ -280,7 +280,7 @@ export const createTranscriptReportColumns = (
             >
               {data}
             </a>
-            <input type="hidden" className="record_batch_id" value={data} />
+            <input type="hidden" className="record_batch_id" value={data} readOnly />
           </span>
         );
       },

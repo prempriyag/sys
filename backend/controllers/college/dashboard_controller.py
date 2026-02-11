@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime, timedelta
+from config.constants import COLLEGE_PROJECT_ID
 import logging
 
 from database.connection import get_db
@@ -29,6 +30,14 @@ class DashboardRequest(BaseModel):
     fromdate: Optional[str] = None
     todate: Optional[str] = None
     
+    class Config:
+        extra = "ignore"
+
+
+class ReconReportRequest(BaseModel):
+    fromdate: Optional[str] = None
+    todate: Optional[str] = None
+
     class Config:
         extra = "ignore"
 
@@ -102,4 +111,36 @@ async def get_colleges_list(
         raise HTTPException(status_code=500, detail=f"Error fetching colleges: {str(e)}")
 
 
+@router.post("/recon-report")
+async def get_recon_report(
+    request: ReconReportRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Get reconciliation report data for the college module.
+    Provides pipeline-level counts across Download → OCR → DATA → Processing → Articulation.
+    """
+    try:
+        # Set default date range if not provided (30 days)
+        if not request.fromdate:
+            thirty_days_ago = datetime.now() - timedelta(days=30)
+            request.fromdate = thirty_days_ago.strftime('%Y-%m-%d')
+        if not request.todate:
+            request.todate = datetime.now().strftime('%Y-%m-%d')
+
+        fromdate_str = f"{request.fromdate} 00:00:00"
+        todate_str = f"{request.todate} 23:59:59"
+
+        recon_data = DashboardModel.get_recon_report(
+            db=db,
+            fromdate=fromdate_str,
+            todate=todate_str,
+            project_id=COLLEGE_PROJECT_ID,
+        )
+
+        return recon_data
+
+    except Exception as e:
+        logger.exception("Recon report error")
+        raise HTTPException(status_code=500, detail=f"Error fetching recon report: {str(e)}")
 

@@ -14,7 +14,8 @@ import logging
 from config.constants import (
     TBL_KICKOUT, TBL_DOWNLOAD, TBL_ARTICULATION,
     COLLEGE_PROJECT_ID, TBL_INSTITUTION_MAPPING,
-    TBL_DIGISCRIPTBOTLOG
+    TBL_DIGISCRIPTBOTLOG, TBL_TRANSCRIPTHDROCR,
+    TBL_TRANSCRIPTHDRDATA
 )
 
 logger = logging.getLogger(__name__)
@@ -131,6 +132,10 @@ class DashboardModel:
             articulation_status_donut = DashboardModel.get_articulation_status_donut(db, college_name, fromdate, todate)
             articulation_courses_status_donut = DashboardModel.get_articulation_courses_status_donut(db, college_name, fromdate, todate)
 
+            # Get download-level distribution reports (Advanced Dashboard)
+            source_type_distribution = DashboardModel.get_source_type_distribution(db, college_name, fromdate, todate)
+            download_status_distribution = DashboardModel.get_download_status_distribution(db, college_name, fromdate, todate)
+
             return {
                 "transcriptSources": {
                     "labels": labels,
@@ -163,6 +168,8 @@ class DashboardModel:
                 "transcriptStatusDonut": transcript_status_donut,
                 "articulationStatusDonut": articulation_status_donut,
                 "articulationCoursesStatusDonut": articulation_courses_status_donut,
+                "sourceTypeDistribution": source_type_distribution,
+                "downloadStatusDistribution": download_status_distribution,
             }
 
         except Exception as e:
@@ -926,6 +933,334 @@ class DashboardModel:
         except Exception as e:
             logger.exception("Error in get_articulation_courses_status_donut")
             return {"labels": [], "series": []}
+
+    @staticmethod
+    def get_source_type_distribution(
+        db: Session, college_name: str, fromdate: str, todate: str
+    ) -> Dict[str, Any]:
+        """
+        Get transcript count grouped by SOURCE_TYPE from TRANSCRIPT_DOWNLOAD.
+        SQL: SELECT SOURCE_TYPE, COUNT(SOURCE_TYPE) FROM TRANSCRIPT_DOWNLOAD
+             WHERE PROJECT_ID = 2 AND CAST(UPLOADED_DATETIME AS DATE) BETWEEN ... GROUP BY SOURCE_TYPE
+        """
+        try:
+            college_filter = ""
+            if college_name:
+                college_filter = f" AND d.INSTITUTION_ID = '{college_name}'"
+
+            query = text(f"""
+                SELECT 
+                    t.SOURCE_TYPE,
+                    COUNT(t.SOURCE_TYPE) AS cnt
+                FROM {TBL_DOWNLOAD} t
+                LEFT JOIN {TBL_KICKOUT} d ON d.BATCH_ID = t.BATCH_ID
+                WHERE (t.PROJECT_ID = {COLLEGE_PROJECT_ID} OR t.PROJECT_ID IS NULL)
+                AND CAST(t.UPLOADED_DATETIME AS DATE) >= :fromdate
+                AND CAST(t.UPLOADED_DATETIME AS DATE) <= :todate
+                {college_filter}
+                GROUP BY t.SOURCE_TYPE
+            """)
+
+            result = db.execute(query, {
+                "fromdate": fromdate.split()[0],
+                "todate": todate.split()[0],
+            }).fetchall()
+
+            labels = []
+            series = []
+            for row in result:
+                source = row.SOURCE_TYPE if row.SOURCE_TYPE else "Unknown"
+                labels.append(source)
+                series.append(row.cnt)
+
+            return {"labels": labels, "series": series}
+        except Exception as e:
+            logger.exception("Error in get_source_type_distribution")
+            return {"labels": [], "series": []}
+
+    @staticmethod
+    def get_download_status_distribution(
+        db: Session, college_name: str, fromdate: str, todate: str
+    ) -> Dict[str, Any]:
+        """
+        Get transcript count grouped by STATUS from TRANSCRIPT_DOWNLOAD.
+        SQL: SELECT STATUS, COUNT(STATUS) FROM TRANSCRIPT_DOWNLOAD
+             WHERE PROJECT_ID = 2 AND CAST(UPLOADED_DATETIME AS DATE) BETWEEN ... GROUP BY STATUS
+        """
+        try:
+            college_filter = ""
+            if college_name:
+                college_filter = f" AND d.INSTITUTION_ID = '{college_name}'"
+
+            query = text(f"""
+                SELECT 
+                    t.STATUS AS Status,
+                    COUNT(t.STATUS) AS cnt
+                FROM {TBL_DOWNLOAD} t
+                LEFT JOIN {TBL_KICKOUT} d ON d.BATCH_ID = t.BATCH_ID
+                WHERE (t.PROJECT_ID = {COLLEGE_PROJECT_ID} OR t.PROJECT_ID IS NULL)
+                AND CAST(t.UPLOADED_DATETIME AS DATE) >= :fromdate
+                AND CAST(t.UPLOADED_DATETIME AS DATE) <= :todate
+                {college_filter}
+                GROUP BY t.STATUS
+            """)
+
+            result = db.execute(query, {
+                "fromdate": fromdate.split()[0],
+                "todate": todate.split()[0],
+            }).fetchall()
+
+            labels = []
+            series = []
+            for row in result:
+                status = row.Status if row.Status else "Unknown"
+                labels.append(status)
+                series.append(row.cnt)
+
+            return {"labels": labels, "series": series}
+        except Exception as e:
+            logger.exception("Error in get_download_status_distribution")
+            return {"labels": [], "series": []}
+
+    # ──────────────────────────────────────────────────────────────────
+    # Recon Report methods
+    # ──────────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def get_recon_report(
+        db: Session,
+        fromdate: str,
+        todate: str,
+        project_id: int = COLLEGE_PROJECT_ID,
+    ) -> Dict[str, Any]:
+        """
+        Get full reconciliation report data.
+        Runs all recon queries and returns structured data.
+        """
+        try:
+            return {
+                "transcriptStatusByProject": DashboardModel._recon_transcript_status(db, fromdate, todate, project_id),
+                "articulationStatusByProject": DashboardModel._recon_articulation_status(db, fromdate, todate, project_id),
+                "transcriptErrorCategories": DashboardModel._recon_transcript_errors(db, fromdate, todate, project_id),
+                "downloadStatus": DashboardModel._recon_download_status(db, fromdate, todate, project_id),
+                "ocrStatus": DashboardModel._recon_ocr_status(db, fromdate, todate, project_id),
+                "hdrDataStatus": DashboardModel._recon_hdr_data_status(db, fromdate, todate, project_id),
+                "hdrDataAfterOcrSuccess": DashboardModel._recon_hdr_data_after_ocr(db, fromdate, todate, project_id),
+                "downloadSourceStatus": DashboardModel._recon_download_source_status(db, fromdate, todate, project_id),
+                "articulationErrorCategories": DashboardModel._recon_articulation_errors(db, fromdate, todate, project_id),
+            }
+        except Exception as e:
+            logger.exception("Error in get_recon_report")
+            raise
+
+    @staticmethod
+    def _recon_transcript_status(db: Session, fromdate: str, todate: str, project_id: int) -> List[Dict]:
+        """Q1: DIGISCRIPT_LOG – TRANSCRIPT_STATUS_FLAG counts"""
+        try:
+            query = text(f"""
+                SELECT
+                    TRANSCRIPT_STATUS_FLAG,
+                    COUNT(*) AS StatusCount
+                FROM {TBL_KICKOUT}
+                WHERE PROJECT_ID = :pid
+                AND CAST(LAST_UPDATED_DATETIME AS DATETIME) BETWEEN :fromdate AND :todate
+                GROUP BY TRANSCRIPT_STATUS_FLAG
+                ORDER BY TRANSCRIPT_STATUS_FLAG ASC
+            """)
+            rows = db.execute(query, {"pid": project_id, "fromdate": fromdate, "todate": todate}).fetchall()
+            return [{"status": r.TRANSCRIPT_STATUS_FLAG or "Unknown", "count": r.StatusCount} for r in rows]
+        except Exception as e:
+            logger.exception("Error in _recon_transcript_status")
+            return []
+
+    @staticmethod
+    def _recon_articulation_status(db: Session, fromdate: str, todate: str, project_id: int) -> List[Dict]:
+        """Q2: DIGISCRIPT_LOG – ARTICULATION_STATUS_FLAG counts"""
+        try:
+            query = text(f"""
+                SELECT
+                    ARTICULATION_STATUS_FLAG,
+                    COUNT(*) AS StatusCount
+                FROM {TBL_KICKOUT}
+                WHERE PROJECT_ID = :pid
+                AND CAST(LAST_UPDATED_DATETIME AS DATETIME) BETWEEN :fromdate AND :todate
+                GROUP BY ARTICULATION_STATUS_FLAG
+                ORDER BY ARTICULATION_STATUS_FLAG ASC
+            """)
+            rows = db.execute(query, {"pid": project_id, "fromdate": fromdate, "todate": todate}).fetchall()
+            return [{"status": r.ARTICULATION_STATUS_FLAG or "Unknown", "count": r.StatusCount} for r in rows]
+        except Exception as e:
+            logger.exception("Error in _recon_articulation_status")
+            return []
+
+    @staticmethod
+    def _recon_transcript_errors(db: Session, fromdate: str, todate: str, project_id: int) -> List[Dict]:
+        """Q3: DIGISCRIPT_LOG – Error categories for FAILED transcripts"""
+        try:
+            query = text(f"""
+                SELECT
+                    CASE
+                        WHEN CHARINDEX('-', ERROR_REASON) > 0
+                        THEN LEFT(ERROR_REASON, CHARINDEX('-', ERROR_REASON) - 1)
+                        ELSE ERROR_REASON
+                    END AS ERROR_CATEGORY,
+                    MIN(ERROR_REASON) AS ErrorReason,
+                    COUNT(BATCH_ID) AS ErrorCount
+                FROM {TBL_KICKOUT}
+                WHERE UPPER(TRANSCRIPT_STATUS_FLAG) = 'FAILED'
+                AND PROJECT_ID = :pid
+                AND CAST(LAST_UPDATED_DATETIME AS DATETIME) BETWEEN :fromdate AND :todate
+                GROUP BY
+                    CASE
+                        WHEN CHARINDEX('-', ERROR_REASON) > 0
+                        THEN LEFT(ERROR_REASON, CHARINDEX('-', ERROR_REASON) - 1)
+                        ELSE ERROR_REASON
+                    END
+                ORDER BY ErrorCount DESC
+            """)
+            rows = db.execute(query, {"pid": project_id, "fromdate": fromdate, "todate": todate}).fetchall()
+            return [{"category": r.ERROR_CATEGORY or "Unknown", "reason": r.ErrorReason or "", "count": r.ErrorCount} for r in rows]
+        except Exception as e:
+            logger.exception("Error in _recon_transcript_errors")
+            return []
+
+    @staticmethod
+    def _recon_download_status(db: Session, fromdate: str, todate: str, project_id: int) -> List[Dict]:
+        """Q4: TRANSCRIPT_DOWNLOAD – STATUS counts"""
+        try:
+            query = text(f"""
+                SELECT
+                    STATUS AS TRANSCRIPT_STATUS_FLAG,
+                    COUNT(*) AS data_Count
+                FROM {TBL_DOWNLOAD}
+                WHERE PROJECT_ID = :pid
+                AND CAST(LAST_UPDATED_DATETIME AS DATETIME) BETWEEN :fromdate AND :todate
+                GROUP BY STATUS
+                ORDER BY STATUS ASC
+            """)
+            rows = db.execute(query, {"pid": project_id, "fromdate": fromdate, "todate": todate}).fetchall()
+            return [{"status": r.TRANSCRIPT_STATUS_FLAG or "Unknown", "count": r.data_Count} for r in rows]
+        except Exception as e:
+            logger.exception("Error in _recon_download_status")
+            return []
+
+    @staticmethod
+    def _recon_ocr_status(db: Session, fromdate: str, todate: str, project_id: int) -> List[Dict]:
+        """Q5: TRANSCRIPT_HDR_OCR – STATUS_FLAG counts"""
+        try:
+            query = text(f"""
+                SELECT
+                    STATUS_FLAG AS TRANSCRIPT_STATUS_FLAG,
+                    COUNT(*) AS data_Count
+                FROM {TBL_TRANSCRIPTHDROCR}
+                WHERE PROJECT_ID = :pid
+                AND CAST(OCR_EXTRACTED_DATE AS DATETIME) BETWEEN :fromdate AND :todate
+                GROUP BY STATUS_FLAG
+                ORDER BY STATUS_FLAG ASC
+            """)
+            rows = db.execute(query, {"pid": project_id, "fromdate": fromdate, "todate": todate}).fetchall()
+            return [{"status": r.TRANSCRIPT_STATUS_FLAG or "Unknown", "count": r.data_Count} for r in rows]
+        except Exception as e:
+            logger.exception("Error in _recon_ocr_status")
+            return []
+
+    @staticmethod
+    def _recon_hdr_data_status(db: Session, fromdate: str, todate: str, project_id: int) -> List[Dict]:
+        """Q6: TRANSCRIPT_HDR_DATA – STATUS_FLAG counts"""
+        try:
+            query = text(f"""
+                SELECT
+                    STATUS_FLAG AS TRANSCRIPT_STATUS_FLAG,
+                    COUNT(*) AS data_Count
+                FROM {TBL_TRANSCRIPTHDRDATA}
+                WHERE PROJECT_ID = :pid
+                AND CAST(LAST_UPDATED_DATETIME AS DATETIME) BETWEEN :fromdate AND :todate
+                GROUP BY STATUS_FLAG
+                ORDER BY STATUS_FLAG ASC
+            """)
+            rows = db.execute(query, {"pid": project_id, "fromdate": fromdate, "todate": todate}).fetchall()
+            return [{"status": r.TRANSCRIPT_STATUS_FLAG or "Unknown", "count": r.data_Count} for r in rows]
+        except Exception as e:
+            logger.exception("Error in _recon_hdr_data_status")
+            return []
+
+    @staticmethod
+    def _recon_hdr_data_after_ocr(db: Session, fromdate: str, todate: str, project_id: int) -> List[Dict]:
+        """Q7: TRANSCRIPT_HDR_DATA – STATUS_FLAG counts WHERE BATCH_ID in OCR SUCCESS"""
+        try:
+            query = text(f"""
+                SELECT
+                    STATUS_FLAG AS TRANSCRIPT_STATUS_FLAG,
+                    COUNT(STATUS_FLAG) AS data_Count
+                FROM {TBL_TRANSCRIPTHDRDATA}
+                WHERE PROJECT_ID = :pid
+                AND BATCH_ID IN (
+                    SELECT BATCH_ID
+                    FROM {TBL_TRANSCRIPTHDROCR}
+                    WHERE UPPER(STATUS_FLAG) = 'SUCCESS'
+                )
+                AND CAST(LAST_UPDATED_DATETIME AS DATETIME) BETWEEN :fromdate AND :todate
+                GROUP BY STATUS_FLAG
+                ORDER BY STATUS_FLAG ASC
+            """)
+            rows = db.execute(query, {"pid": project_id, "fromdate": fromdate, "todate": todate}).fetchall()
+            return [{"status": r.TRANSCRIPT_STATUS_FLAG or "Unknown", "count": r.data_Count} for r in rows]
+        except Exception as e:
+            logger.exception("Error in _recon_hdr_data_after_ocr")
+            return []
+
+    @staticmethod
+    def _recon_download_source_status(db: Session, fromdate: str, todate: str, project_id: int) -> List[Dict]:
+        """Q8: TRANSCRIPT_DOWNLOAD – SOURCE_TYPE + STATUS cross-tab"""
+        try:
+            query = text(f"""
+                SELECT
+                    SOURCE_TYPE,
+                    STATUS AS TRANSCRIPT_STATUS_FLAG,
+                    COUNT(STATUS) AS data_Count
+                FROM {TBL_DOWNLOAD}
+                WHERE PROJECT_ID = :pid
+                AND CAST(LAST_UPDATED_DATETIME AS DATETIME) BETWEEN :fromdate AND :todate
+                GROUP BY SOURCE_TYPE, STATUS
+                ORDER BY SOURCE_TYPE, STATUS ASC
+            """)
+            rows = db.execute(query, {"pid": project_id, "fromdate": fromdate, "todate": todate}).fetchall()
+            return [{"sourceType": r.SOURCE_TYPE or "Unknown", "status": r.TRANSCRIPT_STATUS_FLAG or "Unknown", "count": r.data_Count} for r in rows]
+        except Exception as e:
+            logger.exception("Error in _recon_download_source_status")
+            return []
+
+    @staticmethod
+    def _recon_articulation_errors(db: Session, fromdate: str, todate: str, project_id: int) -> List[Dict]:
+        """Q9: DIGISCRIPT_LOG – Articulation error categories (PROCESSED transcript + FAILED/PARTIALLY PROCESSED articulation)"""
+        try:
+            query = text(f"""
+                SELECT
+                    CASE
+                        WHEN CHARINDEX('-', ERROR_REASON) > 0
+                        THEN LEFT(ERROR_REASON, CHARINDEX('-', ERROR_REASON) - 1)
+                        ELSE ERROR_REASON
+                    END AS ERROR_CATEGORY,
+                    MIN(ERROR_REASON) AS ErrorReason,
+                    COUNT(BATCH_ID) AS ErrorCount
+                FROM {TBL_KICKOUT}
+                WHERE UPPER(TRANSCRIPT_STATUS_FLAG) = 'PROCESSED'
+                AND (UPPER(ARTICULATION_STATUS_FLAG) = 'FAILED' OR UPPER(ARTICULATION_STATUS_FLAG) = 'PARTIALLY PROCESSED')
+                AND PROJECT_ID = :pid
+                AND CAST(LAST_UPDATED_DATETIME AS DATETIME) BETWEEN :fromdate AND :todate
+                GROUP BY
+                    CASE
+                        WHEN CHARINDEX('-', ERROR_REASON) > 0
+                        THEN LEFT(ERROR_REASON, CHARINDEX('-', ERROR_REASON) - 1)
+                        ELSE ERROR_REASON
+                    END
+                ORDER BY ErrorCount DESC
+            """)
+            rows = db.execute(query, {"pid": project_id, "fromdate": fromdate, "todate": todate}).fetchall()
+            return [{"category": r.ERROR_CATEGORY or "Unknown", "reason": r.ErrorReason or "", "count": r.ErrorCount} for r in rows]
+        except Exception as e:
+            logger.exception("Error in _recon_articulation_errors")
+            return []
 
     @staticmethod
     def get_colleges_list(db: Session, search_term: str = "") -> List[Dict[str, str]]:

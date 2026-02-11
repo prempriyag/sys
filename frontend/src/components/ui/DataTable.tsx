@@ -783,14 +783,19 @@ const DataTableComponent = (props: DataTableProps, ref: React.ForwardedRef<DataT
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow>
-                <TableCell
-                  colSpan={visibleColumnsArray.length}
-                  className="px-4 py-8 text-center text-sm text-gray-500"
-                >
-                  Loading...
-                </TableCell>
-              </TableRow>
+              // Skeleton loading rows for smoother perceived performance
+              Array.from({ length: Math.min(length, 5) }).map((_, skeletonIdx) => (
+                <TableRow key={`skeleton-${skeletonIdx}`} className="border-b border-gray-200 dark:border-gray-700 animate-pulse">
+                  {visibleColumnsArray.map((_, colIdx) => (
+                    <TableCell key={colIdx} className="px-4 py-3">
+                      <div
+                        className="h-4 rounded bg-gray-200 dark:bg-gray-700"
+                        style={{ width: `${55 + ((skeletonIdx + colIdx) % 4) * 12}%` }}
+                      />
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
             ) : data.length > 0 ? (
               data.map((row, rowIndex) => (
                 <TableRow

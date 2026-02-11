@@ -82,10 +82,9 @@ const BottomNavigation: React.FC = () => {
   const isActive = (path: string): boolean => {
     if (!path) return false;
     const pathWithoutQuery = path.split("?")[0];
-    return (
-      location.pathname === pathWithoutQuery ||
-      location.pathname.startsWith(pathWithoutQuery + "/")
-    );
+    // Exact match only (no prefix matching to avoid
+    // /college/transcripts lighting up when on /college/transcripts/add)
+    return location.pathname === pathWithoutQuery;
   };
 
   // Order items: Transcripts, Articulation, Dashboard, Reports, Uploads (must run before any return - hooks rule)

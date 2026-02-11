@@ -58,10 +58,9 @@ const SubMenuTabs: React.FC<SubMenuTabsProps> = ({ parentMenuName }) => {
   const isActive = (path: string): boolean => {
     if (!path) return false;
     const pathWithoutQuery = path.split("?")[0];
-    return (
-      location.pathname === pathWithoutQuery ||
-      location.pathname.startsWith(pathWithoutQuery + "/")
-    );
+    // Exact match only (no prefix matching to avoid
+    // /college/transcripts lighting up when on /college/transcripts/add)
+    return location.pathname === pathWithoutQuery;
   };
 
   return (

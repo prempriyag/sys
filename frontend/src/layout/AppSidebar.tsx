@@ -85,15 +85,15 @@ const AppSidebar: React.FC = () => {
   const isActive = useCallback(
     (path?: string, activePaths?: string[]) => {
       const current = location.pathname.split("?")[0];
+      // Exact match on the item's own path (no prefix matching to avoid
+      // /college/transcripts lighting up when on /college/transcripts/add)
       if (path) {
         const pathWithoutQuery = path.split("?")[0];
-        if (
-          current === pathWithoutQuery ||
-          current.startsWith(pathWithoutQuery + "/")
-        ) {
+        if (current === pathWithoutQuery) {
           return true;
         }
       }
+      // activePaths supports prefix matching (opt-in) for items that need it
       if (activePaths?.length) {
         return activePaths.some((p) => {
           const pClean = p.split("?")[0];

@@ -110,8 +110,9 @@ async def ajaxlist(
     # Build query
     query = db.query(User, Role).join(Role, User.role_id == Role.ID)
     
-    # Default filter - exclude verifiers role
-    query = query.filter(func.lower(Role.ROLE_KEY) != 'verifiers')
+    # Default filter - exclude verifiers role (only when not requesting verifiers)
+    if not type or type.lower() != 'verifiers':
+        query = query.filter(func.lower(Role.ROLE_KEY) != 'verifiers')
     
     # Column-specific search filters
     has_column_search = False

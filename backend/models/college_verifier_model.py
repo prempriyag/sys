@@ -187,6 +187,7 @@ class CollegeVerifierModel:
                     "COURSE_TITLE": _null_if_empty((post_data.get("COURSE_TITLE") or [])[key] if key < len(post_data.get("COURSE_TITLE") or []) else None),
                     "START_TERM": _null_if_empty((post_data.get("START_TERM") or [])[key] if key < len(post_data.get("START_TERM") or []) else None),
                     "END_TERM": _null_if_empty((post_data.get("END_TERM") or [])[key] if key < len(post_data.get("END_TERM") or []) else None),
+                    "EXTERNAL_INSTITUTION_NAME": _null_if_empty((post_data.get("EXTERNAL_INSTITUTION_NAME") or [])[key] if key < len(post_data.get("EXTERNAL_INSTITUTION_NAME") or []) else None),
                     "CREDIT_HOURS_EARNED": _null_if_empty((post_data.get("CREDIT_HOURS_EARNED") or [])[key] if key < len(post_data.get("CREDIT_HOURS_EARNED") or []) else None),
                     "GRADE": _null_if_empty((post_data.get("GRADE") or [])[key] if key < len(post_data.get("GRADE") or []) else None),
                     "PAGE_NBR": _null_if_empty((post_data.get("PAGE_NBR") or [])[key] if key < len(post_data.get("PAGE_NBR") or []) else None),
@@ -197,8 +198,8 @@ class CollegeVerifierModel:
                     row["BATCH_ID"] = batch_id
                     r = db.execute(
                         text(
-                            f"INSERT INTO {table} (BATCH_ID, SUBJECT, COURSE_ID, COURSE_TITLE, START_TERM, END_TERM, CREDIT_HOURS_EARNED, GRADE, PAGE_NBR) "
-                            f"OUTPUT INSERTED.AUTO_SEQNO VALUES (:BATCH_ID, :SUBJECT, :COURSE_ID, :COURSE_TITLE, :START_TERM, :END_TERM, :CREDIT_HOURS_EARNED, :GRADE, :PAGE_NBR)"
+                            f"INSERT INTO {table} (BATCH_ID, SUBJECT, COURSE_ID, COURSE_TITLE, START_TERM, END_TERM, EXTERNAL_INSTITUTION_NAME, CREDIT_HOURS_EARNED, GRADE, PAGE_NBR) "
+                            f"OUTPUT INSERTED.AUTO_SEQNO VALUES (:BATCH_ID, :SUBJECT, :COURSE_ID, :COURSE_TITLE, :START_TERM, :END_TERM, :EXTERNAL_INSTITUTION_NAME, :CREDIT_HOURS_EARNED, :GRADE, :PAGE_NBR)"
                         ),
                         row,
                     )
@@ -209,7 +210,8 @@ class CollegeVerifierModel:
                     db.execute(
                         text(
                             f"UPDATE {table} SET SUBJECT=:SUBJECT, COURSE_ID=:COURSE_ID, COURSE_TITLE=:COURSE_TITLE, "
-                            f"START_TERM=:START_TERM, END_TERM=:END_TERM, CREDIT_HOURS_EARNED=:CREDIT_HOURS_EARNED, "
+                            f"START_TERM=:START_TERM, END_TERM=:END_TERM, EXTERNAL_INSTITUTION_NAME=:EXTERNAL_INSTITUTION_NAME, "
+                            f"CREDIT_HOURS_EARNED=:CREDIT_HOURS_EARNED, "
                             f"GRADE=:GRADE, PAGE_NBR=:PAGE_NBR WHERE BATCH_ID=:BATCH_ID AND AUTO_SEQNO=:AUTO_SEQNO"
                         ),
                         {
@@ -388,15 +390,12 @@ class CollegeVerifierModel:
                 return result
             hdr_data = dict(hdr._mapping)
             file_path = hdr_data.get("FILE_PATH") or ""
-            if file_path:
-                try:
-                    from helpers.encryption_helper import get_encrypt_file_path
-                    encrypted_path = get_encrypt_file_path(file_path)
-                    hdr_data["TRANSCRIPT_URL"] = f"/api/viewfile/transcript_file?pdf={encrypted_path}"
-                except Exception:
-                    hdr_data["TRANSCRIPT_URL"] = ""
-            else:
-                hdr_data["TRANSCRIPT_URL"] = ""
+
+            # Build TRANSCRIPT_URL (handles FTP→share-path conversion)
+            from helpers.common_helper import build_transcript_url
+            hdr_data["TRANSCRIPT_URL"] = build_transcript_url(
+                db, file_path, batch_id, SCHOOL_PROJECT_ID
+            )
 
             line_rows = db.execute(
                 text(f"SELECT * FROM {TBL_TRANSCRIPT_TEST_SCORE_OCR} WITH(NOLOCK) WHERE BATCH_ID = :bid ORDER BY AUTO_SEQNO"),

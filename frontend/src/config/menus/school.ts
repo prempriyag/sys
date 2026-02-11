@@ -217,12 +217,12 @@ export const schoolMenu: MenuConfig = {
         },
       ],
     },
-    {
-      name: "Profiler",
-      path: "/school/profiler",
-      icon: "gauge",
-      // Access controlled by backend - only KTech users can view
-    },
+    // {
+    //   name: "Profiler",
+    //   path: "/school/profiler",
+    //   icon: "gauge",
+    //   // Access controlled by backend - only KTech users can view
+    // },
   ],
 };
 

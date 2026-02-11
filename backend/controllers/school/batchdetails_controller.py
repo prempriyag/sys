@@ -8,7 +8,7 @@ from sqlalchemy import text
 from typing import Dict, Any
 import logging
 from database.connection import get_db
-from config.constants import TBL_TRANSCRIPTHDRDATA, TBL_INSTITUTION_MAPPING, TBL_TRANSCRIPTHDROCR, TBL_TRANSCRIPTLINEDATA, TBL_TRANSCRIPT_TEST_SCORE_OCR
+from config.constants import TBL_TRANSCRIPTHDRDATA, TBL_INSTITUTION_MAPPING, TBL_TRANSCRIPTHDROCR, TBL_TRANSCRIPTLINEDATA, TBL_TRANSCRIPT_TEST_SCORE_OCR, SCHOOL_PROJECT_ID
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/batchdetails", tags=["batchdetails"])
@@ -43,15 +43,12 @@ async def get_batch_details(
         
         header_data = dict(header_result._mapping)
         
-        # Generate encrypted transcript URL if FILE_PATH exists (matches CI3 view logic)
+        # Generate encrypted transcript URL (handles FTP→share-path conversion)
         file_path = header_data.get("FILE_PATH") or ""
-        if file_path:
-            from helpers.encryption_helper import get_encrypt_file_path
-            encrypted_path = get_encrypt_file_path(file_path)
-            # Store the encrypted URL for frontend to use directly
-            header_data["TRANSCRIPT_URL"] = f"/api/viewfile/transcript_file?pdf={encrypted_path}"
-        else:
-            header_data["TRANSCRIPT_URL"] = ""
+        from helpers.common_helper import build_transcript_url
+        header_data["TRANSCRIPT_URL"] = build_transcript_url(
+            db, file_path, batch_id, SCHOOL_PROJECT_ID
+        )
         
         # Get line data (matches CI3 lines 124-129)
         line_query = text(f"""

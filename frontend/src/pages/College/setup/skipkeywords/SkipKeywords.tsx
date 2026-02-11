@@ -187,18 +187,10 @@ export default function SkipKeywords() {
       <PageMeta title="Skip Keywords | College Module" description="Manage skip keywords" />
       <PageBreadcrumb pageTitle="Skip Keywords" />
       <PageContainer>
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="font-semibold text-gray-800 text-theme-xl dark:text-white/90 sm:text-2xl">View Skip Keywords</h3>
-          <div className="flex items-center gap-2">
-            {hasAddPermission && (
-              <Button onClick={handleAdd}>Add Skip Keyword</Button>
-            )}
-            <Button onClick={() => setRefreshTrigger((prev) => prev + 1)} variant="outline" startIcon={<RefreshIcon className="w-5 h-5" />}>Refresh Data</Button>
-          </div>
-        </div>
 
         <DataTable
           refreshTrigger={refreshTrigger}
+          toolbarActions={<>{hasAddPermission && <Button size="sm" onClick={handleAdd}>Add Skip Keyword</Button>}<button onClick={() => setRefreshTrigger((prev) => prev + 1)} className="inline-flex items-center gap-1.5 rounded border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700"><RefreshIcon className="w-4 h-4" /> Refresh</button></>}
           ajaxUrl="/api/skipkeywords/ajaxlist"
           columns={[
             { data: "KEYWORD", name: "Keyword", searchable: true, orderable: true },

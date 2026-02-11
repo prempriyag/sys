@@ -58,7 +58,15 @@ export default function HorizontalMenuItem({
     return false;
   };
 
-  const isItemActive = isActive(item.path, item.activePaths);
+  // Check if any sub-item (recursively) is active
+  const isAnyChildActive = (menuItem: MenuItem): boolean => {
+    if (!menuItem.subItems) return false;
+    return menuItem.subItems.some(
+      (sub) => isActive(sub.path, sub.activePaths) || isAnyChildActive(sub)
+    );
+  };
+
+  const isItemActive = isActive(item.path, item.activePaths) || isAnyChildActive(item);
 
   // Close submenu when location changes (after navigation)
   useEffect(() => {
@@ -263,17 +271,20 @@ export default function HorizontalMenuItem({
       <li className="flex-shrink-0">
         <Link
           to={item.path || "#"}
-          className={`group/link flex items-center ${showIconOnly ? 'justify-center px-3' : 'gap-2 px-4'} py-3 text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${
+          className={`group/link relative flex items-center ${showIconOnly ? 'justify-center px-3' : 'gap-2 px-4'} py-3 text-sm font-medium rounded-lg transition-all duration-200 whitespace-nowrap ${
             isItemActive
-              ? "bg-brand-50 text-brand-600 dark:bg-brand-900/20 dark:text-brand-400"
-              : "text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
+              ? "bg-brand-50 text-brand-700 font-semibold shadow-[0_1px_3px_rgba(229,113,36,0.12)] dark:bg-brand-500/15 dark:text-brand-300"
+              : "text-gray-800 hover:bg-brand-50/60 hover:text-black dark:text-gray-300 dark:hover:bg-brand-500/10 dark:hover:text-white"
           }`}
           title={!showIconOnly ? item.name : undefined}
         >
-          <span ref={iconRef} className="relative">
+          <span ref={iconRef} className="relative transition-transform duration-200 group-hover/link:scale-110">
             {getIcon(item.icon)}
           </span>
           {!showIconOnly && <span>{item.name}</span>}
+          {isItemActive && (
+            <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-2/3 h-0.5 rounded-full bg-brand-500 dark:bg-brand-400" />
+          )}
         </Link>
         {showIconOnly && showTooltip && tooltipPosition && createPortal(
           <div
@@ -313,14 +324,14 @@ export default function HorizontalMenuItem({
         onClick={() => onSubmenuToggle(key)}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        className={`flex items-center ${shouldShowText ? 'gap-0 px-2' : 'justify-center px-3'} py-3 text-sm font-medium rounded-lg transition-all whitespace-nowrap ${
+        className={`relative flex items-center ${shouldShowText ? 'gap-0 px-2' : 'justify-center px-3'} py-3 text-sm font-medium rounded-lg transition-all duration-200 whitespace-nowrap ${
           isItemActive || isSubmenuOpen
-            ? "bg-brand-50 text-brand-600 dark:bg-brand-900/20 dark:text-brand-400"
-            : "text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
+            ? "bg-brand-50 text-brand-700 font-semibold shadow-[0_1px_3px_rgba(229,113,36,0.12)] dark:bg-brand-500/15 dark:text-brand-300"
+            : "text-gray-800 hover:bg-brand-50/60 hover:text-black dark:text-gray-300 dark:hover:bg-brand-500/10 dark:hover:text-white"
         }`}
         title={!shouldShowText ? item.name : undefined}
       >
-        <span ref={iconRef} className="relative">
+        <span ref={iconRef} className="relative transition-transform duration-200 group-hover:scale-110">
           {getIcon(item.icon)}
         </span>
         {shouldShowText && (
@@ -328,10 +339,13 @@ export default function HorizontalMenuItem({
             <span className="whitespace-nowrap">{item.name}</span>
             {hasSubItems && (
               <ChevronDownIcon
-                className={`w-4 h-4 me-1 transition-transform flex-shrink-0 ${isSubmenuOpen ? "rotate-180" : ""}`}
+                className={`w-4 h-4 me-1 transition-transform duration-200 flex-shrink-0 ${isSubmenuOpen ? "rotate-180" : ""}`}
               />
             )}
           </>
+        )}
+        {(isItemActive || isSubmenuOpen) && (
+          <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-2/3 h-0.5 rounded-full bg-brand-500 dark:bg-brand-400" />
         )}
       </button>
       {showIconOnly && showTooltip && !isButtonHovered && !isSubmenuOpen && tooltipPosition && createPortal(
@@ -364,8 +378,8 @@ export default function HorizontalMenuItem({
             ref={dropdownRef}
             onMouseEnter={handleDropdownMouseEnter}
             onMouseLeave={handleDropdownMouseLeave}
-            className="w-56 bg-white rounded-lg shadow-xl border border-gray-200 dark:bg-gray-800 dark:border-gray-700 py-2 min-w-max"
-            style={{ zIndex: 10000, position: "fixed" }}
+            className="w-56 bg-white rounded-lg shadow-lg border border-brand-200/40 dark:bg-gray-800 dark:border-gray-700/60 py-2 min-w-max"
+            style={{ zIndex: 10000, position: "fixed", boxShadow: "0 10px 15px -3px rgba(229,113,36,0.08), 0 4px 6px -4px rgba(229,113,36,0.06)" }}
           >
             {item.subItems?.map((subItem, subIndex) => {
               const subKey = `${key}-${subIndex}`;
@@ -391,12 +405,15 @@ export default function HorizontalMenuItem({
                   key={subKey}
                   to={subItem.path || "#"}
                   onClick={() => onSubmenuToggle(key)} // Close main submenu
-                  className={`flex items-center gap-2 px-4 py-2 text-sm transition-colors ${
+                  className={`relative flex items-center gap-2 px-4 py-2 text-sm transition-all duration-200 ${
                     isSubItemActive
-                      ? "bg-brand-50 text-brand-600 dark:bg-brand-900/20 dark:text-brand-400"
-                      : "text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+                      ? "bg-brand-50 text-brand-700 font-semibold dark:bg-brand-500/15 dark:text-brand-300"
+                      : "text-gray-700 hover:bg-brand-50/50 hover:text-black hover:pl-5 dark:text-gray-400 dark:hover:bg-brand-500/10 dark:hover:text-white"
                   }`}
                 >
+                  {isSubItemActive && (
+                    <span className="absolute left-1 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-brand-500 dark:bg-brand-400" />
+                  )}
                   {subItem.icon && (
                     <span className={`menu-item-icon-size ${
                       isSubItemActive
@@ -484,10 +501,10 @@ function NestedMenuItem({
       <button
         ref={nestedButtonRef}
         onClick={() => onSubmenuToggle(subKey)}
-        className={`w-full flex items-center justify-between px-4 py-2 text-sm transition-colors ${
+        className={`w-full flex items-center justify-between px-4 py-2 text-sm transition-all duration-200 ${
           isSubItemActive
-            ? "bg-brand-50 text-brand-600 dark:bg-brand-900/20 dark:text-brand-400"
-            : "text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+            ? "bg-brand-50 text-brand-700 font-semibold dark:bg-brand-500/15 dark:text-brand-300"
+            : "text-gray-700 hover:bg-brand-50/50 hover:text-black dark:text-gray-400 dark:hover:bg-brand-500/10 dark:hover:text-white"
         }`}
       >
         <span>{subItem.name}</span>
@@ -497,8 +514,8 @@ function NestedMenuItem({
         createPortal(
           <div
             ref={nestedDropdownRef}
-            className="w-56 bg-white rounded-lg shadow-xl border border-gray-200 dark:bg-gray-800 dark:border-gray-700 py-2 min-w-max"
-            style={{ zIndex: 10001, position: "fixed" }}
+            className="w-56 bg-white rounded-lg shadow-lg border border-brand-200/40 dark:bg-gray-800 dark:border-gray-700/60 py-2 min-w-max"
+            style={{ zIndex: 10001, position: "fixed", boxShadow: "0 10px 15px -3px rgba(229,113,36,0.08), 0 4px 6px -4px rgba(229,113,36,0.06)" }}
           >
             {subItem.subItems?.map((nestedItem, nestedIndex) => {
               const nestedKey = `${subKey}-${nestedIndex}`;
@@ -510,7 +527,7 @@ function NestedMenuItem({
                     onSubmenuToggle(subKey); // Close nested submenu
                     onRootClose(); // Close root menu
                   }}
-                  className="block px-4 py-2 text-sm transition-colors text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+                  className="block px-4 py-2 text-sm transition-all duration-200 text-gray-700 hover:bg-brand-50/50 hover:text-black hover:pl-5 dark:text-gray-400 dark:hover:bg-brand-500/10 dark:hover:text-white"
                 >
                   {nestedItem.name}
                 </Link>

@@ -57,6 +57,16 @@ import { ReactComponent as ErrorHexaIcon } from "./info-hexa.svg?react";
 import { RefreshIcon } from "./refresh";
 import { FilterIcon } from "./filter";
 import { SearchIcon } from "./search";
+import { GearIcon } from "./gear";
+import { UploadIcon } from "./upload";
+import { DatabaseIcon } from "./database";
+import { BarChartIcon } from "./bar-chart";
+import { GaugeIcon } from "./gauge";
+import { CalculatorIcon } from "./calculator";
+import { FlaskIcon } from "./flask";
+import { LinkIcon } from "./link";
+import { ClipboardIcon } from "./clipboard";
+import { BotIcon } from "./bot";
 
 export {
   ErrorHexaIcon,
@@ -118,4 +128,14 @@ export {
   RefreshIcon,
   FilterIcon,
   SearchIcon,
+  GearIcon,
+  UploadIcon,
+  DatabaseIcon,
+  BarChartIcon,
+  GaugeIcon,
+  CalculatorIcon,
+  FlaskIcon,
+  LinkIcon,
+  ClipboardIcon,
+  BotIcon,
 };

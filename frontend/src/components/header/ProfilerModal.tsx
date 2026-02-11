@@ -1,39 +1,10 @@
 /**
  * Profiler Modal - Debug tool for KTech users
- * Based on CI3 MY_Profiler / Speedtest controller
- * Shows database queries, timing, and performance metrics in a modal popup
+ * Shows API request profiles with SQL queries and timing in a modal popup
  */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { useLocation } from "react-router";
 import { API_ENDPOINTS, apiRequest } from "../../config/api";
-
-interface ProfilerSection {
-  label: string;
-  value: string;
-}
-
-interface ProfilerData {
-  [key: string]: ProfilerSection[];
-}
-
-interface SpeedtestResult {
-  name: string;
-  duration_ms: number;
-  status: "pass" | "fail";
-  error?: string;
-  result?: number;
-  rows_returned?: number;
-}
-
-interface SpeedtestData {
-  tests: SpeedtestResult[];
-  summary: {
-    total_tests: number;
-    passed: number;
-    failed: number;
-    total_time_ms: number;
-    average_time_ms: number;
-  };
-}
 
 interface QueryProfile {
   index: number;
@@ -67,16 +38,29 @@ interface ProfilerModalProps {
 
 export default function ProfilerModal({ isOpen, onClose }: ProfilerModalProps) {
   const [profilerEnabled, setProfilerEnabled] = useState<boolean>(false);
-  const [profilerData, setProfilerData] = useState<ProfilerData | null>(null);
-  const [speedtestData, setSpeedtestData] = useState<SpeedtestData | null>(null);
   const [requestProfiles, setRequestProfiles] = useState<RequestProfile[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"requests" | "profiler" | "speedtest">("requests");
-  const [profilerType, setProfilerType] = useState<"page" | "ajax">("page");
-  const [hasPageData, setHasPageData] = useState(false);
-  const [hasAjaxData, setHasAjaxData] = useState(false);
   const [expandedRequest, setExpandedRequest] = useState<number | null>(null);
+  const [showAllRequests, setShowAllRequests] = useState<boolean>(false);
+  const [profilingActive, setProfilingActive] = useState<boolean>(true);
+
+  // Track route changes - record timestamp so we only show APIs for the current page
+  const location = useLocation();
+  const prevPathnameRef = useRef(location.pathname);
+  const routeChangeTimestampRef = useRef<number>(Date.now() / 1000); // Unix seconds (matches backend timestamps)
+
+  useEffect(() => {
+    if (prevPathnameRef.current !== location.pathname) {
+      prevPathnameRef.current = location.pathname;
+      // Record the route change time - we'll filter request profiles to only show data after this
+      routeChangeTimestampRef.current = Date.now() / 1000;
+      // Reset local state so stale data from previous page isn't visible
+      setRequestProfiles([]);
+      setExpandedRequest(null);
+      setError(null);
+    }
+  }, [location.pathname]);
 
   useEffect(() => {
     if (isOpen) {
@@ -84,7 +68,12 @@ export default function ProfilerModal({ isOpen, onClose }: ProfilerModalProps) {
     }
   }, [isOpen]);
 
-  const [profilingActive, setProfilingActive] = useState<boolean>(true);
+  // Reload request profiles when the filter toggle changes
+  useEffect(() => {
+    if (isOpen && profilerEnabled) {
+      loadRequestProfiles();
+    }
+  }, [showAllRequests]);
 
   const checkProfilerStatus = async () => {
     setLoading(true);
@@ -119,9 +108,21 @@ export default function ProfilerModal({ isOpen, onClose }: ProfilerModalProps) {
       const data = await response.json();
       
       if (response.ok) {
-        setRequestProfiles(data.requests || []);
-        if (!data.requests || data.requests.length === 0) {
-          setError("No request profiles captured yet. Navigate to any page, then come back here.");
+        const allRequests: RequestProfile[] = data.requests || [];
+        if (showAllRequests) {
+          // Show all accumulated requests across pages
+          setRequestProfiles(allRequests);
+        } else {
+          // Filter to only show requests that occurred after the last route change
+          // This ensures we only see API calls for the current page, not previous pages
+          const filteredRequests = allRequests.filter(
+            (req) => req.timestamp >= routeChangeTimestampRef.current
+          );
+          setRequestProfiles(filteredRequests);
+        }
+        if ((!showAllRequests && allRequests.filter(r => r.timestamp >= routeChangeTimestampRef.current).length === 0) ||
+            (showAllRequests && allRequests.length === 0)) {
+          setError("No request profiles captured yet. Navigate or interact with the page, then check again.");
         }
       } else {
         setError(data.detail || "Failed to load request profiles");
@@ -142,54 +143,6 @@ export default function ProfilerModal({ isOpen, onClose }: ProfilerModalProps) {
       }
     } catch (err) {
       // silent
-    }
-  };
-
-  const loadProfilerData = async (type: "page" | "ajax" = "page") => {
-    setLoading(true);
-    setError(null);
-    setProfilerType(type);
-    try {
-      const response = await apiRequest(`${API_ENDPOINTS.PROFILER_DATA}?type=${type}`);
-      const data = await response.json();
-      
-      if (response.ok) {
-        setProfilerData(data.data);
-        setHasPageData(data.has_page_data || false);
-        setHasAjaxData(data.has_ajax_data || false);
-        if (!data.data) {
-          setError(data.message || "No profiler data available. Navigate to a page first, then check the profiler.");
-        } else {
-          setError(null);
-        }
-      } else {
-        setError(data.detail || "Failed to load profiler data");
-      }
-    } catch (err) {
-      setError("Failed to load profiler data");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const runSpeedtest = async () => {
-    setLoading(true);
-    setSpeedtestData(null);
-    setError(null);
-    try {
-      const response = await apiRequest(`${API_ENDPOINTS.PROFILER_SPEEDTEST}`);
-      const data = await response.json();
-      
-      if (response.ok) {
-        setSpeedtestData(data);
-        setError(null);
-      } else {
-        setError(data.detail || "Failed to run speedtest");
-      }
-    } catch (err) {
-      setError("Failed to run speedtest");
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -286,81 +239,49 @@ export default function ProfilerModal({ isOpen, onClose }: ProfilerModalProps) {
         {/* Main Content */}
         {profilerEnabled && (
           <>
-            {/* Tabs */}
-            <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 px-6">
-              <div className="flex">
-                <button
-                  onClick={() => { setActiveTab("requests"); setError(null); loadRequestProfiles(); }}
-                  className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-                    activeTab === "requests"
-                      ? "border-blue-500 text-blue-600 dark:text-blue-400"
-                      : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-                  }`}
-                >
-                  Request Profiles
-                  {totalRequests > 0 && (
-                    <span className="ml-2 px-1.5 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full">
-                      {totalRequests}
-                    </span>
-                  )}
-                </button>
-                <button
-                  onClick={() => { setActiveTab("profiler"); setError(null); loadProfilerData(profilerType); }}
-                  className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-                    activeTab === "profiler"
-                      ? "border-blue-500 text-blue-600 dark:text-blue-400"
-                      : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-                  }`}
-                >
-                  Last Request
-                </button>
-                <button
-                  onClick={() => { setActiveTab("speedtest"); setError(null); if (!speedtestData) runSpeedtest(); }}
-                  className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-                    activeTab === "speedtest"
-                      ? "border-blue-500 text-blue-600 dark:text-blue-400"
-                      : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-                  }`}
-                >
-                  DB Speedtest
-                </button>
+            {/* Toolbar */}
+            <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 px-6 py-2">
+              <div className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                Request Profiles
+                {totalRequests > 0 && (
+                  <span className="px-1.5 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full">
+                    {totalRequests}
+                  </span>
+                )}
               </div>
-              
-              {/* Page/AJAX toggle for profiler tab */}
-              {activeTab === "profiler" && (
-                <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+              <div className="flex items-center gap-2">
+                {/* Current Page / All Pages toggle */}
+                <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5">
                   <button
-                    onClick={() => loadProfilerData("page")}
-                    className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
-                      profilerType === "page"
+                    onClick={() => { setShowAllRequests(false); }}
+                    className={`px-2.5 py-1 text-xs font-medium rounded transition-colors ${
+                      !showAllRequests
                         ? "bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm"
                         : "text-gray-500 hover:text-gray-700 dark:text-gray-400"
                     }`}
                   >
-                    Page {hasPageData && <span className="ml-1 w-1.5 h-1.5 bg-green-500 rounded-full inline-block"></span>}
+                    Current Page
                   </button>
                   <button
-                    onClick={() => loadProfilerData("ajax")}
-                    className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
-                      profilerType === "ajax"
+                    onClick={() => { setShowAllRequests(true); }}
+                    className={`px-2.5 py-1 text-xs font-medium rounded transition-colors ${
+                      showAllRequests
                         ? "bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm"
                         : "text-gray-500 hover:text-gray-700 dark:text-gray-400"
                     }`}
                   >
-                    AJAX {hasAjaxData && <span className="ml-1 w-1.5 h-1.5 bg-green-500 rounded-full inline-block"></span>}
+                    All Pages
                   </button>
                 </div>
-              )}
-
-              {/* Clear button for requests tab */}
-              {activeTab === "requests" && requestProfiles.length > 0 && (
-                <button
-                  onClick={clearRequestProfiles}
-                  className="px-3 py-1 text-xs font-medium text-red-600 hover:text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
-                >
-                  Clear All
-                </button>
-              )}
+                {requestProfiles.length > 0 && (
+                  <button
+                    onClick={clearRequestProfiles}
+                    className="px-3 py-1 text-xs font-medium text-red-600 hover:text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
+                  >
+                    Clear All
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Content */}
@@ -368,7 +289,7 @@ export default function ProfilerModal({ isOpen, onClose }: ProfilerModalProps) {
               {!profilingActive && (
                 <div className="mb-4 bg-orange-50 border border-orange-200 rounded-lg p-3 dark:bg-orange-900/20 dark:border-orange-800">
                   <p className="text-sm font-medium text-orange-800 dark:text-orange-300">
-                    Profiling is disabled on the server (ENABLE_PROFILING=False in .env). Request data and query timing will not be captured. Only the DB Speedtest tab is functional.
+                    Profiling is disabled on the server (ENABLE_PROFILING=False in .env). Request data and query timing will not be captured.
                   </p>
                 </div>
               )}
@@ -384,8 +305,8 @@ export default function ProfilerModal({ isOpen, onClose }: ProfilerModalProps) {
                 </div>
               )}
 
-              {/* ====================== REQUEST PROFILES TAB ====================== */}
-              {activeTab === "requests" && !loading && (
+              {/* Request Profiles */}
+              {!loading && (
                 <div className="space-y-4">
                   {requestProfiles.length > 0 && (
                     <>
@@ -580,212 +501,6 @@ export default function ProfilerModal({ isOpen, onClose }: ProfilerModalProps) {
                       </button>
                     </div>
                   )}
-                </div>
-              )}
-
-              {/* ====================== SPEEDTEST TAB ====================== */}
-              {activeTab === "speedtest" && speedtestData && !loading && (
-                <div className="space-y-4">
-                  {/* Summary Cards */}
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                    <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 text-center">
-                      <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                        {speedtestData.summary.total_tests}
-                      </div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">Total Tests</div>
-                    </div>
-                    <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-3 text-center">
-                      <div className="text-2xl font-bold text-green-600">
-                        {speedtestData.summary.passed}
-                      </div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">Passed</div>
-                    </div>
-                    <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-3 text-center">
-                      <div className="text-2xl font-bold text-red-600">
-                        {speedtestData.summary.failed}
-                      </div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">Failed</div>
-                    </div>
-                    <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 text-center">
-                      <div className="text-2xl font-bold text-blue-600">
-                        {speedtestData.summary.total_time_ms}ms
-                      </div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">Total Time</div>
-                    </div>
-                    <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-3 text-center">
-                      <div className="text-2xl font-bold text-purple-600">
-                        {speedtestData.summary.average_time_ms}ms
-                      </div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">Avg Time</div>
-                    </div>
-                  </div>
-
-                  {/* Test Results Table */}
-                  <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-                    <table className="w-full text-sm">
-                      <thead className="bg-gray-50 dark:bg-gray-700/50">
-                        <tr>
-                          <th className="px-4 py-2 text-left font-semibold text-gray-700 dark:text-gray-300">Test</th>
-                          <th className="px-4 py-2 text-center font-semibold text-gray-700 dark:text-gray-300">Status</th>
-                          <th className="px-4 py-2 text-right font-semibold text-gray-700 dark:text-gray-300">Time</th>
-                          <th className="px-4 py-2 text-left font-semibold text-gray-700 dark:text-gray-300">Details</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                        {speedtestData.tests.map((test, index) => (
-                          <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
-                            <td className="px-4 py-2 font-medium text-gray-900 dark:text-white">
-                              {test.name}
-                            </td>
-                            <td className="px-4 py-2 text-center">
-                              <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
-                                test.status === "pass"
-                                  ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-                                  : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
-                              }`}>
-                                {test.status === "pass" ? "PASS" : "FAIL"}
-                              </span>
-                            </td>
-                            <td className="px-4 py-2 text-right text-gray-600 dark:text-gray-400">
-                              {test.duration_ms}ms
-                            </td>
-                            <td className="px-4 py-2 text-gray-600 dark:text-gray-400">
-                              {test.error && <span className="text-red-600 text-xs break-all">{test.error}</span>}
-                              {test.result !== undefined && <span>Count: {test.result}</span>}
-                              {test.rows_returned !== undefined && <span>Rows: {test.rows_returned}</span>}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* Run Again Button */}
-                  <div className="flex justify-center pt-2">
-                    <button
-                      onClick={runSpeedtest}
-                      disabled={loading}
-                      className="px-4 py-2 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                      {loading ? "Running..." : "Run Again"}
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* ====================== LAST REQUEST (PROFILER) TAB ====================== */}
-              {activeTab === "profiler" && profilerData && !loading && (
-                <div className="space-y-4">
-                  {Object.entries(profilerData).map(([section, items]) => {
-                    const isDatabase = section.toLowerCase().includes("database");
-                    const sectionColor = isDatabase 
-                      ? "bg-purple-600" 
-                      : section.includes("BENCHMARKS") 
-                        ? "bg-green-600" 
-                        : "bg-blue-600";
-                    
-                    return (
-                      <div key={section} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-                        <div className={`${sectionColor} text-white px-4 py-2 text-sm font-semibold flex items-center justify-between`}>
-                          <span>{section}</span>
-                          {isDatabase && (
-                            <span className="text-xs bg-white/20 px-2 py-0.5 rounded">
-                              {items.length} {items.length === 1 ? 'query' : 'queries'}
-                            </span>
-                          )}
-                        </div>
-                        <div className="p-3 max-h-64 overflow-y-auto">
-                          {items.length === 0 ? (
-                            <p className="text-gray-500 dark:text-gray-400 text-sm italic">No data</p>
-                          ) : (
-                            <table className="w-full text-sm">
-                              <tbody>
-                                {items.map((item: ProfilerSection, index: number) => (
-                                  <tr key={index} className="border-b border-gray-100 dark:border-gray-700 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-700/30">
-                                    <td className={`py-2 pr-4 text-xs text-gray-700 dark:text-gray-300 ${isDatabase ? 'font-mono break-all' : ''}`}>
-                                      {isDatabase ? (
-                                        <code className="text-purple-700 dark:text-purple-400">{item.label}</code>
-                                      ) : (
-                                        item.label
-                                      )}
-                                    </td>
-                                    <td className={`py-2 text-right text-xs whitespace-nowrap font-medium ${
-                                      item.value.includes('ms') 
-                                        ? parseFloat(item.value) > 100 
-                                          ? 'text-red-600 dark:text-red-400' 
-                                          : parseFloat(item.value) > 50 
-                                            ? 'text-yellow-600 dark:text-yellow-400'
-                                            : 'text-green-600 dark:text-green-400'
-                                        : 'text-gray-600 dark:text-gray-400'
-                                    }`}>
-                                      {item.value}
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                  
-                  {/* Refresh button */}
-                  <div className="flex justify-center pt-2">
-                    <button
-                      onClick={() => loadProfilerData(profilerType)}
-                      disabled={loading}
-                      className="px-4 py-2 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 disabled:opacity-50 transition-colors"
-                    >
-                      Refresh Data
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Empty state for profiler */}
-              {activeTab === "profiler" && !profilerData && !loading && (
-                <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-6 text-center">
-                  <div className="mb-4">
-                    <svg className="w-12 h-12 mx-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                  </div>
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                    No Profiler Data Yet
-                  </h3>
-                  <p className="text-gray-600 dark:text-gray-400 text-sm mb-4">
-                    {error || "Navigate to any page in the app, then come back here to see the queries and timing for that request."}
-                  </p>
-                  <div className="flex justify-center gap-2">
-                    <button
-                      onClick={() => loadProfilerData("page")}
-                      className="px-4 py-2 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 transition-colors"
-                    >
-                      Check Page Data
-                    </button>
-                    <button
-                      onClick={() => loadProfilerData("ajax")}
-                      className="px-4 py-2 bg-gray-500 text-white text-sm rounded-lg hover:bg-gray-600 transition-colors"
-                    >
-                      Check AJAX Data
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Empty state for speedtest */}
-              {activeTab === "speedtest" && !speedtestData && !loading && !error && (
-                <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-6 text-center">
-                  <p className="text-gray-600 dark:text-gray-400 text-sm mb-4">
-                    Run database speedtest to check performance.
-                  </p>
-                  <button
-                    onClick={runSpeedtest}
-                    className="px-4 py-2 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 transition-colors"
-                  >
-                    Run Speedtest
-                  </button>
                 </div>
               )}
             </div>

@@ -742,8 +742,8 @@ export default function CollegeDashboard() {
             </div>
 
             {/* Charts Grid - Modern Compact Layout */}
-            <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-md dark:border-gray-800 dark:bg-gray-900">
-              <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+            {/* <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-md dark:border-gray-800 dark:bg-gray-900"> */}
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
               {/* Transcripts Downloaded From Sources */}
               <div className="group relative overflow-hidden rounded-xl border-2 border-blue-300/60 bg-gradient-to-br from-white via-white to-blue-50/40 p-5 shadow-lg transition-all duration-300 hover:scale-[1.01] hover:shadow-xl hover:border-blue-400 dark:border-blue-600/50 dark:from-gray-800/90 dark:via-gray-800/90 dark:to-blue-900/30 dark:hover:border-blue-500">
                 <div className="absolute top-0 right-0 h-20 w-20 bg-blue-500/15 rounded-full blur-2xl group-hover:bg-blue-500/25 transition-all duration-300"></div>
@@ -968,7 +968,7 @@ export default function CollegeDashboard() {
                 </div>
               </div>
             </div>
-            </div>
+            {/* </div> */}
           </div>
         )}
       </PageContainer>

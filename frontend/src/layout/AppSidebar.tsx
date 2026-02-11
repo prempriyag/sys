@@ -257,7 +257,7 @@ const AppSidebar: React.FC = () => {
             }`}
           >
             <span
-              className={`menu-item-icon-size ${
+              className={`menu-item-icon-size group-hover:scale-110 ${
                 isSubmenuOpen
                   ? "menu-item-icon-active"
                   : "menu-item-icon-inactive"
@@ -270,8 +270,10 @@ const AppSidebar: React.FC = () => {
             )}
             {(isExpanded || isHovered || isMobileOpen) && (
               <ChevronDownIcon
-                className={`ml-auto w-5 h-5 transition-transform duration-200 ${
-                  isSubmenuOpen ? "rotate-180 text-brand-500" : ""
+                className={`ml-auto w-4 h-4 transition-all duration-200 ${
+                  isSubmenuOpen
+                    ? "rotate-180 text-brand-500 dark:text-brand-400"
+                    : "text-gray-400 group-hover:text-brand-500 dark:text-gray-500 dark:group-hover:text-brand-400"
                 }`}
               />
             )}
@@ -281,12 +283,13 @@ const AppSidebar: React.FC = () => {
               ref={(el) => {
                 subMenuRefs.current[key] = el;
               }}
-              className="overflow-hidden transition-all duration-300"
+              className="overflow-hidden transition-all duration-300 ease-in-out"
               style={{
                 height: isSubmenuOpen ? `${subMenuHeights[key] || 0}px` : "0px",
+                opacity: isSubmenuOpen ? 1 : 0,
               }}
             >
-              <ul className="mt-2 space-y-1 ml-9">
+              <ul className="mt-2 space-y-0.5 ml-9">
                 {item.subItems?.map((subItem, subIndex) => {
                   if (subItem.subItems && subItem.subItems.length > 0) {
                     // For nested submenus, renderMenuItem already returns <li>, so don't wrap it
@@ -307,7 +310,7 @@ const AppSidebar: React.FC = () => {
             }`}
                       >
                         {subItem.icon && (
-                          <span className={`menu-item-icon-size ${
+                          <span className={`menu-item-icon-size group-hover:scale-110 ${
                             isActive(subItem.path, subItem.activePaths)
                               ? "menu-item-icon-active"
                               : "menu-item-icon-inactive"
@@ -341,7 +344,7 @@ const AppSidebar: React.FC = () => {
             }`}
           >
             <span
-              className={`menu-item-icon-size ${
+              className={`menu-item-icon-size group-hover:scale-110 ${
                 isItemActive
                   ? "menu-item-icon-active"
                   : "menu-item-icon-inactive"
@@ -360,7 +363,7 @@ const AppSidebar: React.FC = () => {
             }`}
           >
             <span
-              className={`menu-item-icon-size ${
+              className={`menu-item-icon-size group-hover:scale-110 ${
                 isItemActive
                   ? "menu-item-icon-active"
                   : "menu-item-icon-inactive"
@@ -381,7 +384,7 @@ const AppSidebar: React.FC = () => {
   if (menuLayout === "horizontal") {
     return (
       <nav
-        className="w-full border-b border-gray-200 dark:border-gray-800 shadow-sm"
+        className="w-full border-b border-brand-200/50 dark:border-gray-700/80 shadow-sm"
         style={{ 
           position: "relative", 
           zIndex: 100, 
@@ -416,7 +419,7 @@ const AppSidebar: React.FC = () => {
   // Vertical menu layout (default)
   return (
     <aside
-      className={`fixed mt-16 flex flex-col lg:mt-0 top-0 px-2 left-0 dark:border-gray-800 h-screen transition-all duration-300 ease-in-out z-50 border-r border-gray-200 
+      className={`fixed mt-16 flex flex-col lg:mt-0 top-0 px-2 left-0 h-screen transition-all duration-300 ease-in-out z-50 border-r border-brand-200/50 dark:border-gray-700/80 
         ${
           isExpanded || isMobileOpen
             ? "w-[290px]"
@@ -478,15 +481,17 @@ const AppSidebar: React.FC = () => {
           )}
         </Link>
       </div>
-      <div className="flex flex-col overflow-y-auto duration-300 ease-linear no-scrollbar">
+      {/* Divider between logo and menu */}
+      <div className="mx-2 border-t border-brand-200/40 dark:border-gray-700/60" />
+      <div className="flex flex-col overflow-y-auto duration-300 ease-linear no-scrollbar pt-2">
         <nav className="mb-6">
           <div className="flex flex-col gap-4">
             <div>
               <h2
-                className={`mb-4 text-xs uppercase flex leading-[20px] text-gray-400 visibility-hidden ${
+                className={`mb-3 text-[11px] uppercase flex leading-[20px] font-semibold tracking-wider text-brand-400 dark:text-brand-500/60 ${
                   !isExpanded && !isHovered
                     ? "lg:justify-center"
-                    : "justify-start"
+                    : "justify-start px-3"
                 }`}
               >
                 {isExpanded || isHovered || isMobileOpen ? (
@@ -495,7 +500,7 @@ const AppSidebar: React.FC = () => {
                   <HorizontaLDots className="size-6" />
                 )}
               </h2>
-              <ul className="flex flex-col">
+              <ul className="flex flex-col gap-0.5">
                 {filteredMenuConfigItems
                   .map((item, index) => renderMenuItem(item, index))
                   .filter((item) => item !== null)}

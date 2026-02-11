@@ -32,6 +32,7 @@ interface DataTableProps {
   showExport?: boolean; // Show export buttons
   showColumnVisibility?: boolean; // Show column visibility toggle
   exportFileName?: string; // Default export file name
+  toolbarActions?: React.ReactNode; // Custom buttons rendered before export buttons
 }
 
 export interface DataTableRef {
@@ -58,6 +59,7 @@ const DataTableComponent = (props: DataTableProps, ref: React.ForwardedRef<DataT
   const showExport = props.showExport !== false;
   const showColumnVisibility = props.showColumnVisibility !== false;
   const exportFileName = props.exportFileName || "export";
+  const toolbarActions = props.toolbarActions;
   
   // Apply default values (support both ajaxMethod and deprecated method prop)
   const method = ajaxMethod ?? props.method ?? "POST";
@@ -81,6 +83,25 @@ const DataTableComponent = (props: DataTableProps, ref: React.ForwardedRef<DataT
   const columnMenuRef = useRef<HTMLDivElement>(null);
   const tableContainerRef = useRef<HTMLDivElement>(null);
   
+  // Horizontal scroll arrow state
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const updateScrollArrows = useCallback(() => {
+    const container = tableContainerRef.current;
+    if (!container) return;
+    const { scrollLeft, scrollWidth, clientWidth } = container;
+    setCanScrollLeft(scrollLeft > 0);
+    setCanScrollRight(scrollLeft + clientWidth < scrollWidth - 1);
+  }, []);
+
+  const scrollTable = (direction: "left" | "right") => {
+    const container = tableContainerRef.current;
+    if (!container) return;
+    const amount = container.clientWidth * 0.4; // scroll 40% of visible width
+    container.scrollBy({ left: direction === "left" ? -amount : amount, behavior: "smooth" });
+  };
+
   // Calculate visible columns array - must be early so it's available everywhere
   const visibleColumnsArray = columns.filter((_, idx) => visibleColumns.has(idx));
   
@@ -119,6 +140,20 @@ const DataTableComponent = (props: DataTableProps, ref: React.ForwardedRef<DataT
   const [length, setLength] = useState(pageLen);
   const [recordsTotal, setRecordsTotal] = useState(0);
   const [recordsFiltered, setRecordsFiltered] = useState(0);
+
+  // Listen for scroll & resize to update arrow visibility
+  useEffect(() => {
+    const container = tableContainerRef.current;
+    if (!container) return;
+    updateScrollArrows();
+    container.addEventListener("scroll", updateScrollArrows);
+    const ro = new ResizeObserver(updateScrollArrows);
+    ro.observe(container);
+    return () => {
+      container.removeEventListener("scroll", updateScrollArrows);
+      ro.disconnect();
+    };
+  }, [updateScrollArrows, data, visibleColumns]);
 
   // Find default order column (defaultOrderby) or use first column
   const defaultOrderColumn = columns.findIndex(col => col.defaultOrder === true);
@@ -547,7 +582,9 @@ const DataTableComponent = (props: DataTableProps, ref: React.ForwardedRef<DataT
             value={globalSearch}
             onChange={(e) => setGlobalSearch(e.target.value)}
             className="max-w-md"
+            size="sm"
           />
+          {toolbarActions}
           {showExport && (
             <>
               <button
@@ -595,31 +632,60 @@ const DataTableComponent = (props: DataTableProps, ref: React.ForwardedRef<DataT
         </div>
       </div>
 
-      {/* Table */}
-      <div 
-        ref={tableContainerRef}
-        className="border border-gray-200 rounded-lg dark:border-gray-700" 
-        style={{ 
-          overflowX: 'auto', 
-          overflowY: 'visible',
-          width: '100%',
-          maxWidth: '100%',
-          display: 'block',
-          position: 'relative',
-          scrollBehavior: 'smooth'
-        }}
-      >
-        <div style={{ width: '100%' }}>
-          <Table className="border-collapse" style={hasExplicitWidths ? { tableLayout: 'fixed', width: totalTableWidth > 0 ? `${totalTableWidth}px` : '100%' } : { width: '100%' }}>
-          {hasExplicitWidths && (
-            <colgroup>
-              {visibleColumnsArray.map((column) => {
-                return (
-                  <col key={column.data} style={{ width: column.width || '150px' }} />
-                );
-              })}
-            </colgroup>
-          )}
+      {/* Table with scroll arrows */}
+      <div style={{ position: 'relative' }}>
+        {/* Left scroll arrow */}
+        {canScrollLeft && (
+          <button
+            type="button"
+            onClick={() => scrollTable("left")}
+            className="absolute left-0 top-1/2 -translate-y-1/2 z-20 flex h-8 w-8 items-center justify-center rounded-full bg-brand-500 shadow-md border border-brand-600 text-white hover:bg-brand-600 dark:bg-brand-600 dark:border-brand-700 dark:hover:bg-brand-700 transition-colors"
+            style={{ left: '4px' }}
+            title="Scroll left"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M10 12L6 8L10 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+        )}
+        {/* Right scroll arrow */}
+        {canScrollRight && (
+          <button
+            type="button"
+            onClick={() => scrollTable("right")}
+            className="absolute right-0 top-1/2 -translate-y-1/2 z-20 flex h-8 w-8 items-center justify-center rounded-full bg-brand-500 shadow-md border border-brand-600 text-white hover:bg-brand-600 dark:bg-brand-600 dark:border-brand-700 dark:hover:bg-brand-700 transition-colors"
+            style={{ right: '4px' }}
+            title="Scroll right"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M6 4L10 8L6 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+        )}
+        <div 
+          ref={tableContainerRef}
+          className="border border-gray-200 rounded-lg dark:border-gray-700" 
+          style={{ 
+            overflowX: 'auto', 
+            overflowY: 'visible',
+            width: '100%',
+            maxWidth: '100%',
+            display: 'block',
+            position: 'relative',
+            scrollBehavior: 'smooth'
+          }}
+        >
+          <div style={{ width: '100%' }}>
+            <Table className="border-collapse" style={hasExplicitWidths ? { tableLayout: 'fixed', width: totalTableWidth > 0 ? `${totalTableWidth}px` : '100%' } : { width: '100%' }}>
+            {hasExplicitWidths && (
+              <colgroup>
+                {visibleColumnsArray.map((column) => {
+                  return (
+                    <col key={column.data} style={{ width: column.width || '150px' }} />
+                  );
+                })}
+              </colgroup>
+            )}
           <TableHeader className="bg-gray-100 dark:bg-gray-800" style={{ position: 'sticky', top: 0, zIndex: 10 }}>
             <TableRow>
               {visibleColumnsArray.map((column) => {
@@ -650,7 +716,7 @@ const DataTableComponent = (props: DataTableProps, ref: React.ForwardedRef<DataT
                       }`}
                       onClick={() => column.orderable !== false && handleSort(originalIndex)}
                     >
-                      <p className={`font-medium text-gray-700 text-theme-xs dark:text-gray-400 ${
+                      <p className={`font-medium text-gray-900 text-theme-xs dark:text-gray-900 ${
                         order.column === originalIndex ? "text-brand-500" : ""
                       }`}>
                         {column.name || column.data}
@@ -742,7 +808,7 @@ const DataTableComponent = (props: DataTableProps, ref: React.ForwardedRef<DataT
                     const cellStyle: React.CSSProperties = hasExplicitWidths ? (shouldWrap ? {
                       wordWrap: 'break-word',
                       whiteSpace: 'normal',
-                      overflow: 'visible',
+                      overflow: 'hidden',
                       maxWidth: column.width || '150px',
                       width: column.width || '150px',
                     } : {
@@ -760,7 +826,7 @@ const DataTableComponent = (props: DataTableProps, ref: React.ForwardedRef<DataT
                         className={cellClassName}
                         style={cellStyle}
                       >
-                        <div style={hasExplicitWidths ? { width: '100%', maxWidth: '100%', minWidth: 0, overflow: shouldWrap ? 'visible' : 'hidden' } : {}}>
+                        <div style={hasExplicitWidths ? { width: '100%', maxWidth: '100%', minWidth: 0, overflow: 'hidden' } : {}}>
                           {column.render
                             ? column.render(row[column.data], row)
                             : (() => {
@@ -788,7 +854,8 @@ const DataTableComponent = (props: DataTableProps, ref: React.ForwardedRef<DataT
               </TableRow>
             )}
           </TableBody>
-        </Table>
+          </Table>
+          </div>
         </div>
       </div>
 

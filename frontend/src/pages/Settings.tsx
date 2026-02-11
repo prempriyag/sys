@@ -274,6 +274,7 @@ export default function Settings() {
 
   // Predefined color options
   const colorOptions = [
+    { name: "OSU Orange", value: "#e57124" },
     { name: "Blue", value: "#465fff" },
     { name: "Purple", value: "#7a5af8" },
     { name: "Green", value: "#10b981" },
@@ -433,7 +434,7 @@ export default function Settings() {
   };
 
   const handleResetColor = async () => {
-    const defaultColor = "#465fff";
+    const defaultColor = "#e57124";
     setSelectedColor(defaultColor);
     updateThemeColor(defaultColor);
     await saveSettings({ primaryColor: defaultColor });

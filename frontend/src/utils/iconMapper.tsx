@@ -23,33 +23,74 @@ import {
   BoxCubeIcon,
   AlertIcon,
   RefreshIcon,
+  GearIcon,
+  UploadIcon,
+  DatabaseIcon,
+  BarChartIcon,
+  GaugeIcon,
+  CalculatorIcon,
+  FlaskIcon,
+  LinkIcon,
+  ClipboardIcon,
+  BotIcon,
 } from "../icons";
 
 // Map icon string names to icon components
 export const iconMap: Record<string, React.ComponentType<any>> = {
+  // Navigation / Layout
   dashboard: GridIcon,
+
+  // User related
   "user-circle": UserCircleIcon,
-  "file-text": FileIcon,
-  settings: TaskIcon, // Using TaskIcon as settings
   users: GroupIcon,
-  "bar-chart": PieChartIcon,
-  upload: DownloadIcon,
-  eye: EyeIcon,
-  database: TaskIcon, // Using TaskIcon as database placeholder
-  clock: TimeIcon,
-  book: DocsIcon,
-  refresh: RefreshIcon,
-  calendar: CalenderIcon,
-  list: ListIcon,
-  table: TableIcon,
+
+  // Documents / Files
+  "file-text": FileIcon,
   page: PageIcon,
-  box: BoxIcon,
+  docs: DocsIcon,
+  book: DocsIcon,
+  folder: FolderIcon,
+  clipboard: ClipboardIcon,
+
+  // Settings / Config
+  settings: GearIcon,
+  "gear": GearIcon,
+
+  // Data / Charts
+  "bar-chart": BarChartIcon,
+  "pie-chart": PieChartIcon,
+  table: TableIcon,
+  database: DatabaseIcon,
+  gauge: GaugeIcon,
+
+  // Actions
+  upload: UploadIcon,
+  download: DownloadIcon,
+  refresh: RefreshIcon,
   pencil: PencilIcon,
   "check-circle": CheckCircleIcon,
   "arrow-right": ArrowRightIcon,
-  folder: FolderIcon,
-  "box-cube": BoxCubeIcon,
+
+  // Status / Alerts
   alert: AlertIcon,
+  eye: EyeIcon,
+
+  // Time / Calendar
+  clock: TimeIcon,
+  calendar: CalenderIcon,
+
+  // Objects / Categories
+  box: BoxIcon,
+  "box-cube": BoxCubeIcon,
+  bolt: BoltIcon,
+  list: ListIcon,
+  link: LinkIcon,
+  task: TaskIcon,
+
+  // Domain-specific
+  calculator: CalculatorIcon,
+  flask: FlaskIcon,
+  bot: BotIcon,
 };
 
 export const getIcon = (iconName?: string | React.ReactNode): React.ReactNode => {
@@ -62,4 +103,3 @@ export const getIcon = (iconName?: string | React.ReactNode): React.ReactNode =>
   
   return iconName;
 };
-

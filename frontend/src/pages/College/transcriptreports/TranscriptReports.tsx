@@ -529,55 +529,6 @@ export default function TranscriptReports(props?: TranscriptReportsProps) {
       <PageBreadcrumb pageTitle={pageTitle} />
 
       <PageContainer>
-        {/* Header */}
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="font-semibold text-gray-800 text-theme-xl dark:text-white/90 sm:text-2xl">
-            {pageTitle}
-          </h3>
-          <div className="flex items-center gap-2">
-            <BulkUpdateButton
-              isVisible={(() => {
-                // Only show button if rowChanges has entries AND at least one has an action selected
-                if (rowChanges.size === 0) {
-                  return false;
-                }
-                
-                const hasAction = Array.from(rowChanges.values()).some((changes: any) => {
-                  // Show button if any row has an action selected (not "0" or empty or undefined) - matching CI3 logic
-                  // CI3 shows button when: Processed, Rerun, or Noaction is selected (lines 563, 682, 776, 824, 829, 839)
-                  const transcriptAction = changes.reprocessTranscript !== undefined 
-                    ? String(changes.reprocessTranscript).trim() 
-                    : "";
-                  const articulationAction = changes.articulationProcess !== undefined 
-                    ? String(changes.articulationProcess).trim() 
-                    : "";
-                  
-                  const hasTranscriptAction = transcriptAction !== "" && transcriptAction !== "0";
-                  const hasArticulationAction = articulationAction !== "" && articulationAction !== "0";
-                  
-                  return hasTranscriptAction || hasArticulationAction;
-                });
-                
-                return hasAction;
-              })()}
-              onClick={handleBulkUpdate}
-            />
-            <Button
-              onClick={() => setRefreshTrigger((prev) => prev + 1)}
-              variant="outline"
-              startIcon={<RefreshIcon className="w-5 h-5" />}
-            >
-              Refresh Data
-            </Button>
-            <Button
-              onClick={() => setShowFilters(!showFilters)}
-              variant="outline"
-              startIcon={<FilterIcon className="w-5 h-5" />}
-            >
-              Filter
-            </Button>
-          </div>
-        </div>
 
         {/* Filters Section */}
         {showFilters && (
@@ -682,6 +633,23 @@ export default function TranscriptReports(props?: TranscriptReportsProps) {
         <DataTable
           ref={tableRef}
           refreshTrigger={refreshTrigger}
+          toolbarActions={
+            <>
+              <BulkUpdateButton
+                isVisible={(() => {
+                  if (rowChanges.size === 0) return false;
+                  return Array.from(rowChanges.values()).some((changes: any) => {
+                    const ta = changes.reprocessTranscript !== undefined ? String(changes.reprocessTranscript).trim() : "";
+                    const aa = changes.articulationProcess !== undefined ? String(changes.articulationProcess).trim() : "";
+                    return (ta !== "" && ta !== "0") || (aa !== "" && aa !== "0");
+                  });
+                })()}
+                onClick={handleBulkUpdate}
+              />
+              <button onClick={() => setRefreshTrigger((prev) => prev + 1)} className="inline-flex items-center gap-1.5 rounded border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700"><RefreshIcon className="w-4 h-4" /> Refresh</button>
+              <button onClick={() => setShowFilters(!showFilters)} className="inline-flex items-center gap-1.5 rounded border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700"><FilterIcon className="w-4 h-4" /> Filter</button>
+            </>
+          }
           columns={getColumns()}
           ajaxUrl={`${API_BASE_URL}${API_ENDPOINTS.TRANSCRIPT_REPORTS_LIST}`}
           ajaxMethod="POST"

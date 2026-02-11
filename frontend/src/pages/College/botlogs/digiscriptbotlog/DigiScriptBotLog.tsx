@@ -78,27 +78,6 @@ export default function DigiScriptBotLog() {
       <PageBreadcrumb pageTitle="Transcript Log" />
 
       <PageContainer>
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="font-semibold text-gray-800 text-theme-xl dark:text-white/90 sm:text-2xl">
-            Transcript Log
-          </h3>
-          <div className="flex items-center gap-2">
-            <Button
-              onClick={() => setRefreshTrigger((prev) => prev + 1)}
-              variant="outline"
-              startIcon={<RefreshIcon className="w-5 h-5" />}
-            >
-              Refresh Data
-            </Button>
-            <Button
-              onClick={() => setShowFilters(!showFilters)}
-              variant="outline"
-              startIcon={<FilterIcon className="w-5 h-5" />}
-            >
-              Filter
-            </Button>
-          </div>
-        </div>
 
         {showFilters && (
           <div className="mb-6 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-900/50">
@@ -158,6 +137,7 @@ export default function DigiScriptBotLog() {
 
         <DataTable
           refreshTrigger={refreshTrigger}
+          toolbarActions={<><button onClick={() => setRefreshTrigger((prev) => prev + 1)} className="inline-flex items-center gap-1.5 rounded border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700"><RefreshIcon className="w-4 h-4" /> Refresh</button><button onClick={() => setShowFilters(!showFilters)} className="inline-flex items-center gap-1.5 rounded border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700"><FilterIcon className="w-4 h-4" /> Filter</button></>}
           ajaxUrl={API_ENDPOINTS.DIGISCRIPT_BOT_LOG_LIST}
           ajaxData={ajaxData}
           columns={[

@@ -17,16 +17,9 @@ export default function BotStatusReport() {
       <PageMeta title="Bot Status Report | College Module" description="View bot status reports" />
       <PageBreadcrumb pageTitle="Bot Status Report" />
       <PageContainer>
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="font-semibold text-gray-800 text-theme-xl dark:text-white/90 sm:text-2xl">View Bot Status Report</h3>
-          <div className="flex items-center gap-2">
-            <input type="number" value={noOfDays} onChange={(e) => setNoOfDays(parseInt(e.target.value) || 7)} placeholder="Days" className="px-3 py-2 border rounded-lg w-20" />
-            <input type="text" value={botProcessName} onChange={(e) => setBotProcessName(e.target.value)} placeholder="Process Name" className="px-3 py-2 border rounded-lg w-40" />
-            <Button onClick={() => setRefreshTrigger((prev) => prev + 1)} variant="outline" startIcon={<RefreshIcon className="w-5 h-5" />}>Refresh Data</Button>
-          </div>
-        </div>
         <DataTable
           refreshTrigger={refreshTrigger}
+          toolbarActions={<><input type="number" value={noOfDays} onChange={(e) => setNoOfDays(parseInt(e.target.value) || 7)} placeholder="Days" className="px-3 py-1.5 border rounded text-sm w-20 dark:border-gray-700 dark:bg-gray-800 dark:text-white" /><input type="text" value={botProcessName} onChange={(e) => setBotProcessName(e.target.value)} placeholder="Process Name" className="px-3 py-1.5 border rounded text-sm w-40 dark:border-gray-700 dark:bg-gray-800 dark:text-white" /><button onClick={() => setRefreshTrigger((prev) => prev + 1)} className="inline-flex items-center gap-1.5 rounded border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700"><RefreshIcon className="w-4 h-4" /> Refresh</button></>}
           ajaxUrl="/api/botstatusreport/ajaxlist"
           ajaxData={{ no_of_days: noOfDays, bot_process_name: botProcessName }}
           columns={[

@@ -13,7 +13,7 @@ export type MenuItem = {
   };
 };
 
-export type ModuleType = "college" | "school" | "ocrverify";
+export type ModuleType = "sir";
 
 export type MenuConfig = {
   module: ModuleType;

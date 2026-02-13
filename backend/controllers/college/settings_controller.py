@@ -84,7 +84,7 @@ async def get_smtp_settings(db: Session = Depends(get_db)):
         from config.constants import TBL_SMTP
         
         # Get the first SMTP configuration
-        query = text(f"SELECT TOP 1 id, host, username, password, port FROM {TBL_SMTP} ORDER BY id")
+        query = text(f"SELECT id, host, username, password, port FROM {TBL_SMTP} ORDER BY id LIMIT 1")
         result = db.execute(query).fetchone()
         
         if result:
@@ -125,7 +125,7 @@ async def update_smtp_settings(request: SmtpSettingsRequest, db: Session = Depen
         from config.constants import TBL_SMTP
         
         # Check if an SMTP record exists
-        check_query = text(f"SELECT TOP 1 id FROM {TBL_SMTP} ORDER BY id")
+        check_query = text(f"SELECT id FROM {TBL_SMTP} ORDER BY id LIMIT 1")
         existing = db.execute(check_query).fetchone()
         
         request_dict = request.dict(exclude_none=True)

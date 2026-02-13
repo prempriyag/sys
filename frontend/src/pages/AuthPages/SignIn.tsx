@@ -11,19 +11,9 @@ export default function SignIn() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Redirect to dashboard if already authenticated
+    // Redirect to SIR dashboard if already authenticated
     if (!loading && isAuthenticated && user) {
-      // Redirect based on permissions
-      if (user.college_perm === 1) {
-        navigate("/college/dashboard", { replace: true });
-      } else if (user.hs_perm === 1) {
-        navigate("/school/dashboard", { replace: true });
-      } else if (user.ocr_perm === 1) {
-        navigate("/ocrverify/dashboard", { replace: true });
-      } else {
-        // Default to college dashboard if no permissions match
-        navigate("/college/dashboard", { replace: true });
-      }
+      navigate("/dashboard", { replace: true });
     }
   }, [isAuthenticated, user, loading, navigate]);
 

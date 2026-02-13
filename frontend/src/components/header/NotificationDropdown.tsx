@@ -116,10 +116,11 @@ export default function NotificationDropdown() {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // ---- Fetch unread count (lightweight, for badge) ---- //
-  const fetchUnreadCount = useCallback(async () => {
-    const data = await notificationFetch(API_ENDPOINTS.NOTIFICATIONS_UNREAD_COUNT);
-    if (data) setUnreadCount(data.unread_count ?? 0);
-  }, []);
+  // Commented out - endpoint disabled for now
+  // const fetchUnreadCount = useCallback(async () => {
+  //   const data = await notificationFetch(API_ENDPOINTS.NOTIFICATIONS_UNREAD_COUNT);
+  //   if (data) setUnreadCount(data.unread_count ?? 0);
+  // }, []);
 
   // ---- Fetch full notification list ---- //
   const fetchNotifications = useCallback(async () => {
@@ -133,13 +134,14 @@ export default function NotificationDropdown() {
   }, []);
 
   // ---- Poll unread count every 60 seconds ---- //
-  useEffect(() => {
-    fetchUnreadCount(); // initial
-    pollRef.current = setInterval(fetchUnreadCount, 60_000);
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
-    };
-  }, [fetchUnreadCount]);
+  // Commented out - endpoint disabled for now
+  // useEffect(() => {
+  //   fetchUnreadCount(); // initial
+  //   pollRef.current = setInterval(fetchUnreadCount, 60_000);
+  //   return () => {
+  //     if (pollRef.current) clearInterval(pollRef.current);
+  //   };
+  // }, [fetchUnreadCount]);
 
   // ---- Fetch list when dropdown opens ---- //
   useEffect(() => {

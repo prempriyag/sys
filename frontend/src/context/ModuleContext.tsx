@@ -20,24 +20,11 @@ export const useModule = () => {
 export const ModuleProvider: React.FC<{ children: ReactNode }> = ({
   children,
 }) => {
-  const location = useLocation();
-  const [currentModule, setCurrentModuleState] = useState<ModuleType>("college");
-
-  // Determine module from URL path
-  useEffect(() => {
-    const path = location.pathname;
-    if (path.startsWith("/school")) {
-      setCurrentModuleState("school");
-    } else if (path.startsWith("/ocrverify")) {
-      setCurrentModuleState("ocrverify");
-    } else if (path.startsWith("/college") || path === "/" || path === "/dashboard" || path.startsWith("/dashboard/")) {
-      setCurrentModuleState("college");
-    }
-  }, [location.pathname]);
+  // SIR application - single module, no switching needed
+  const [currentModule] = useState<ModuleType>("sir");
 
   const setCurrentModule = (module: ModuleType) => {
-    setCurrentModuleState(module);
-    // Module change will trigger navigation in the component that calls this
+    // No-op for SIR application (single module)
   };
 
   return (

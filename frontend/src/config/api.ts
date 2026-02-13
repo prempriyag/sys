@@ -96,6 +96,20 @@ export const API_ENDPOINTS = {
   SCHOOL_TRANSCRIPTS_SOURCES: "/api/school/transcripts/sources",
   SCHOOL_INSTITUTION_MAPPING_LIST: "/api/school/institutionmapping/ajaxlist",
 
+  // SIR Impact Analysis endpoints
+  SIR_UPLOAD_PRE: "/api/upload/pre-sir",
+  SIR_UPLOAD_POST: "/api/upload/post-sir",
+  SIR_MATCHING_RUN: "/api/matching/run",
+  SIR_KPI_BOOTH: "/api/kpi/booth",
+  SIR_KPI_CONSTITUENCY: "/api/kpi/constituency",
+  SIR_KPI_CALCULATE: "/api/kpi/calculate",
+  SIR_KPI_BOOTHS: "/api/kpi/booths",
+  SIR_DASHBOARD_RISK_MAP: "/api/sir/dashboard/risk-map",
+  SIR_DASHBOARD_CONSTITUENCIES: "/api/sir/dashboard/constituencies",
+  SIR_ANALYTICS_RUN: "/api/sir/analytics/run",
+  SIR_ANALYTICS_HIGH_RISK: "/api/sir/analytics/high-risk",
+  SIR_ANALYTICS_VALIDATION_SAMPLE: "/api/sir/analytics/validation-sample",
+
   // Student View endpoints
   SCHOOL_STUDENTVIEW: "/api/school/studentview",
   SCHOOL_STUDENTVIEW_GET_STUDENTS: "/api/school/studentview/getstudentslist",

@@ -60,14 +60,6 @@ export const parseElectoralRollPdf = (formData: FormData) =>
         responseType: 'blob',
     });
 
-/** Batch convert multiple scanned electoral roll PDFs; returns ZIP of CSVs (max 100 per request). */
-export const batchConvertElectoralPdf = (formData: FormData) =>
-    api.post(API_ENDPOINTS.SIR_BATCH_CONVERT_ELECTORAL_PDF, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-        responseType: 'blob',
-        timeout: 600000, // 10 min for large batches
-    });
-
 // SIR Analytics APIs
 export const runAnalytics = (constituencyId: number) => 
     api.post(`${API_ENDPOINTS.SIR_ANALYTICS_RUN}/${constituencyId}`);

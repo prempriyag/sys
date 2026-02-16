@@ -109,7 +109,6 @@ export const API_ENDPOINTS = {
   SIR_DASHBOARD_CONSTITUENCIES: "/api/sir/dashboard/constituencies",
   SIR_CONVERT_PDF: "/api/upload/convert-scanned-pdf",
   SIR_PARSE_ELECTORAL_PDF: "/api/upload/parse-electoral-roll-pdf",
-  SIR_BATCH_CONVERT_ELECTORAL_PDF: "/api/upload/batch-convert-electoral-pdf",
   SIR_ANALYTICS_RUN: "/api/sir/analytics/run",
   SIR_ANALYTICS_HIGH_RISK: "/api/sir/analytics/high-risk",
   SIR_ANALYTICS_VALIDATION_SAMPLE: "/api/sir/analytics/validation-sample",

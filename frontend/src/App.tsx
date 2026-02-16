@@ -1,4 +1,4 @@
-import { Routes, Route } from "react-router";
+import { Routes, Route, Navigate } from "react-router";
 import SignIn from "./pages/AuthPages/SignIn";
 import SignUp from "./pages/AuthPages/SignUp";
 import ForgotPassword from "./pages/AuthPages/ForgotPassword";
@@ -33,7 +33,6 @@ import AppLayout from "./layout/AppLayout";
 import { ScrollToTop } from "./components/common/ScrollToTop";
 import ToastContainer from "./components/ui/toast/ToastContainer";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
-import PermissionRoute from "./components/auth/PermissionRoute";
 
 export default function App() {
   return (
@@ -85,31 +84,11 @@ export default function App() {
           <Route path="/reports/action-plan" element={<Reports type="action-plan" />} />
           <Route path="/reports/constituency" element={<Reports type="constituency" />} />
 
-          {/* User Management */}
-          <Route
-            path="/users"
-            element={
-              <PermissionRoute permission="user_management" action="VIEW">
-                <UserManagement />
-              </PermissionRoute>
-            }
-          />
-          <Route
-            path="/users/add"
-            element={
-              <PermissionRoute permission="user_management" action="ADD">
-                <AddUser />
-              </PermissionRoute>
-            }
-          />
-          <Route
-            path="/users/edit/:id"
-            element={
-              <PermissionRoute permission="user_management" action="UPDATE">
-                <EditUser />
-              </PermissionRoute>
-            }
-          />
+          {/* User Management - /college/users redirects for backward compatibility */}
+          <Route path="/college/users" element={<Navigate to="/users" replace />} />
+          <Route path="/users" element={<UserManagement />} />
+          <Route path="/users/add" element={<AddUser />} />
+          <Route path="/users/edit/:id" element={<EditUser />} />
 
           {/* Roles & Permissions */}
           <Route path="/roles" element={<Roles />} />

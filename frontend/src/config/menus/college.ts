@@ -33,7 +33,7 @@ export const collegeMenu: MenuConfig = {
     },
     {
       name: "User Management",
-      path: "/college/users",
+      path: "/users",
       icon: "user-circle",
       permission: "user_management",
     },

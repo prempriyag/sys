@@ -75,7 +75,7 @@ export default function AddUser() {
       const { cpassword, ...submitData } = formData;
       await api.post(API_ENDPOINTS.USERS_INSERT, submitData);
       // Navigate back to user management list
-      navigate("/college/users");
+      navigate("/users");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to add user");
     } finally {
@@ -250,7 +250,7 @@ export default function AddUser() {
             <Button
               type="button"
               variant="outline"
-              onClick={() => navigate("/college/users")}
+              onClick={() => navigate("/users")}
               className="flex-1"
               disabled={loading}
             >

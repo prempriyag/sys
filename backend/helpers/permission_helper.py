@@ -119,6 +119,10 @@ def check_permission(
     """
     if not per:
         return False
+
+    # Super admin bypass - full access to all permissions
+    if user and logged_in_user(db, 'super_admin', user):
+        return True
     
     # Get role_id from user if not provided
     if not role_id and user:

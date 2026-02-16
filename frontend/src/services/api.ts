@@ -50,6 +50,23 @@ export const getRiskMap = (constituencyId: number) =>
 
 export const getConstituencies = () => 
     api.get(API_ENDPOINTS.SIR_DASHBOARD_CONSTITUENCIES);
+export const convertScannedPdf = (formData: FormData) =>
+    api.post(API_ENDPOINTS.SIR_CONVERT_PDF, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+
+/** SOP: Parse ECI electoral roll PDF (text or scanned); returns CSV file. */
+export const parseElectoralRollPdf = (formData: FormData) =>
+    api.post(API_ENDPOINTS.SIR_PARSE_ELECTORAL_PDF, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        responseType: 'blob',
+    });
+
+/** Batch convert multiple scanned electoral roll PDFs; returns ZIP of CSVs (max 100 per request). */
+export const batchConvertElectoralPdf = (formData: FormData) =>
+    api.post(API_ENDPOINTS.SIR_BATCH_CONVERT_ELECTORAL_PDF, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        responseType: 'blob',
+        timeout: 600000, // 10 min for large batches
+    });
 
 // SIR Analytics APIs
 export const runAnalytics = (constituencyId: number) => 

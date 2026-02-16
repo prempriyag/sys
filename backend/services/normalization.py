@@ -23,3 +23,20 @@ class NormalizationService:
         # e.g. Lakshmi vs Laxmi. 
         # Ideally uses a library or mapping. For now, basic text normalization.
         return NormalizationService.normalize_text(name)
+
+    @staticmethod
+    def normalize_gender(gender: str) -> str:
+        """Normalize gender to M/F for consistent KPI counting."""
+        if not gender:
+            return ""
+        g = str(gender).strip().upper()
+        if g in ("M", "MALE"):
+            return "M"
+        if g in ("F", "FEMALE"):
+            return "F"
+        if g.startswith("M"):
+            return "M"
+        if g.startswith("F"):
+            return "F"
+        # Third gender / other
+        return g[:1] if g else ""

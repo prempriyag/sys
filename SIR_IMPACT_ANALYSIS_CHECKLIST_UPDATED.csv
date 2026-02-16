@@ -1,0 +1,88 @@
+Section,Item_ID,Description,Status,Notes
+Infrastructure & Environment,1.1,Install PostgreSQL,Not Done,Manual step; verify on server
+Infrastructure & Environment,1.2,Install PostGIS extension (CREATE EXTENSION postgis;),Optional,App uses latitude/longitude columns; PostGIS optional for future geom
+Infrastructure & Environment,1.3,Create application database and user,Not Done,Manual step
+Infrastructure & Environment,1.4,Verify minimum server specs (8 cores 16 GB RAM 200 GB SSD) or document deviations,Not Done,Document if different
+Backend Project Structure,2.1,app/main.py - FastAPI app entry CORS router includes,Done,backend/main.py with SIR routers
+Backend Project Structure,2.2,app/core/config.py - env vars settings,Done,Equivalent: config/settings.py
+Backend Project Structure,2.3,app/core/database.py - engine session connection handling,Done,Equivalent: database/connection.py
+Backend Project Structure,2.4,app/models/ - SQLAlchemy models,Done,models/sir/ (constituency booth voter match_result kpi)
+Backend Project Structure,2.5,app/schemas/ - Pydantic request/response schemas,Partial,Responses as dict; add Pydantic schemas if needed
+Backend Project Structure,2.6,app/api/upload.py - upload routes,Done,controllers/sir/upload_controller.py prefix /api/upload
+Backend Project Structure,2.7,app/api/matching.py - matching execution routes,Done,controllers/sir/matching_controller.py prefix /api/matching
+Backend Project Structure,2.8,app/api/kpi.py - KPI retrieval routes,Done,controllers/sir/kpi_controller.py prefix /api/kpi
+Backend Project Structure,2.9,app/api/dashboard.py - dashboard/risk-map routes,Done,controllers/sir/dashboard_controller.py prefix /api/sir/dashboard
+Backend Project Structure,2.10,app/services/pdf_parser.py - PDF parsing (if required),Partial,OCR logic in upload_controller; optional separate pdf_parser service
+Backend Project Structure,2.11,app/services/normalization.py - name/address normalization,Done,services/normalization.py + normalize_gender
+Backend Project Structure,2.12,app/services/matching_engine.py - EPIC + fuzzy matching,Done,services/matching_engine.py RapidFuzz
+Backend Project Structure,2.13,app/services/kpi_engine.py - booth/constituency KPI calculation,Done,services/kpi_engine.py
+Backend Project Structure,2.14,app/utils/ - shared helpers,Partial,backend/helpers/ used
+Backend Project Structure,2.15,requirements.txt - FastAPI Uvicorn SQLAlchemy psycopg2 pandas rapidfuzz geoalchemy2,Done,All present in requirements.txt
+Backend Project Structure,2.16,Alembic (or equivalent) configured for migrations,Done,alembic.ini present; ensure SIR tables in migrations
+Database Schema,3.1,Table constituencies - id name district state created_at,Done,models/sir/constituency.py
+Database Schema,3.2,Table booths - id constituency_id booth_number location_name geom Point 4326 created_at,Done,Using latitude/longitude columns (no PostGIS required)
+Database Schema,3.3,Table voters_pre_sir - id epic_number name relative_name age gender house_no address booth_id normalized_name normalized_address,Done,models/sir/voter.py VoterPre
+Database Schema,3.4,Table voters_post_sir - same structure as voters_pre_sir,Done,VoterPost
+Database Schema,3.5,Table voter_match_results - id pre_voter_id post_voter_id classification match_score created_at,Done,models/sir/match_result.py
+Database Schema,3.6,Table booth_kpis - booth_id total_pre total_post additions deletions net_change_percent deletion_velocity youth_intake_percent gender_shift_percent risk_category,Done,models/sir/kpi.py + anomaly_household_count
+Database Schema,3.7,Index: CREATE INDEX idx_epic_pre ON voters_pre_sir(epic_number),Done,epic_number has index=True in model
+Database Schema,3.8,Index: CREATE INDEX idx_epic_post ON voters_post_sir(epic_number),Done,epic_number has index=True in model
+Database Schema,3.9,Additional indexes (booth_id on voter tables constituency_id on booths),Done,Foreign keys and index=True on primary keys
+Matching Engine,4.1,Exact EPIC match implemented,Done,matching_engine.py common_epics
+Matching Engine,4.2,Same EPIC different booth classified as MIGRATED,Done,classification = MIGRATED when pre.booth_id != post.booth_id
+Matching Engine,4.3,Fuzzy name match (RapidFuzz) threshold >90% -> MODIFIED,Done,calculate_fuzzy_score >= 90
+Matching Engine,4.4,No match from Pre -> DELETED,Done,pre_voter_id set post_voter_id None
+Matching Engine,4.5,No match from Post -> ADDED,Done,post_voter_id set pre_voter_id None
+Matching Engine,4.6,Same EPIC same booth no significant name change -> UNCHANGED,Done,default classification UNCHANGED
+Matching Engine,4.7,Booth-wise grouping for processing (no row-by-row Python loops at scale),Partial,Constituency-level fetch; consider booth-wise batches for very large data
+Matching Engine,4.8,Batch matching for large datasets,Partial,Bulk save results; fuzzy loop is O(n*m) per constituency
+Matching Engine,4.9,Match results persisted to voter_match_results,Done,bulk_save_objects MatchResult
+KPI Engine,5.1,Total Pre-SIR voters (per booth/constituency),Done,kpi_engine + get_constituency_kpi
+KPI Engine,5.2,Total Post-SIR voters (per booth/constituency),Done,
+KPI Engine,5.3,Additions count,Done,
+KPI Engine,5.4,Deletions count,Done,
+KPI Engine,5.5,Net change %,Done,
+KPI Engine,5.6,Deletion velocity,Done,
+KPI Engine,5.7,Youth intake %,Done,
+KPI Engine,5.8,Gender shift %,Done,Gender normalized to M/F in upload
+KPI Engine,5.9,Risk category: HIGH_RISK if deletions > 5% of total_pre else NORMAL,Done,+ HIGH_OPPORTUNITY ANOMALY in implementation
+KPI Engine,5.10,Booth KPIs written to booth_kpis,Done,
+KPI Engine,5.11,Constituency-level KPI aggregation available,Done,GET /api/kpi/constituency/{id}
+API Endpoints,6.1,POST /upload/pre-sir - upload Pre-SIR data (file/CSV),Done,POST /api/upload/pre-sir
+API Endpoints,6.2,POST /upload/post-sir - upload Post-SIR data (file/CSV),Done,POST /api/upload/post-sir
+API Endpoints,6.3,POST /matching/run/{constituency_id} - trigger matching for a constituency,Done,POST /api/matching/run/{constituency_id}
+API Endpoints,6.4,GET /kpi/booth/{booth_id} - booth KPI response,Done,GET /api/kpi/booth/{booth_id}
+API Endpoints,6.5,GET /kpi/constituency/{id} - constituency KPI response,Done,GET /api/kpi/constituency/{id}
+API Endpoints,6.6,GET /dashboard/risk-map/{constituency_id} - returns booth_id lat lng risk_category,Done,GET /api/sir/dashboard/risk-map/{constituency_id}
+API Endpoints,6.7,Dashboard aggregates API (total additions deletions net roll change high-risk booth count),Done,GET /api/sir/dashboard/aggregates/{constituency_id}
+Frontend React Dashboard,7.1,Dashboard page - KPI cards Total Additions Total Deletions Net Roll Change High-Risk Booth Count,Done,Dashboard.tsx uses getConstituencyKPI + charts
+Frontend React Dashboard,7.2,Booth Analysis page - table Booth Additions Deletions Risk Youth %,Done,BoothKPIs.tsx DataTable with all columns
+Frontend React Dashboard,7.3,Risk Heatmap page - react-leaflet map booth markers colored by risk level,Done,RiskHeatmap.tsx + RiskMap component; booths with coords only
+Frontend React Dashboard,7.4,Upload page - Pre-SIR and Post-SIR file upload UI wired to upload APIs,Done,UploadPage.tsx + Run Matching
+Frontend React Dashboard,7.5,API client/service for all SIR endpoints,Done,services/api.ts + API_ENDPOINTS in config/api.ts
+Frontend React Dashboard,7.6,Routing - Dashboard Booth Analysis Risk Map Upload accessible from app,Done,App.tsx routes; sir.ts menu
+Performance & Scale,8.1,No row-by-row Python loops for bulk matching; use batch/vectorized operations,Partial,Bulk save; EPIC dict lookup; fuzzy still per-unmatched
+Performance & Scale,8.2,EPIC indexes in place and used in queries,Done,Index on epic_number
+Performance & Scale,8.3,Booth-wise grouping in matching logic,Partial,Constituency-level; can add booth-wise for scale
+Performance & Scale,8.4,Database joins used where possible instead of app-side iteration,Done,KPI engine uses DB aggregates
+Performance & Scale,8.5,(Optional) Async/background job for matching (Celery FastAPI BackgroundTasks) for large runs,Not Done,Future: BackgroundTasks or Celery
+Deployment,9.1,Backend: Gunicorn + Uvicorn workers,Not Done,Manual deployment
+Deployment,9.2,Nginx reverse proxy for backend API,Not Done,Manual
+Deployment,9.3,React production build (npm run build or equivalent),Not Done,Manual
+Deployment,9.4,Frontend served via Nginx (or CDN),Not Done,Manual
+Deployment,9.5,Environment variables for DB URL API base URL etc.,Done,config/settings and app.config
+Deployment,9.6,(Optional) Authentication enabled and documented,Done,Existing auth in app
+Implementation Roadmap,10.1,Week 1: Install PostgreSQL + PostGIS,Not Done,Environment
+Implementation Roadmap,10.2,Week 1: Set up FastAPI project structure,Done,
+Implementation Roadmap,10.3,Week 1: Create DB schema (all tables + indexes),Done,Models + Alembic
+Implementation Roadmap,10.4,Week 2: Build matching engine,Done,
+Implementation Roadmap,10.5,Week 2: Test matching for 1 constituency,Done,Can test via API
+Implementation Roadmap,10.6,Week 3: Implement KPI engine,Done,
+Implementation Roadmap,10.7,Week 3: Develop basic dashboard (all 4 pages + API integration),Done,
+Advanced Future Scope,Caste inference,Caste inference AI model,Future,Not implemented
+Advanced Future Scope,Turnout,Turnout probability modeling,Future,Not implemented
+Advanced Future Scope,Booth sim,Booth win/loss simulation,Future,Not implemented
+Advanced Future Scope,ML anomaly,ML anomaly detection,Future,Not implemented
+Advanced Future Scope,OCR,Automated OCR correction,Future,Scanned PDF convert present; enhance as needed
+Advanced Future Scope,Cluster,Cluster analysis (e.g. scikit-learn),Future,Not implemented
+Advanced Future Scope,Scale-out,Scale-out: read replicas Redis cache Celery/RabbitMQ for queues,Future,Not implemented

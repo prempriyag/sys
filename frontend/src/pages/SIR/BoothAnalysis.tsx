@@ -2,32 +2,35 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
-import { getBoothKPI, getRiskMap } from '../../services/api';
+import { getBoothKPI, getRiskMap, getConstituencies } from '../../services/api';
 import 'leaflet/dist/leaflet.css';
-
-// Fix for Leaflet icons if needed, but CircleMarker avoids icon asset issues
 
 const BoothAnalysis: React.FC = () => {
     const { boothId } = useParams<{ boothId: string }>();
     const navigate = useNavigate();
 
-    // State for Single Booth
     const [kpi, setKpi] = useState<any>(null);
-
-    // State for Map
     const [mapData, setMapData] = useState<any[]>([]);
-    const [constituencyId, setConstituencyId] = useState(1); // Default
+    const [constituencies, setConstituencies] = useState<{ id: number; name: string; district: string }[]>([]);
+    const [constituencyId, setConstituencyId] = useState<number | null>(null);
+
+    useEffect(() => {
+        getConstituencies().then((res) => {
+            const list = res.data || [];
+            setConstituencies(list);
+            if (list.length > 0 && constituencyId == null) {
+                setConstituencyId(list[0].id);
+            }
+        });
+    }, []);
 
     useEffect(() => {
         if (boothId) {
-            // Fetch Single Booth KPI
-            getBoothKPI(parseInt(boothId)).then(res => {
-                setKpi(res.data);
-            });
-        } else {
-            // Fetch Risk Map Data
-            getRiskMap(constituencyId).then(res => {
-                setMapData(res.data);
+            getBoothKPI(parseInt(boothId)).then((res) => setKpi(res.data));
+        } else if (constituencyId != null) {
+            getRiskMap(constituencyId).then((res) => {
+                const data = res.data || [];
+                setMapData(data.filter((b: any) => b != null && typeof b.lat === 'number' && typeof b.lng === 'number' && !Number.isNaN(b.lat) && !Number.isNaN(b.lng)));
             });
         }
     }, [boothId, constituencyId]);
@@ -90,18 +93,19 @@ const BoothAnalysis: React.FC = () => {
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-3xl font-bold text-gray-800">Risk Map Analysis</h1>
                 <select
-                    value={constituencyId}
+                    value={constituencyId ?? ''}
                     onChange={(e) => setConstituencyId(Number(e.target.value))}
                     className="p-2 rounded border"
                 >
-                    <option value={1}>Constituency 1</option>
-                    <option value={2}>Constituency 2</option>
+                    {constituencies.map((c) => (
+                        <option key={c.id} value={c.id}>{c.name} - {c.district}</option>
+                    ))}
                 </select>
             </div>
 
             <div className="flex-1 bg-white rounded-xl shadow-md overflow-hidden relative" style={{ minHeight: '600px' }}>
                 {/* Check if we have data to center the map, else default to some coords */}
-                <MapContainer center={[12.9716, 77.5946]} zoom={12} style={{ height: '100%', width: '100%' }}>
+                <MapContainer center={[12.9716, 77.5946]} zoom={12} style={{ height: '100%', width: '100%' }} key={constituencyId}>
                     <TileLayer
                         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'

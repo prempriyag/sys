@@ -35,6 +35,41 @@ async def get_constituencies(db: Session = Depends(get_db)):
             detail=f"Error fetching constituencies: {str(e)}"
         )
 
+@router.get("/aggregates/{constituency_id}")
+async def get_dashboard_aggregates(constituency_id: int, db: Session = Depends(get_db)):
+    """
+    Dashboard aggregates for KPI cards: total additions, total deletions,
+    net roll change, high-risk booth count.
+    """
+    try:
+        kpis = db.query(BoothKPI).join(Booth).filter(Booth.constituency_id == constituency_id).all()
+        if not kpis:
+            return {
+                "total_additions": 0,
+                "total_deletions": 0,
+                "net_roll_change": 0,
+                "net_roll_change_percent": 0.0,
+                "high_risk_booth_count": 0,
+            }
+        total_additions = sum(k.additions for k in kpis)
+        total_deletions = sum(k.deletions for k in kpis)
+        total_pre = sum(k.total_pre for k in kpis)
+        total_post = sum(k.total_post for k in kpis)
+        net_roll_change = total_post - total_pre
+        net_roll_change_percent = (net_roll_change / total_pre * 100) if total_pre else 0.0
+        high_risk_booth_count = sum(1 for k in kpis if k.risk_category == "HIGH_RISK")
+        return {
+            "total_additions": total_additions,
+            "total_deletions": total_deletions,
+            "net_roll_change": net_roll_change,
+            "net_roll_change_percent": round(float(net_roll_change_percent), 2),
+            "high_risk_booth_count": high_risk_booth_count,
+        }
+    except Exception as e:
+        logger.exception(f"Error fetching dashboard aggregates: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/risk-map/{constituency_id}")
 async def get_risk_map(constituency_id: int, db: Session = Depends(get_db)):
     """

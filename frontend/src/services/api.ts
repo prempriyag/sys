@@ -28,6 +28,18 @@ export const uploadPostSir = (formData: FormData) =>
         headers: { 'Content-Type': 'multipart/form-data' }
     });
 
+/** Upload Pre-SIR electoral roll as PDF (ECI format). Optional: constituency_name, booth_number. */
+export const uploadPreSirPdf = (formData: FormData) =>
+    api.post(API_ENDPOINTS.SIR_UPLOAD_PRE_PDF, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+    });
+
+/** Upload Post-SIR electoral roll as PDF (ECI format). Optional: constituency_name, booth_number. */
+export const uploadPostSirPdf = (formData: FormData) =>
+    api.post(API_ENDPOINTS.SIR_UPLOAD_POST_PDF, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+    });
+
 export const runMatching = (constituencyId: number) => 
     api.post(`${API_ENDPOINTS.SIR_MATCHING_RUN}/${constituencyId}`);
 
@@ -58,6 +70,16 @@ export const parseElectoralRollPdf = (formData: FormData) =>
     api.post(API_ENDPOINTS.SIR_PARSE_ELECTORAL_PDF, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
         responseType: 'blob',
+    });
+
+/** Summary of uploaded Pre-SIR and Post-SIR data per constituency/booth (see where your upload went). */
+export const getRollSummary = () =>
+    api.get(API_ENDPOINTS.SIR_DASHBOARD_ROLL_SUMMARY);
+
+/** Sample of voter records for a constituency (pre or post roll) to verify extracted data. */
+export const getRollSample = (constituencyId: number, roll: 'pre' | 'post', limit: number = 50) =>
+    api.get(API_ENDPOINTS.SIR_DASHBOARD_ROLL_SAMPLE, {
+        params: { constituency_id: constituencyId, roll, limit }
     });
 
 // SIR Analytics APIs

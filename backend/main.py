@@ -75,12 +75,16 @@ app.include_router(mastersettings_controller.router)
 
 # Import and include SIR controllers
 from controllers.sir import upload_router, matching_router, kpi_router, dashboard_router, analytics_router
+from controllers.sir.validation_controller import router as validation_router
+from controllers.sir.reports_controller import router as reports_router
 
 app.include_router(upload_router)
 app.include_router(matching_router)
 app.include_router(kpi_router)
 app.include_router(dashboard_router)
 app.include_router(analytics_router)
+app.include_router(validation_router)
+app.include_router(reports_router)
 
 @app.get("/")
 async def root():

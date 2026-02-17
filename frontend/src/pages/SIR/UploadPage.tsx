@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
-import { uploadPreSir, uploadPostSir, runMatching, getConstituencies, parseElectoralRollPdf } from '../../services/api';
+import { uploadPreSir, uploadPostSir, uploadPreSirPdf, uploadPostSirPdf, runMatching, getConstituencies } from '../../services/api';
 import PageContainer from '../../components/common/PageContainer';
 import PageMeta from '../../components/common/PageMeta';
 import ThemedLoader from '../../components/common/ThemedLoader';
@@ -17,6 +17,8 @@ const UploadPage: React.FC<UploadPageProps> = ({ type }) => {
   
   const [preFile, setPreFile] = useState<File | null>(null);
   const [postFile, setPostFile] = useState<File | null>(null);
+  const [pdfConstituencyName, setPdfConstituencyName] = useState('');
+  const [pdfBoothNumber, setPdfBoothNumber] = useState('');
   const [uploading, setUploading] = useState(false);
   const [status, setStatus] = useState<string>('');
   const [constituencies, setConstituencies] = useState<any[]>([]);
@@ -50,29 +52,35 @@ const UploadPage: React.FC<UploadPageProps> = ({ type }) => {
       return;
     }
 
+    const isPdf = file.name.toLowerCase().endsWith('.pdf');
     const formData = new FormData();
     formData.append('file', file);
+    if (isPdf) {
+      if (pdfConstituencyName.trim()) formData.append('constituency_name', pdfConstituencyName.trim());
+      if (pdfBoothNumber.trim()) formData.append('booth_number', pdfBoothNumber.trim());
+    }
 
     try {
       setUploading(true);
-      setStatus(`Uploading ${uploadType.toUpperCase()}-SIR data...`);
-      
-      const response = uploadType === 'pre' 
-        ? await uploadPreSir(formData)
-        : await uploadPostSir(formData);
-      
-      alertsuccess(response.data.message || `${uploadType.toUpperCase()}-SIR uploaded successfully!`);
-      setStatus('');
-      
-      // Clear file input
-      if (uploadType === 'pre') {
-        setPreFile(null);
+      setStatus(`${isPdf ? 'Extracting from PDF and uploading' : 'Uploading'} ${uploadType.toUpperCase()}-SIR data...`);
+
+      const response = isPdf
+        ? (uploadType === 'pre' ? await uploadPreSirPdf(formData) : await uploadPostSirPdf(formData))
+        : (uploadType === 'pre' ? await uploadPreSir(formData) : await uploadPostSir(formData));
+
+      const msg = response.data.message || `${uploadType.toUpperCase()}-SIR ${isPdf ? 'extracted and ' : ''}uploaded successfully!`;
+      if (response.data.records_processed !== undefined) {
+        alertsuccess(`${msg} (${response.data.records_processed} records)`);
       } else {
-        setPostFile(null);
+        alertsuccess(msg);
       }
+      setStatus('');
+
+      if (uploadType === 'pre') setPreFile(null);
+      else setPostFile(null);
     } catch (error: any) {
       const errorMsg = error.response?.data?.detail || error.message || 'Upload failed';
-      alerterror(errorMsg);
+      alerterror(Array.isArray(errorMsg) ? errorMsg.map((x: any) => x?.msg || x).join(', ') : errorMsg);
       setStatus('');
     } finally {
       setUploading(false);
@@ -121,6 +129,17 @@ const UploadPage: React.FC<UploadPageProps> = ({ type }) => {
           </p>
         </div>
 
+        {/* Workflow reminder */}
+        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+          <h3 className="font-semibold text-amber-800 dark:text-amber-200 mb-2">Do in this order:</h3>
+          <ol className="list-decimal list-inside space-y-1 text-sm text-amber-900 dark:text-amber-100">
+            <li><strong>Upload Pre-SIR Roll</strong> – roll before Special Intensive Revision (CSV or PDF).</li>
+            <li><strong>Upload Post-SIR Roll</strong> – roll after revision (same format).</li>
+            <li><strong>Run Matching</strong> – compare both rolls, classify voters, compute booth KPIs. <em>Required before Reports and Booth Analysis.</em></li>
+          </ol>
+          <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">After matching, use <strong>Dashboard</strong>, <strong>Booth Analysis</strong>, <strong>Field Validation</strong>, and <strong>Reports</strong> for validation and reports.</p>
+        </div>
+
         <div className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 max-w-4xl">
           {/* Pre-SIR Upload */}
           {(pageType === 'pre' || pageType === 'matching') && (
@@ -130,12 +149,13 @@ const UploadPage: React.FC<UploadPageProps> = ({ type }) => {
               </h2>
               <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
                 Upload the electoral roll before Special Intensive Revision (SIR). 
-                Expected CSV format with columns: epic_number, name, relative_name, age, gender, house_no, address, booth_number, constituency_name
+                CSV: columns epic_number, name, relative_name, age, gender, house_no, address, booth_number, constituency_name. 
+                PDF: ECI-style electoral roll (table with EPIC No, Name, Relative, Age, Sex, House No, Address).
               </p>
               <div className="space-y-4">
                 <input
                   type="file"
-                  accept=".csv"
+                  accept=".csv,.pdf"
                   onChange={(e) => setPreFile(e.target.files?.[0] || null)}
                   className="block w-full text-sm text-gray-500 dark:text-gray-400
                     file:mr-4 file:py-2 file:px-4 file:rounded-lg
@@ -148,7 +168,20 @@ const UploadPage: React.FC<UploadPageProps> = ({ type }) => {
                 {preFile && (
                   <p className="text-sm text-gray-600 dark:text-gray-300">
                     Selected: {preFile.name} ({(preFile.size / 1024).toFixed(2)} KB)
+                    {preFile.name.toLowerCase().endsWith('.pdf') && ' — optional: set constituency/booth below if not in PDF.'}
                   </p>
+                )}
+                {preFile?.name.toLowerCase().endsWith('.pdf') && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Constituency name (optional)</label>
+                      <input type="text" value={pdfConstituencyName} onChange={(e) => setPdfConstituencyName(e.target.value)} placeholder="e.g. Chennai North" className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Booth / Part number (optional)</label>
+                      <input type="text" value={pdfBoothNumber} onChange={(e) => setPdfBoothNumber(e.target.value)} placeholder="e.g. 20" className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white" />
+                    </div>
+                  </div>
                 )}
                 <button
                   onClick={() => handleUpload('pre')}
@@ -170,12 +203,12 @@ const UploadPage: React.FC<UploadPageProps> = ({ type }) => {
               </h2>
               <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
                 Upload the electoral roll after Special Intensive Revision (SIR). 
-                Same CSV format as Pre-SIR.
+                Same CSV or PDF format as Pre-SIR.
               </p>
               <div className="space-y-4">
                 <input
                   type="file"
-                  accept=".csv"
+                  accept=".csv,.pdf"
                   onChange={(e) => setPostFile(e.target.files?.[0] || null)}
                   className="block w-full text-sm text-gray-500 dark:text-gray-400
                     file:mr-4 file:py-2 file:px-4 file:rounded-lg
@@ -188,7 +221,20 @@ const UploadPage: React.FC<UploadPageProps> = ({ type }) => {
                 {postFile && (
                   <p className="text-sm text-gray-600 dark:text-gray-300">
                     Selected: {postFile.name} ({(postFile.size / 1024).toFixed(2)} KB)
+                    {postFile.name.toLowerCase().endsWith('.pdf') && ' — optional: set constituency/booth above (shared with Pre-SIR) if not in PDF.'}
                   </p>
+                )}
+                {postFile?.name.toLowerCase().endsWith('.pdf') && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Constituency name (optional)</label>
+                      <input type="text" value={pdfConstituencyName} onChange={(e) => setPdfConstituencyName(e.target.value)} placeholder="e.g. Chennai North" className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Booth / Part number (optional)</label>
+                      <input type="text" value={pdfBoothNumber} onChange={(e) => setPdfBoothNumber(e.target.value)} placeholder="e.g. 20" className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white" />
+                    </div>
+                  </div>
                 )}
                 <button
                   onClick={() => handleUpload('post')}

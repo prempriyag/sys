@@ -13,6 +13,7 @@ import Settings from "./pages/Settings";
 // SIR Pages
 import SIRDashboard from "./pages/SIR/Dashboard";
 import UploadPage from "./pages/SIR/UploadPage";
+import RollDataPage from "./pages/SIR/RollDataPage";
 import BoothAnalysis from "./pages/SIR/BoothAnalysis";
 import BoothKPIs from "./pages/SIR/BoothKPIs";
 import RiskHeatmap from "./pages/SIR/RiskHeatmap";
@@ -66,6 +67,7 @@ export default function App() {
           <Route path="/upload/pre-sir" element={<UploadPage type="pre" />} />
           <Route path="/upload/post-sir" element={<UploadPage type="post" />} />
           <Route path="/upload/matching" element={<UploadPage type="matching" />} />
+          <Route path="/upload/roll-data" element={<RollDataPage />} />
           <Route path="/upload" element={<UploadPage />} />
 
           {/* Booth Analysis */}

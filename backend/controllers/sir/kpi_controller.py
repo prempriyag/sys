@@ -29,7 +29,8 @@ async def get_booth_kpi(booth_id: int, db: Session = Depends(get_db)):
         "youth_intake_percent": float(kpi.youth_intake_percent) if kpi.youth_intake_percent else 0.0,
         "gender_shift_percent": float(kpi.gender_shift_percent) if kpi.gender_shift_percent else 0.0,
         "anomaly_household_count": kpi.anomaly_household_count,
-        "risk_category": kpi.risk_category
+        "risk_category": kpi.risk_category,
+        "risk_score": float(kpi.risk_score) if kpi.risk_score is not None else 0.0
     }
 
 @router.get("/constituency/{constituency_id}")
@@ -118,7 +119,8 @@ async def get_booths_kpi(constituency_id: int, db: Session = Depends(get_db)):
             "youth_intake_percent": float(kpi.youth_intake_percent) if kpi and kpi.youth_intake_percent else 0.0,
             "gender_shift_percent": float(kpi.gender_shift_percent) if kpi and kpi.gender_shift_percent else 0.0,
             "anomaly_household_count": kpi.anomaly_household_count if kpi else 0,
-            "risk_category": kpi.risk_category if kpi else "NORMAL"
+            "risk_category": kpi.risk_category if kpi else "NORMAL",
+            "risk_score": float(kpi.risk_score) if kpi and kpi.risk_score is not None else 0.0
         })
     
     return result

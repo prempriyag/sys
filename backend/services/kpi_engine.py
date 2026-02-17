@@ -95,6 +95,17 @@ class KPIEngine:
             if anomaly_household_count > 0:
                 risk = "ANOMALY"
             
+            # Risk score 0-100 (political risk scale: higher = more risk)
+            risk_score = 0.0
+            risk_score += min(50.0, deletion_velocity * 2.0)  # Deletion impact
+            if risk == "HIGH_RISK":
+                risk_score += 30.0
+            if risk == "ANOMALY":
+                risk_score += 25.0
+            if risk == "HIGH_OPPORTUNITY":
+                risk_score = max(0.0, risk_score - 20.0)  # Opportunity lowers risk
+            risk_score = min(100.0, max(0.0, risk_score))
+            
             # Update or Create KPI record
             kpi = self.db.query(BoothKPI).filter(BoothKPI.booth_id == booth.id).first()
             if not kpi:
@@ -111,5 +122,6 @@ class KPIEngine:
             kpi.gender_shift_percent = gender_shift_percent
             kpi.anomaly_household_count = anomaly_household_count
             kpi.risk_category = risk
+            kpi.risk_score = risk_score
             
         self.db.commit()

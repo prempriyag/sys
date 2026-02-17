@@ -99,6 +99,8 @@ export const API_ENDPOINTS = {
   // SIR Impact Analysis endpoints
   SIR_UPLOAD_PRE: "/api/upload/pre-sir",
   SIR_UPLOAD_POST: "/api/upload/post-sir",
+  SIR_UPLOAD_PRE_PDF: "/api/upload/pre-sir-pdf",
+  SIR_UPLOAD_POST_PDF: "/api/upload/post-sir-pdf",
   SIR_MATCHING_RUN: "/api/matching/run",
   SIR_KPI_BOOTH: "/api/kpi/booth",
   SIR_KPI_CONSTITUENCY: "/api/kpi/constituency",
@@ -106,6 +108,8 @@ export const API_ENDPOINTS = {
   SIR_KPI_BOOTHS: "/api/kpi/booths",
   SIR_DASHBOARD_RISK_MAP: "/api/sir/dashboard/risk-map",
   SIR_DASHBOARD_CONSTITUENCIES: "/api/sir/dashboard/constituencies",
+  SIR_DASHBOARD_ROLL_SUMMARY: "/api/sir/dashboard/roll-summary",
+  SIR_DASHBOARD_ROLL_SAMPLE: "/api/sir/dashboard/roll-sample",
   SIR_ANALYTICS_RUN: "/api/sir/analytics/run",
   SIR_ANALYTICS_HIGH_RISK: "/api/sir/analytics/high-risk",
   SIR_ANALYTICS_VALIDATION_SAMPLE: "/api/sir/analytics/validation-sample",

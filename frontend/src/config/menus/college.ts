@@ -11,6 +11,27 @@ export const collegeMenu: MenuConfig = {
       permission: "college_dashboard",
     },
     {
+      name: "SIR Impact Analysis",
+      icon: "bar-chart",
+      subItems: [
+        {
+          name: "SIR Dashboard",
+          path: "/dashboard",
+          icon: "dashboard",
+        },
+        {
+          name: "Upload Rolls",
+          path: "/upload",
+          icon: "upload",
+        },
+        {
+          name: "Booth Analysis",
+          path: "/booth-analysis",
+          icon: "map",
+        },
+      ],
+    },
+    {
       name: "User Management",
       path: "/college/users",
       icon: "user-circle",

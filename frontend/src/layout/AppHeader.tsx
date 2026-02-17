@@ -243,7 +243,7 @@ const AppHeader: React.FC = () => {
             {/* Dark Mode Toggler - Always visible */}
             <ThemeToggleButton />
             {/* Notification - Always visible */}
-            {/* <NotificationDropdown /> */}
+            <NotificationDropdown />
             {/* User Dropdown - Always visible */}
             <UserDropdown />
           </div>

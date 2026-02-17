@@ -208,6 +208,18 @@ async def login(
     try:
         logger.info("[LOGIN] Starting login for email: %s", login_data.email)
 
+        # First check if user exists (for better error messages)
+        user_by_email = db.query(User).filter(
+            User.email.ilike(login_data.email)
+        ).first()
+        
+        if not user_by_email:
+            logger.warning("[LOGIN] User not found: %s", login_data.email)
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid email or password"
+            )
+
         # Hash password for comparison
         hashed_password = hash_password(login_data.password)
 
@@ -218,6 +230,7 @@ async def login(
         ).first()
 
         if not user:
+            logger.warning("[LOGIN] Invalid password for user: %s", login_data.email)
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid email or password"
@@ -327,6 +340,13 @@ async def login(
         raise
     except Exception as e:
         logger.exception("Unexpected exception in login: %s", e)
+        # Check if it's a database connection error
+        error_str = str(e).lower()
+        if "connection" in error_str or "database" in error_str or "operational" in error_str:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Database connection error. Please try again later."
+            )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Internal server error: {str(e)}"

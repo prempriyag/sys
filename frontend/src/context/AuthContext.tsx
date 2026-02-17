@@ -85,11 +85,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const token = getAuthToken();
       const storedUser = localStorage.getItem("user");
       const storedPermissions = localStorage.getItem("user_permissions");
-      
+
       if (token && storedUser) {
         try {
           const parsedUser = JSON.parse(storedUser);
-          
+
           // Load permissions from localStorage
           if (storedPermissions) {
             try {
@@ -103,7 +103,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               console.error("Error parsing stored permissions:", error);
             }
           }
-          
+
           // Verify token is still valid by making a request to /api/me
           try {
             await api.get(API_ENDPOINTS.ME);
@@ -149,6 +149,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setTwoWayPending(null);
 
     // Redirect based on permissions
+    // For SIR System, we redirect everyone to the main dashboard
+    // Legacy redirects removed
+    navigate("/");
+
+    /* 
     if (response.user.college_perm === 1) {
       navigate("/college/dashboard");
     } else if (response.user.hs_perm === 1) {
@@ -156,8 +161,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } else if (response.user.ocr_perm === 1) {
       navigate("/ocrverify/dashboard");
     } else {
-      throw new Error("You don't have proper permissions to login.");
+      // Default fallback
+      navigate("/");
     }
+    */
   };
 
   const login = async (email: string, password: string) => {
@@ -388,14 +395,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (!permissions || !permission) {
       return false;
     }
-    
+
     const actionUpper = action.toUpperCase();
     if (permissions[permission] && permissions[permission][actionUpper] !== undefined) {
       const value = permissions[permission][actionUpper];
       // Check for both number 1 and string "1" (API returns strings)
       return value === 1 || String(value) === "1";
     }
-    
+
     return false;
   };
 
@@ -405,7 +412,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (!permissions || !Array.isArray(permissionList) || permissionList.length === 0) {
       return false;
     }
-    
+
     const actionUpper = action.toUpperCase();
     return permissionList.some((permission) => {
       if (permissions[permission] && permissions[permission][actionUpper] !== undefined) {

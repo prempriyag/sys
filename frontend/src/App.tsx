@@ -9,61 +9,17 @@ import NotFound from "./pages/OtherPage/NotFound";
 import ServerError from "./pages/OtherPage/ServerError";
 import UserProfiles from "./pages/UserProfiles";
 import Settings from "./pages/Settings";
-import Videos from "./pages/UiElements/Videos";
-import Images from "./pages/UiElements/Images";
-import Alerts from "./pages/UiElements/Alerts";
-import Badges from "./pages/UiElements/Badges";
-import Avatars from "./pages/UiElements/Avatars";
-import Buttons from "./pages/UiElements/Buttons";
-import LineChart from "./pages/Charts/LineChart";
-import BarChart from "./pages/Charts/BarChart";
-import Calendar from "./pages/Calendar";
-import BasicTables from "./pages/Tables/BasicTables";
-import FormElements from "./pages/Forms/FormElements";
-import Blank from "./pages/Blank";
-import AppLayout from "./layout/AppLayout";
-import { ScrollToTop } from "./components/common/ScrollToTop";
-import ToastContainer from "./components/ui/toast/ToastContainer";
-import CollegeDashboard from "./pages/College/dashboard/CollegeDashboard";
-import Dashboard2 from "./pages/College/dashboard/dashboard2";
-import Dashboard3 from "./pages/College/dashboard/dashboard3";
-import CollegeAdvancedDashboard from "./pages/College/dashboard/CollegeAdvancedDashboard";
-import TranscriptReports from "./pages/College/transcriptreports/TranscriptReports";
-import ArticulationReports from "./pages/College/articulationreports/ArticulationReports";
-import DigiScriptReports from "./pages/College/digiscriptreports/DigiScriptReports";
-import TranscriptHdrOcr from "./pages/College/ocr/transcripthdrocr/TranscriptHdrOcr";
-import TranscriptLineOcr from "./pages/College/ocr/transcriptlineocr/TranscriptLineOcr";
-import TranscriptHdrData from "./pages/College/data/transcripthdrdata/TranscriptHdrData";
-import TranscriptLineData from "./pages/College/data/transcriptlinedata/TranscriptLineData";
-import DigiScriptBotLog from "./pages/College/botlogs/digiscriptbotlog/DigiScriptBotLog";
-import ArticulationBotLog from "./pages/College/botlogs/articulationbotlog/ArticulationBotLog";
-import StudentLogKickouts from "./pages/College/studentlogs/kickouts/StudentLogKickouts";
-import StudentLogProcessed from "./pages/College/studentlogs/processed/StudentLogProcessed";
-import StudentLogRerun from "./pages/College/studentlogs/rerun/StudentLogRerun";
-import StudentView from "./pages/College/StudentView";
-import TranscriptsUpload from "./pages/College/transcripts/TranscriptsUpload";
-import TranscriptsList from "./pages/College/transcripts/TranscriptsList";
-import StoredProcedure from "./pages/College/setup/storedprocedure/StoredProcedure";
-import DegreeMapping from "./pages/College/setup/degreemapping/DegreeMapping";
-import TermMapping from "./pages/College/setup/termmapping/TermMapping";
-import TermNameMapping from "./pages/College/setup/termnamemapping/TermNameMapping";
-import GradeMapping from "./pages/College/setup/grademapping/GradeMapping";
-import SkipKeywords from "./pages/College/setup/skipkeywords/SkipKeywords";
-import SkipCourses from "./pages/College/setup/skipcourses/SkipCourses";
-import YearMapping from "./pages/College/setup/yearmapping/YearMapping";
-import BotSchedule from "./pages/College/BotSchedule";
-import BotStatusReport from "./pages/College/BotStatusReport";
-import SuffixName from "./pages/College/setup/suffixname/SuffixName";
-import PrefixName from "./pages/College/setup/prefixname/PrefixName";
-import CombinedName from "./pages/College/setup/combinedname/CombinedName";
-import AcceptedGradesMapping from "./pages/College/setup/acceptedgradesmapping/AcceptedGradesMapping";
-import TransferGradesMapping from "./pages/College/setup/transfergradesmapping/TransferGradesMapping";
-import InstitutionMapping from "./pages/College/setup/institutionmapping/InstitutionMapping";
-import AccreditedInstitution from "./pages/College/setup/accreditedinstitution/AccreditedInstitution";
-import OverrideEditMapping from "./pages/College/setup/overrideeditmapping/OverrideEditMapping";
-import ErrorLog from "./pages/College/settings/errorlog/ErrorLog";
-import SmtpSetup from "./pages/College/settings/smtpsetup/SmtpSetup";
-import MasterSettings from "./pages/College/settings/mastersettings/MasterSettings";
+
+// SIR Pages
+import SIRDashboard from "./pages/SIR/Dashboard";
+import UploadPage from "./pages/SIR/UploadPage";
+import BoothAnalysis from "./pages/SIR/BoothAnalysis";
+import BoothKPIs from "./pages/SIR/BoothKPIs";
+import RiskHeatmap from "./pages/SIR/RiskHeatmap";
+import FieldValidation from "./pages/SIR/FieldValidation";
+import Reports from "./pages/SIR/Reports";
+
+// User Management Pages
 import Permissions from "./pages/College/settings/permissions/Permissions";
 import Roles from "./pages/College/settings/roles/Roles";
 import AddRole from "./pages/College/settings/roles/AddRole";
@@ -71,48 +27,13 @@ import EditRole from "./pages/College/settings/roles/EditRole";
 import UserManagement from "./pages/College/users/UserManagement";
 import AddUser from "./pages/College/users/AddUser";
 import EditUser from "./pages/College/users/EditUser";
-import Help from "./pages/College/Help";
-import BatchDetails from "./pages/College/BatchDetails";
-import ErrorScreenshot from "./pages/College/ErrorScreenshot";
+import MasterSettings from "./pages/College/settings/mastersettings/MasterSettings";
+
+import AppLayout from "./layout/AppLayout";
+import { ScrollToTop } from "./components/common/ScrollToTop";
+import ToastContainer from "./components/ui/toast/ToastContainer";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import PermissionRoute from "./components/auth/PermissionRoute";
-
-//School Pages
-import SchoolDashboard from "./pages/School/dashboard/SchoolDashboard";
-import SchoolTranscriptReports from "./pages/School/transcriptreports/TranscriptReports";
-import SchoolDigiScriptReports from "./pages/School/digiscriptreports/DigiScriptReports";
-import SchoolTranscriptHdrOcr from "./pages/School/ocr/transcripthdrocr/TranscriptHdrOcr";
-import SchoolTranscriptLineOcr from "./pages/School/ocr/transcriptlineocr/TranscriptLineOcr";
-import SchoolTranscriptHdrData from "./pages/School/data/transcripthdrdata/TranscriptHdrData";
-import SchoolTranscriptLineData from "./pages/School/data/transcriptlinedata/TranscriptLineData";
-import SchoolDigiScriptBotLog from "./pages/School/botlogs/digiscriptbotlog/DigiScriptBotLog";
-import SchoolStudentLogKickouts from "./pages/School/studentlogs/kickouts/StudentLogKickouts";
-import SchoolStudentLogProcessed from "./pages/School/studentlogs/processed/StudentLogProcessed";
-import SchoolStudentLogRerun from "./pages/School/studentlogs/rerun/StudentLogRerun";
-import SchoolStudentView from "./pages/School/StudentView";
-import SchoolTranscriptsUpload from "./pages/School/transcripts/TranscriptsUpload";
-import SchoolTranscriptsList from "./pages/School/transcripts/TranscriptsList";
-import SchoolInstitutionMapping from "./pages/School/setup/institutionmapping/InstitutionMapping";
-import SchoolGpaPickMapping from "./pages/School/setup/gpapickmapping/GpaPickMapping";
-import SchoolGpaScaleMapping from "./pages/School/setup/gpascalemapping/GpaScaleMapping";
-import SchoolHelp from "./pages/School/Help";
-
-// Admin/System Pages
-import Profiler from "./pages/Admin/Profiler";
-
-// OCR (OCR Verify) module pages
-import OCRDashboard from "./pages/OCR/OCRDashboard";
-import Verifiers from "./pages/OCR/Verifiers";
-import AssignBatches from "./pages/OCR/AssignBatches";
-import ToBeAssignedBatches from "./pages/OCR/ToBeAssignedBatches";
-import CollegeAssignedBatches from "./pages/OCR/CollegeAssignedBatches";
-import SchoolAssignedBatches from "./pages/OCR/SchoolAssignedBatches";
-import CollegeHeaderData from "./pages/OCR/CollegeHeaderData";
-import SchoolHeaderData from "./pages/OCR/SchoolHeaderData";
-import CollegeOCRBatch from "./pages/OCR/CollegeOCRBatch";
-import CollegeHDRBatch from "./pages/OCR/CollegeHDRBatch";
-import SchoolOCRBatch from "./pages/OCR/SchoolOCRBatch";
-import SchoolHDRBatch from "./pages/OCR/SchoolHDRBatch";
 
 export default function App() {
   return (
@@ -120,8 +41,7 @@ export default function App() {
       <ScrollToTop />
       <ToastContainer />
       <Routes>
-        {/* Auth Layout - Public Routes */}
-        {/* <Route path="/signin" element={<SignIn />} /> */}
+        {/* Auth Routes */}
         <Route path="/login" element={<SignIn />} />
         <Route path="/verify" element={<TwoWayVerify />} />
         <Route path="/signup" element={<SignUp />} />
@@ -131,7 +51,7 @@ export default function App() {
         <Route path="/sso/ktech" element={<SSORedirect />} />
         <Route path="/server-error" element={<ServerError />} />
 
-        {/* Protected Routes - Require Authentication */}
+        {/* Protected Routes */}
         <Route
           element={
             <ProtectedRoute>
@@ -139,19 +59,35 @@ export default function App() {
             </ProtectedRoute>
           }
         >
-          {/* Default route - college dashboard */}
-          <Route index element={<CollegeDashboard />} />
-          <Route path="college/dashboard" element={<CollegeDashboard />} />
+          {/* SIR Dashboard (Default) */}
+          <Route index element={<SIRDashboard />} />
+          <Route path="/dashboard" element={<SIRDashboard />} />
 
-          {/* College module routes (default module) */}
-          <Route path="/college/dashboard" element={<CollegeDashboard />} />
-          <Route path="/college/dashboard2" element={<Dashboard2 />} />
-          <Route path="/college/dashboard3" element={<Dashboard3 />} />
-          <Route path="/college/advanceddashboard" element={<CollegeAdvancedDashboard />} />
+          {/* Data Upload */}
+          <Route path="/upload/pre-sir" element={<UploadPage type="pre" />} />
+          <Route path="/upload/post-sir" element={<UploadPage type="post" />} />
+          <Route path="/upload/matching" element={<UploadPage type="matching" />} />
+          <Route path="/upload" element={<UploadPage />} />
 
-          {/* College - User Management */}
+          {/* Booth Analysis */}
+          <Route path="/booths" element={<BoothKPIs />} />
+          <Route path="/booths/risk-map" element={<RiskHeatmap />} />
+          <Route path="/booths/analysis" element={<BoothAnalysis />} />
+          <Route path="/booth-analysis/:boothId" element={<BoothAnalysis />} />
+          <Route path="/booth-analysis" element={<BoothAnalysis />} />
+
+          {/* Field Validation */}
+          <Route path="/validation/sampling" element={<FieldValidation type="sampling" />} />
+          <Route path="/validation/results" element={<FieldValidation type="results" />} />
+
+          {/* Reports */}
+          <Route path="/reports/summary" element={<Reports type="summary" />} />
+          <Route path="/reports/action-plan" element={<Reports type="action-plan" />} />
+          <Route path="/reports/constituency" element={<Reports type="constituency" />} />
+
+          {/* User Management */}
           <Route
-            path="/college/users"
+            path="/users"
             element={
               <PermissionRoute permission="user_management" action="VIEW">
                 <UserManagement />
@@ -159,7 +95,7 @@ export default function App() {
             }
           />
           <Route
-            path="/college/users/add"
+            path="/users/add"
             element={
               <PermissionRoute permission="user_management" action="ADD">
                 <AddUser />
@@ -167,7 +103,7 @@ export default function App() {
             }
           />
           <Route
-            path="/college/users/edit/:id"
+            path="/users/edit/:id"
             element={
               <PermissionRoute permission="user_management" action="UPDATE">
                 <EditUser />
@@ -175,303 +111,22 @@ export default function App() {
             }
           />
 
-          {/* College - Transcripts (all handled by single TranscriptReports component with type parameter) */}
-          <Route path="/college/transcriptkickouts" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><TranscriptReports /></PermissionRoute>} />
-          <Route path="/college/transcript_articulationkickouts" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><TranscriptReports /></PermissionRoute>} />
-          <Route path="/college/transcriptprocessed" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><TranscriptReports /></PermissionRoute>} />
-          <Route path="/college/transcriptrerun" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><TranscriptReports /></PermissionRoute>} />
-            {/* School dashboard */}
-            <Route index element={<SchoolDashboard />} />
-            <Route path="school/dashboard" element={<SchoolDashboard />} />
-            
-            {/* College module routes (default module) */}
-            <Route path="/college/dashboard" element={<CollegeDashboard />} />
-            <Route path="/college/dashboard2" element={<Dashboard2 />} />
-            <Route path="/college/dashboard3" element={<Dashboard3 />} />
-            <Route path="/college/advanceddashboard" element={<CollegeAdvancedDashboard />} />
-            
-                    {/* College - User Management */}
-                    <Route 
-                      path="/college/users" 
-                      element={
-                        <PermissionRoute permission="user_management" action="VIEW">
-                          <UserManagement />
-                        </PermissionRoute>
-                      } 
-                    />
-                    <Route 
-                      path="/college/users/add" 
-                      element={
-                        <PermissionRoute permission="user_management" action="ADD">
-                          <AddUser />
-                        </PermissionRoute>
-                      } 
-                    />
-                    <Route 
-                      path="/college/users/edit/:id" 
-                      element={
-                        <PermissionRoute permission="user_management" action="UPDATE">
-                          <EditUser />
-                        </PermissionRoute>
-                      } 
-                    />
-            
-            {/* College - Transcripts (all handled by single TranscriptReports component with type parameter) */}
-            <Route path="/college/transcriptkickouts" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><TranscriptReports /></PermissionRoute>} />
-            <Route path="/college/transcript_articulationkickouts" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><TranscriptReports /></PermissionRoute>} />
-            <Route path="/college/transcriptprocessed" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><TranscriptReports /></PermissionRoute>} />
-            <Route path="/college/transcriptrerun" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><TranscriptReports /></PermissionRoute>} />
-            
-            {/* School - Transcripts (all handled by single TranscriptReports component with type parameter) */}
-            <Route path="/school/transcriptreports" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><SchoolTranscriptReports /></PermissionRoute>} />
-            <Route path="/school/transcriptkickouts" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><SchoolTranscriptReports /></PermissionRoute>} />
-            <Route path="/school/transcriptprocessed" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><SchoolTranscriptReports /></PermissionRoute>} />
-            <Route path="/school/transcriptrerun" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><SchoolTranscriptReports /></PermissionRoute>} />
+          {/* Roles & Permissions */}
+          <Route path="/roles" element={<Roles />} />
+          <Route path="/roles/add" element={<AddRole />} />
+          <Route path="/roles/edit/:id" element={<EditRole />} />
+          <Route path="/permissions" element={<Permissions />} />
 
-        {/* School - Transcripts (all handled by single TranscriptReports component with type parameter) */}
-        <Route path="/school/transcriptkickouts" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><SchoolTranscriptReports /></PermissionRoute>} />
-        <Route path="/school/transcriptprocessed" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><SchoolTranscriptReports /></PermissionRoute>} />
-        <Route path="/school/transcriptrerun" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><SchoolTranscriptReports /></PermissionRoute>} />
+          {/* Master Settings */}
+          <Route path="/master-settings" element={<MasterSettings />} />
 
-        {/* School - Setup */}
-        <Route
-          path="/school/institutionmapping"
-          element={
-            <PermissionRoute permission="institutions_mapping" action="VIEW">
-              <SchoolInstitutionMapping />
-            </PermissionRoute>
-          }
-        />
-        <Route
-          path="/school/techinstitutionmapping"
-          element={
-            <PermissionRoute permission="institutions_mapping" action="VIEW">
-              <SchoolInstitutionMapping instType="TECH" />
-            </PermissionRoute>
-          }
-        />
-        <Route
-          path="/school/GpapickMapping"
-          element={
-            <PermissionRoute permission="gpa_pick_mapping" action="VIEW">
-              <SchoolGpaPickMapping />
-            </PermissionRoute>
-          }
-        />
-        <Route
-          path="/school/Gpascalemapping"
-          element={
-            <PermissionRoute permission="gpa_scale_mapping" action="VIEW">
-              <SchoolGpaScaleMapping />
-            </PermissionRoute>
-          }
-        />
-
-        {/* College - Articulation */}
-          <Route path="/college/articulationkickouts" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><ArticulationReports /></PermissionRoute>} />
-          <Route path="/college/articulationphase2kickouts" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><ArticulationReports /></PermissionRoute>} />
-          <Route path="/college/articulationprocessed" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><ArticulationReports /></PermissionRoute>} />
-          <Route path="/college/articulationrerun" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><ArticulationReports /></PermissionRoute>} />
-
-          {/* College - Student Action Center */}
-          <Route path="/college/studentlogkickouts" element={<PermissionRoute permission="student_log_kickout" action="VIEW"><StudentLogKickouts /></PermissionRoute>} />
-          <Route path="/college/studentlogprocessed" element={<PermissionRoute permission="student_log_processed" action="VIEW"><StudentLogProcessed /></PermissionRoute>} />
-          <Route path="/college/studentlogreprocessed" element={<PermissionRoute permission="student_log_rerun" action="VIEW"><StudentLogRerun /></PermissionRoute>} />
-          <Route path="/college/studentview" element={<PermissionRoute permission="student_view" action="VIEW"><StudentView /></PermissionRoute>} />
-
-          {/* School - Student Action Center */}
-          <Route path="/school/studentlogkickouts" element={<PermissionRoute permission="student_log_kickout" action="VIEW"><StudentLogKickouts /></PermissionRoute>} />
-          <Route path="/school/studentlogprocessed" element={<PermissionRoute permission="student_log_processed" action="VIEW"><StudentLogProcessed /></PermissionRoute>} />
-          <Route path="/school/studentlogreprocessed" element={<PermissionRoute permission="student_log_rerun" action="VIEW"><StudentLogRerun /></PermissionRoute>} />
-          <Route path="/school/studentview" element={<PermissionRoute permission="student_view" action="VIEW"><StudentView /></PermissionRoute>} />
-
-          {/* College - Reports */}
-          <Route path="/college/transcriptreports" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><TranscriptReports /></PermissionRoute>} />
-          <Route path="/college/transcriptequivalenthours" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><TranscriptReports /></PermissionRoute>} />
-          <Route path="/college/articulationreports" element={<ArticulationReports />} />
-          <Route path="/college/digiscriptreports" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><DigiScriptReports /></PermissionRoute>} />
-          <Route path="/college/batchdetails/:batchId" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><BatchDetails /></PermissionRoute>} />
-          <Route path="/college/errorscreenshot/:batchId" element={<PermissionRoute permission="college_digiscript_reports" action="VIEW"><ErrorScreenshot /></PermissionRoute>} />
-
-          {/* College - Uploads */}
-          <Route
-            path="/college/transcripts/add"
-            element={
-              <PermissionRoute permission="college_upload_transcripts">
-                <TranscriptsUpload />
-              </PermissionRoute>
-            }
-          />
-          <Route
-            path="/college/transcripts"
-            element={
-              <PermissionRoute permission="college_downloaded_transcripts">
-                <TranscriptsList />
-              </PermissionRoute>
-            }
-          />
-
-          
-          {/* School - Uploads */}
-          <Route
-            path="/school/transcripts/add"
-            element={
-              <PermissionRoute permission="college_upload_transcripts">
-                <TranscriptsUpload />
-              </PermissionRoute>
-            }
-          />
-          <Route
-            path="/school/transcripts"
-            element={
-              <PermissionRoute permission="college_downloaded_transcripts">
-                <TranscriptsList />
-              </PermissionRoute>
-            }
-          />
-
-          {/* College - Setup */}
-          <Route
-            path="/college/degreemapping"
-            element={
-              <PermissionRoute permission="college_degree">
-                <DegreeMapping />
-              </PermissionRoute>
-            }
-          />
-          <Route
-            path="/college/termmapping"
-            element={
-              <PermissionRoute permission="college_terms">
-                <TermMapping />
-              </PermissionRoute>
-            }
-          />
-          <Route
-            path="/college/termnamemapping"
-            element={
-              <PermissionRoute permission="college_term_names">
-                <TermNameMapping />
-              </PermissionRoute>
-            }
-          />
-          <Route
-            path="/college/grademapping"
-            element={
-              <PermissionRoute permission="par_grade_mapping">
-                <GradeMapping />
-              </PermissionRoute>
-            }
-          />
-          <Route path="/college/osuskipkeywords" element={<PermissionRoute permission="osu_skip_keywords" action="VIEW"><SkipKeywords /></PermissionRoute>} />
-          <Route path="/college/acceptGradeMapping" element={<PermissionRoute permission="accepted_grades_mapping" action="VIEW"><AcceptedGradesMapping /></PermissionRoute>} />
-          <Route path="/college/accreditedInstitution" element={<PermissionRoute permission="accredited_institution" action="VIEW"><AccreditedInstitution /></PermissionRoute>} />
-          <Route path="/college/transfergrademapping" element={<PermissionRoute permission="transfer_grade_mapping" action="VIEW"><TransferGradesMapping /></PermissionRoute>} />
-          <Route path="/college/yearmapping" element={<PermissionRoute permission="year_mapping" action="VIEW"><YearMapping /></PermissionRoute>} />
-          <Route path="/college/institutionmapping" element={<PermissionRoute permission="institutions_mapping" action="VIEW"><InstitutionMapping /></PermissionRoute>} />
-          <Route path="/college/techinstitutionmapping" element={<PermissionRoute permission="institutions_mapping" action="VIEW"><InstitutionMapping instType="TECH" /></PermissionRoute>} />
-          <Route path="/college/skipcourses" element={<PermissionRoute permission="skip_exclude_courses" action="VIEW"><SkipCourses /></PermissionRoute>} />
-          <Route path="/college/overrideeditmapping" element={<PermissionRoute permission="override_edit_mapping" action="VIEW"><OverrideEditMapping /></PermissionRoute>} />
-          <Route path="/college/suffixname" element={<PermissionRoute permission="suffix_names" action="VIEW"><SuffixName /></PermissionRoute>} />
-          <Route path="/college/prefixname" element={<PermissionRoute permission="prefix_words" action="VIEW"><PrefixName /></PermissionRoute>} />
-          <Route path="/college/combinedname" element={<PermissionRoute permission="combine_words" action="VIEW"><CombinedName /></PermissionRoute>} />
-          <Route path="/college/botschedule" element={<PermissionRoute permission="bot_schedule" action="VIEW"><BotSchedule /></PermissionRoute>} />
-          <Route path="/college/botstatusreport" element={<PermissionRoute permission="bot_status_report" action="VIEW"><BotStatusReport /></PermissionRoute>} />
-
-          {/* College - OCR [P1] */}
-          <Route path="/college/transcripthdrocr" element={<PermissionRoute permission="college_transcript_header_ocr" action="VIEW"><TranscriptHdrOcr /></PermissionRoute>} />
-          <Route path="/college/transcriptlineocr" element={<PermissionRoute permission="college_transcript_line_ocr" action="VIEW"><TranscriptLineOcr /></PermissionRoute>} />
-
-          {/* College - DATA [P2] */}
-          <Route path="/college/transcripthdrdata" element={<PermissionRoute permission="college_transcript_header_data" action="VIEW"><TranscriptHdrData /></PermissionRoute>} />
-          <Route path="/college/transcriptlinedata" element={<PermissionRoute permission="college_transcript_line_data" action="VIEW"><TranscriptLineData /></PermissionRoute>} />
-
-          {/* College - Audit Log [P3] */}
-          <Route path="/college/digiscriptbotlog" element={<PermissionRoute permission="transcript_log" action="VIEW"><DigiScriptBotLog /></PermissionRoute>} />
-          <Route path="/college/articulationbotlog" element={<PermissionRoute permission="articulation_log" action="VIEW"><ArticulationBotLog /></PermissionRoute>} />
-
-          {/* College - Reset Batch ID */}
-          <Route
-            path="/college/storedprocedure"
-            element={
-              <PermissionRoute permission="stored_procedure">
-                <StoredProcedure />
-              </PermissionRoute>
-            }
-          />
-
-          {/* College - Settings */}
-          <Route path="/college/permissions" element={<Permissions />} />
-          <Route path="/college/roles" element={<Roles />} />
-          <Route path="/college/roles/add" element={<AddRole />} />
-          <Route path="/college/roles/edit/:id" element={<EditRole />} />
-          <Route path="/college/roles/view/:id" element={<EditRole />} />
-          <Route path="/college/Error_log" element={<ErrorLog />} />
-          <Route path="/college/master_setup" element={<MasterSettings />} />
-          {/* SMTP route hidden - now accessible via /settings page */}
-          {/* <Route path="/college/smtp" element={<SmtpSetup />} /> */}
-
-          {/* College - User Manual */}
-          <Route path="/college/Help" element={<Help />} />
-
-          {/* School - User Manual */}
-          <Route path="/school/Help" element={<SchoolHelp />} />
-
-          {/* School module routes */}
-          <Route path="/school/dashboard" element={<SchoolDashboard />} />
-
-          {/* OCR (OCR Verify) module routes */}
-          <Route path="/ocrverify/dashboard" element={<OCRDashboard />} />
-          <Route path="/ocrverify/verifiers" element={<Verifiers />} />
-          <Route path="/ocrverify/assignbatches" element={<AssignBatches />} />
-          <Route path="/ocrverify/tobeassignbatches" element={<ToBeAssignedBatches />} />
-          <Route path="/ocrverify/collegeocrbatches" element={<CollegeAssignedBatches />} />
-          <Route path="/ocrverify/schoolocrbatches" element={<SchoolAssignedBatches />} />
-          <Route path="/ocrverify/collegehdrdata" element={<CollegeHeaderData />} />
-          <Route path="/ocrverify/schoolhdrdata" element={<SchoolHeaderData />} />
-          <Route path="/ocrverify/collegeocrbatch" element={<CollegeOCRBatch />} />
-          <Route path="/ocrverify/collegehdrbatch" element={<CollegeHDRBatch />} />
-          <Route path="/ocrverify/schoolocrbatch" element={<SchoolOCRBatch />} />
-          <Route path="/ocrverify/schoolhdrbatch" element={<SchoolHDRBatch />} />
-
-          {/* Others Page */}
+          {/* Settings & Profile */}
           <Route path="/profile" element={<UserProfiles />} />
-          <Route path="/school/profile" element={<UserProfiles />} />
-          <Route path="/ocrverify/profile" element={<UserProfiles />} />
-
           <Route path="/settings" element={<Settings />} />
-          <Route path="/school/settings" element={<Settings />} />
-          <Route path="/ocrverify/settings" element={<Settings />} />
 
-          {/* Admin/System Tools - Profiler (KTech users only) */}
-          <Route path="/profiler" element={<Profiler />} />
-          <Route path="/college/profiler" element={<Profiler />} />
-          <Route path="/school/profiler" element={<Profiler />} />
-          <Route path="/ocrverify/profiler" element={<Profiler />} />
-
-          <Route path="/calendar" element={<Calendar />} />
-          <Route path="/blank" element={<Blank />} />
-
-          {/* Forms */}
-          <Route path="/form-elements" element={<FormElements />} />
-
-          {/* Tables */}
-          <Route path="/basic-tables" element={<BasicTables />} />
-
-          {/* Ui Elements */}
-          <Route path="/alerts" element={<Alerts />} />
-          <Route path="/avatars" element={<Avatars />} />
-          <Route path="/badge" element={<Badges />} />
-          <Route path="/buttons" element={<Buttons />} />
-          <Route path="/images" element={<Images />} />
-          <Route path="/videos" element={<Videos />} />
-
-          {/* Charts */}
-          <Route path="/line-chart" element={<LineChart />} />
-          <Route path="/bar-chart" element={<BarChart />} />
         </Route>
 
-        {/* Fallback Route */}
+        {/* Fallback */}
         <Route path="*" element={<NotFound />} />
       </Routes>
     </>

@@ -74,19 +74,19 @@ async def get_notifications(
         return {"notifications": [], "total": 0, "unread_count": 0}
 
 
-@router.get("/unread-count")
-async def get_unread_count(
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    """Quick endpoint to get unread badge count (used by polling)."""
-    try:
-        _ensure_table(db)
-        count = NotificationModel.get_unread_count(db, user_id=current_user.id)
-        return {"unread_count": count}
-    except Exception as e:
-        logger.error(f"Error getting unread count: {e}")
-        return {"unread_count": 0}
+# @router.get("/unread-count")
+# async def get_unread_count(
+#     current_user: User = Depends(get_current_user),
+#     db: Session = Depends(get_db),
+# ):
+#     """Quick endpoint to get unread badge count (used by polling)."""
+#     try:
+#         _ensure_table(db)
+#         count = NotificationModel.get_unread_count(db, user_id=current_user.id)
+#         return {"unread_count": count}
+#     except Exception as e:
+#         logger.error(f"Error getting unread count: {e}")
+#         return {"unread_count": 0}
 
 
 @router.post("/mark-read")

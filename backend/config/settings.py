@@ -28,7 +28,8 @@ class Settings(BaseSettings):
     DB_NAME: str
     DB_USER: str
     DB_PASSWORD: str
-    DB_DRIVER: str
+    DB_PORT: Optional[str] = None  # Optional port for PostgreSQL (defaults to 5432)
+    DB_DRIVER: Optional[str] = None  # Only needed for SQL Server, not PostgreSQL
     # DB_DRIVER: str = "ODBC Driver 18 for SQL Server"
     # DB_DRIVER: str = "ODBC Driver 17 for SQL Server"
     

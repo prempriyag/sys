@@ -11,7 +11,7 @@ class MasterSettingsModel:
     @staticmethod
     def get_business_settings(db: Session) -> List[Dict[str, Any]]:
         try:
-            query = text(f"SELECT KEYCODE, KEYVALUE FROM {TBL_BUSINESS} WITH(NOLOCK)")
+            query = text(f"SELECT KEYCODE, KEYVALUE FROM {TBL_BUSINESS}")
             records = db.execute(query).fetchall()
             settings = {}
             for record in records:

@@ -1,86 +1,46 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { Link, useLocation } from "react-router";
-import { ChevronDownIcon, HorizontaLDots } from "../icons";
 import { useSidebar } from "../context/SidebarContext";
 import { useModule } from "../context/ModuleContext";
 import { useMenuLayout } from "../context/MenuLayoutContext";
 import { useAuth } from "../context/AuthContext";
 import { useThemeColor } from "../context/ThemeColorContext";
-import { getMenuByModule } from "../config/menus";
-import { MenuItem } from "../types/menu";
+import { getMenu } from "../config/menus";
 import { getIcon } from "../utils/iconMapper";
 import { checkPermission, checkAnyPermission } from "../utils/permissions";
-import SidebarWidget from "./SidebarWidget";
+import { MenuItem } from "../types/menu";
+import { HorizontaLDots } from "../icons";
 import HorizontalMenuItem from "../components/menu/HorizontalMenuItem";
+import SidebarWidget from "./SidebarWidget";
 
-const AppSidebar: React.FC = () => {
+const AppSidebar = () => {
   const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
   const { currentModule } = useModule();
   const { menuLayout } = useMenuLayout();
   const { user } = useAuth();
   const { logoIconUrl, logoLightUrl, logoDarkUrl, sidebarBgColor, sidebarTextColor } = useThemeColor();
   const location = useLocation();
-  const menuConfig = getMenuByModule(currentModule);
-
   const [openSubmenu, setOpenSubmenu] = useState<Record<string, boolean>>({});
-  const [subMenuHeights, setSubMenuHeights] = useState<Record<string, number>>(
-    {}
-  );
+  const [subMenuHeights, setSubMenuHeights] = useState<Record<string, number>>({});
   const subMenuRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
+  // Get menu config for SIR application
+  const menuConfig = getMenu();
+  const menuConfigItems = menuConfig?.items || [];
+
   // Filter menu items based on permissions
-  // Similar to how PHP sidebar filters menu items using checkpermission and checkallpermission
-  const filterMenuItems = useCallback(
-    (items: MenuItem[]): MenuItem[] => {
-      if (!user) return []; // If no user, no permissions, so no menu items
-
-      return items.filter((item) => {
-        // If item has NO permission requirement, show it (like Dashboard and User Manual)
-        if (
-          !item.permission &&
-          (!item.permissions || item.permissions.length === 0)
-        ) {
-          return true; // Show items without permission requirements
-        }
-
-        // If item has permissions array (checkallpermission equivalent - show if user has ANY)
-        if (item.permissions && item.permissions.length > 0) {
-          const hasAny = checkAnyPermission(user, item.permissions, "VIEW");
-          if (!hasAny) {
-            return false; // Hide item if user doesn't have any of the permissions
-          }
-        }
-
-        // If item has single permission (checkpermission equivalent)
-        if (item.permission) {
-          const hasPerm = checkPermission(user, item.permission, "VIEW");
-          if (!hasPerm) {
-            return false; // Hide item if user doesn't have permission
-          }
-        }
-
-        // If item has subItems, filter them recursively
-        if (item.subItems && item.subItems.length > 0) {
-          const filteredSubItems = filterMenuItems(item.subItems);
-          // Keep parent item only if it has at least one visible subItem
-          if (filteredSubItems.length === 0) {
-            return false;
-          }
-          item.subItems = filteredSubItems;
-          return true;
-        }
-
-        return true; // Keep item if no permission or permission granted
-      });
-    },
-    [user]
-  );
-
-  // Filter menu items based on permissions (similar to PHP sidebar filtering)
-  const filteredMenuConfigItems = useMemo(
-    () => filterMenuItems(menuConfig.items),
-    [filterMenuItems, menuConfig.items]
-  );
+  const filteredMenuConfigItems = menuConfigItems.filter((item) => {
+    // If item has single permission, check it
+    if (item.permission) {
+      return checkPermission(user, item.permission, "VIEW");
+    }
+    // If item has multiple permissions (checkallpermission), check if user has any
+    if (item.permissions && item.permissions.length > 0) {
+      return checkAnyPermission(user, item.permissions, "VIEW");
+    }
+    // If no permission specified, show item
+    return true;
+  });
 
   const isActive = useCallback(
     (path?: string, activePaths?: string[]) => {
@@ -105,137 +65,39 @@ const AppSidebar: React.FC = () => {
     [location.pathname]
   );
 
-  // Initialize open submenus based on active route
-  useEffect(() => {
-    // Reset all submenus first, then only open the ones containing active routes
-    if (menuLayout === "horizontal") {
-      setOpenSubmenu({});
-      return;
-    }
-    const newOpenSubmenu: Record<string, boolean> = {};
-    
-    const checkActiveMenu = (
-      items: MenuItem[],
-      parentKey: string = ""
-    ): boolean => {
-      let hasAnyActive = false;
-      items.forEach((item, index) => {
-        const key = parentKey ? `${parentKey}-${index}` : `${index}`;
-
-        if (item.subItems) {
-          // Check if any subitem is active (including nested subitems)
-          let hasActiveSubItem = false;
-          
-          item.subItems.forEach((subItem, subIndex) => {
-            if (subItem.subItems && subItem.subItems.length > 0) {
-              // Recursively check nested submenus
-              const nestedKey = `${key}-${subIndex}`;
-              const hasNestedActive = checkActiveMenu([subItem], key);
-              if (hasNestedActive) {
-                newOpenSubmenu[nestedKey] = true;
-                hasActiveSubItem = true;
-              }
-            } else if (isActive(subItem.path, subItem.activePaths)) {
-              hasActiveSubItem = true;
-            }
-          });
-
-          if (hasActiveSubItem) {
-            newOpenSubmenu[key] = true;
-            hasAnyActive = true;
-          }
-        }
-      });
-      return hasAnyActive;
-    };
-
-    checkActiveMenu(filteredMenuConfigItems);
-    setOpenSubmenu(newOpenSubmenu);
-  }, [location.pathname, filteredMenuConfigItems, isActive]);
+  const handleSubmenuToggle = (key: string) => {
+    setOpenSubmenu((prev) => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
+  };
 
   useEffect(() => {
+    // Update submenu heights when they open/close
     Object.keys(openSubmenu).forEach((key) => {
       if (openSubmenu[key] && subMenuRefs.current[key]) {
-        setSubMenuHeights((prevHeights) => ({
-          ...prevHeights,
+        setSubMenuHeights((prev) => ({
+          ...prev,
           [key]: subMenuRefs.current[key]?.scrollHeight || 0,
         }));
       }
     });
-  }, [openSubmenu, filteredMenuConfigItems]);
+  }, [openSubmenu]);
 
-  const handleSubmenuToggle = (key: string) => {
-    setOpenSubmenu((prev) => {
-      const isCurrentlyOpen = prev[key];
-      // If opening this submenu
-      if (!isCurrentlyOpen) {
-        const newState: Record<string, boolean> = { [key]: true };
-        // Keep parent submenus open (check if key contains parent keys)
-        Object.keys(prev).forEach((prevKey) => {
-          // If prevKey is a parent of key (e.g., "3" is parent of "3-0"), keep it open
-          if (key.startsWith(prevKey + "-")) {
-            newState[prevKey] = true;
-          }
-        });
-        // Close sibling submenus (same level, different parent)
-        // For example, if opening "3-0", close "3-1", "3-2", etc. but keep "3" open
-        const keyParts = key.split("-");
-        if (keyParts.length > 1) {
-          // This is a nested submenu
-          const parentKey = keyParts.slice(0, -1).join("-");
-          Object.keys(prev).forEach((prevKey) => {
-            // Close siblings (same parent, different index)
-            if (prevKey.startsWith(parentKey + "-") && prevKey !== key) {
-              // Don't add to newState, effectively closing it
-            } else if (prevKey === parentKey) {
-              // Keep parent open
-              newState[prevKey] = true;
-            }
-          });
-        } else {
-          // Top-level submenu - close all other top-level submenus
-          Object.keys(prev).forEach((prevKey) => {
-            if (!prevKey.includes("-") && prevKey !== key) {
-              // Don't add to newState, effectively closing it
-            }
-          });
-        }
-        return newState;
-      }
-      // If closing, close this one and all its children
-      const newState = { ...prev };
-      delete newState[key];
-      // Also close all child submenus
-      Object.keys(newState).forEach((prevKey) => {
-        if (prevKey.startsWith(key + "-")) {
-          delete newState[prevKey];
-        }
-      });
-      return newState;
-    });
-  };
+  const renderMenuItem = (item: MenuItem, index: number, parentKey?: string): React.ReactElement | null => {
+    // Check if item has single permission (checkpermission equivalent)
+    if (
+      item.permission &&
+      !checkPermission(user, item.permission, "VIEW")
+    ) {
+      return null; // Hide if user doesn't have permission
+    }
 
-  const renderMenuItem = (
-    item: MenuItem,
-    index: number,
-    parentKey: string = ""
-  ): React.ReactNode => {
-    // Permission check for individual menu items
-    if (!user) return null; // No user, no permissions
-
-    // Check if item has permissions array (checkallpermission equivalent)
+    // Check if item has multiple permissions (checkallpermission equivalent)
     if (item.permissions && item.permissions.length > 0) {
       if (!checkAnyPermission(user, item.permissions, "VIEW")) {
         return null; // Hide if user doesn't have any of the permissions
       }
-    }
-
-    // Check if item has single permission (checkpermission equivalent)
-    if (
-      item.permission &&
-      !checkPermission(user, item.permission, "VIEW", currentModule)
-    ) {
-      return null; // Hide if user doesn't have permission
     }
 
     const key = parentKey ? `${parentKey}-${index}` : `${index}`;
@@ -269,13 +131,28 @@ const AppSidebar: React.FC = () => {
               <span className="menu-item-text">{item.name}</span>
             )}
             {(isExpanded || isHovered || isMobileOpen) && (
-              <ChevronDownIcon
+              <span
                 className={`ml-auto w-4 h-4 transition-all duration-200 ${
                   isSubmenuOpen
                     ? "rotate-180 text-brand-500 dark:text-brand-400"
                     : "text-gray-400 group-hover:text-brand-500 dark:text-gray-500 dark:group-hover:text-brand-400"
                 }`}
-              />
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={2}
+                  stroke="currentColor"
+                  className="w-4 h-4"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M19.5 8.25l-7.5 7.5-7.5-7.5"
+                  />
+                </svg>
+              </span>
             )}
           </button>
           {(isExpanded || isHovered || isMobileOpen) && (
@@ -291,6 +168,19 @@ const AppSidebar: React.FC = () => {
             >
               <ul className="mt-2 space-y-0.5 ml-9">
                 {item.subItems?.map((subItem, subIndex) => {
+                  // Check sub-item permissions
+                  if (
+                    subItem.permission &&
+                    !checkPermission(user, subItem.permission, "VIEW")
+                  ) {
+                    return null;
+                  }
+                  if (subItem.permissions && subItem.permissions.length > 0) {
+                    if (!checkAnyPermission(user, subItem.permissions, "VIEW")) {
+                      return null;
+                    }
+                  }
+
                   if (subItem.subItems && subItem.subItems.length > 0) {
                     // For nested submenus, renderMenuItem already returns <li>, so don't wrap it
                     return renderMenuItem(subItem, subIndex, key);
@@ -300,21 +190,23 @@ const AppSidebar: React.FC = () => {
                       <Link
                         to={subItem.path || "#"}
                         className={`menu-dropdown-item ${
-                          isActive(subItem.path)
+                          isActive(subItem.path, subItem.activePaths)
                             ? "menu-dropdown-item-active"
                             : "menu-dropdown-item-inactive"
                         } cursor-pointer ${
-              !isExpanded && !isHovered
-                ? "lg:justify-center"
-                : "lg:justify-start"
-            }`}
+                          !isExpanded && !isHovered
+                            ? "lg:justify-center"
+                            : "lg:justify-start"
+                        }`}
                       >
                         {subItem.icon && (
-                          <span className={`menu-item-icon-size group-hover:scale-110 ${
-                            isActive(subItem.path, subItem.activePaths)
-                              ? "menu-item-icon-active"
-                              : "menu-item-icon-inactive"
-                          }`}>
+                          <span
+                            className={`menu-item-icon-size group-hover:scale-110 ${
+                              isActive(subItem.path, subItem.activePaths)
+                                ? "menu-item-icon-active"
+                                : "menu-item-icon-inactive"
+                            }`}
+                          >
                             {getIcon(subItem.icon)}
                           </span>
                         )}
@@ -385,9 +277,9 @@ const AppSidebar: React.FC = () => {
     return (
       <nav
         className="w-full border-b border-brand-200/50 dark:border-gray-700/80 shadow-sm"
-        style={{ 
-          position: "relative", 
-          zIndex: 100, 
+        style={{
+          position: "relative",
+          zIndex: 100,
           overflow: "visible",
           backgroundColor: sidebarBgColor,
           color: sidebarTextColor,
@@ -441,9 +333,7 @@ const AppSidebar: React.FC = () => {
           !isExpanded && !isHovered ? "lg:justify-center" : "justify-center"
         }`}
       >
-        <Link
-          to={`/${currentModule}/dashboard`}
-        >
+        <Link to="/dashboard">
           {isExpanded || isHovered || isMobileOpen ? (
             <>
               <img

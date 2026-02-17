@@ -55,7 +55,7 @@ class SmtpModel:
             order_by_column = SmtpModel.get_order_by_column(column_name)
             order_by_clause = f"{order_by_column} {column_dir.upper()}"
             where_clause = search_query if search_query else "1=1"
-            count_query = text(f"SELECT count(*) as allcount FROM {TBL_SMTP} WITH(NOLOCK) WHERE {where_clause}")
+            count_query = text(f"SELECT count(*) as allcount FROM {TBL_SMTP} WHERE {where_clause}")
             count_result = db.execute(count_query).fetchone()
             if count_result:
                 try:
@@ -67,11 +67,10 @@ class SmtpModel:
             records_filtered = total_records
             data_query_sql = f"""
                 SELECT id, host, username, password, port
-                FROM {TBL_SMTP} WITH(NOLOCK)
+                FROM {TBL_SMTP}
                 WHERE {where_clause}
                 ORDER BY {order_by_clause}
-                OFFSET {start} ROWS
-                FETCH NEXT {length} ROWS ONLY
+                LIMIT {length} OFFSET {start}
             """
             records = db.execute(text(data_query_sql)).fetchall()
             data = []

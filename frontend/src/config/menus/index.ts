@@ -1,19 +1,14 @@
-import { MenuConfig, ModuleType } from "../../types/menu";
-import { collegeMenu } from "./college";
-import { schoolMenu } from "./school";
-import { ocrverifyMenu } from "./ocrverify";
+import { MenuConfig } from "../../types/menu";
+import { sirMenu } from "./sir";
 
-export { collegeMenu } from "./college";
-export { schoolMenu } from "./school";
-export { ocrverifyMenu } from "./ocrverify";
+export { sirMenu } from "./sir";
 
-export const menus: Record<ModuleType, MenuConfig> = {
-  college: collegeMenu,
-  school: schoolMenu,
-  ocrverify: ocrverifyMenu,
+// Single menu for SIR application (no modules)
+export const getMenu = (): MenuConfig => {
+  return sirMenu;
 };
 
-export const getMenuByModule = (module: ModuleType): MenuConfig => {
-  return menus[module];
+// Legacy function for compatibility (returns SIR menu)
+export const getMenuByModule = (module?: string): MenuConfig => {
+  return sirMenu;
 };
-

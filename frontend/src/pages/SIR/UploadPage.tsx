@@ -1,0 +1,291 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router';
+import { uploadPreSir, uploadPostSir, runMatching, getConstituencies } from '../../services/api';
+import PageContainer from '../../components/common/PageContainer';
+import PageMeta from '../../components/common/PageMeta';
+import ThemedLoader from '../../components/common/ThemedLoader';
+import { alertsuccess, alerterror } from '../../utils/toast';
+
+interface UploadPageProps {
+  type?: 'pre' | 'post' | 'matching';
+}
+
+const UploadPage: React.FC<UploadPageProps> = ({ type }) => {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const pageType = type || (searchParams.get('type') as 'pre' | 'post' | 'matching') || 'pre';
+  
+  const [preFile, setPreFile] = useState<File | null>(null);
+  const [postFile, setPostFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [status, setStatus] = useState<string>('');
+  const [constituencies, setConstituencies] = useState<any[]>([]);
+  const [selectedConstituency, setSelectedConstituency] = useState<number | null>(null);
+  const [matching, setMatching] = useState(false);
+
+  useEffect(() => {
+    loadConstituencies();
+  }, []);
+
+  const loadConstituencies = async () => {
+    try {
+      const response = await getConstituencies();
+      setConstituencies(response.data);
+      if (response.data.length > 0) {
+        setSelectedConstituency(response.data[0].id);
+      }
+    } catch (error: any) {
+      console.error('Failed to load constituencies:', error);
+    }
+  };
+
+  const handleUpload = async (uploadType: 'pre' | 'post') => {
+    const file = uploadType === 'pre' ? preFile : postFile;
+    if (!file) {
+      alerterror('Please select a file to upload');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      setUploading(true);
+      setStatus(`Uploading ${uploadType.toUpperCase()}-SIR data...`);
+      
+      const response = uploadType === 'pre' 
+        ? await uploadPreSir(formData)
+        : await uploadPostSir(formData);
+      
+      alertsuccess(response.data.message || `${uploadType.toUpperCase()}-SIR uploaded successfully!`);
+      setStatus('');
+      
+      // Clear file input
+      if (uploadType === 'pre') {
+        setPreFile(null);
+      } else {
+        setPostFile(null);
+      }
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.detail || error.message || 'Upload failed';
+      alerterror(errorMsg);
+      setStatus('');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleRunMatching = async () => {
+    if (!selectedConstituency) {
+      alerterror('Please select a constituency');
+      return;
+    }
+
+    try {
+      setMatching(true);
+      setStatus('Running matching algorithm...');
+      
+      const response = await runMatching(selectedConstituency);
+      alertsuccess(response.data.message || 'Matching completed successfully!');
+      setStatus('');
+      
+      // Navigate to dashboard after matching
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 2000);
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.detail || error.message || 'Matching failed';
+      alerterror(errorMsg);
+      setStatus('');
+    } finally {
+      setMatching(false);
+    }
+  };
+
+  return (
+    <PageContainer>
+      <PageMeta
+        title="SIR Data Upload | KTech Products"
+        description="Upload Pre-SIR and Post-SIR electoral rolls"
+      />
+      
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Data Upload</h1>
+          <p className="text-gray-500 dark:text-gray-400 mt-1">
+            Upload electoral rolls and run matching analysis
+          </p>
+        </div>
+
+        <div className="bg-white dark:bg-gray-800 p-8 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 max-w-4xl">
+          {/* Pre-SIR Upload */}
+          {(pageType === 'pre' || pageType === 'matching') && (
+            <div className="mb-8">
+              <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">
+                1. Upload Pre-SIR Electoral Roll
+              </h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                Upload the electoral roll before Special Intensive Revision (SIR). 
+                Expected CSV format with columns: epic_number, name, relative_name, age, gender, house_no, address, booth_number, constituency_name
+              </p>
+              <div className="space-y-4">
+                <input
+                  type="file"
+                  accept=".csv"
+                  onChange={(e) => setPreFile(e.target.files?.[0] || null)}
+                  className="block w-full text-sm text-gray-500 dark:text-gray-400
+                    file:mr-4 file:py-2 file:px-4 file:rounded-lg
+                    file:border-0 file:text-sm file:font-semibold
+                    file:bg-blue-50 file:text-blue-700 dark:file:bg-blue-900/20 dark:file:text-blue-400
+                    hover:file:bg-blue-100 dark:hover:file:bg-blue-900/30
+                    cursor-pointer"
+                  disabled={uploading}
+                />
+                {preFile && (
+                  <p className="text-sm text-gray-600 dark:text-gray-300">
+                    Selected: {preFile.name} ({(preFile.size / 1024).toFixed(2)} KB)
+                  </p>
+                )}
+                <button
+                  onClick={() => handleUpload('pre')}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 
+                    transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={!preFile || uploading}
+                >
+                  {uploading ? 'Uploading...' : 'Upload Pre-SIR'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Post-SIR Upload */}
+          {(pageType === 'post' || pageType === 'matching') && (
+            <div className={`${pageType === 'matching' ? 'border-t pt-8' : ''} mb-8`}>
+              <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">
+                2. Upload Post-SIR Electoral Roll
+              </h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                Upload the electoral roll after Special Intensive Revision (SIR). 
+                Same CSV format as Pre-SIR.
+              </p>
+              <div className="space-y-4">
+                <input
+                  type="file"
+                  accept=".csv"
+                  onChange={(e) => setPostFile(e.target.files?.[0] || null)}
+                  className="block w-full text-sm text-gray-500 dark:text-gray-400
+                    file:mr-4 file:py-2 file:px-4 file:rounded-lg
+                    file:border-0 file:text-sm file:font-semibold
+                    file:bg-green-50 file:text-green-700 dark:file:bg-green-900/20 dark:file:text-green-400
+                    hover:file:bg-green-100 dark:hover:file:bg-green-900/30
+                    cursor-pointer"
+                  disabled={uploading}
+                />
+                {postFile && (
+                  <p className="text-sm text-gray-600 dark:text-gray-300">
+                    Selected: {postFile.name} ({(postFile.size / 1024).toFixed(2)} KB)
+                  </p>
+                )}
+                <button
+                  onClick={() => handleUpload('post')}
+                  className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 
+                    transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={!postFile || uploading}
+                >
+                  {uploading ? 'Uploading...' : 'Upload Post-SIR'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Run Matching */}
+          {pageType === 'matching' && (
+            <div className="border-t pt-8">
+              <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">
+                3. Run Matching Analysis
+              </h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                After uploading both Pre-SIR and Post-SIR rolls, run the matching algorithm to:
+                classify voters (UNCHANGED, ADDED, DELETED, MODIFIED, MIGRATED), calculate booth KPIs, and generate risk scores.
+              </p>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Select Constituency
+                  </label>
+                  <select
+                    value={selectedConstituency || ''}
+                    onChange={(e) => setSelectedConstituency(Number(e.target.value))}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg 
+                      bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                    disabled={matching}
+                  >
+                    <option value="">Select a constituency</option>
+                    {constituencies.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} - {c.district}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <button
+                  onClick={handleRunMatching}
+                  className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 
+                    transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={!selectedConstituency || matching}
+                >
+                  {matching ? (
+                    <span className="flex items-center gap-2">
+                      <ThemedLoader size={16} />
+                      Running Matching...
+                    </span>
+                  ) : (
+                    'Run Matching Analysis'
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {status && (
+            <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 text-center rounded-lg border border-blue-200 dark:border-blue-800">
+              <p className="font-medium text-blue-700 dark:text-blue-300">{status}</p>
+            </div>
+          )}
+
+          {/* Navigation Links */}
+          <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
+            <div className="flex gap-4">
+              {pageType !== 'pre' && (
+                <button
+                  onClick={() => navigate('/upload/pre-sir')}
+                  className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400"
+                >
+                  ← Upload Pre-SIR
+                </button>
+              )}
+              {pageType !== 'post' && (
+                <button
+                  onClick={() => navigate('/upload/post-sir')}
+                  className="text-sm text-green-600 hover:text-green-700 dark:text-green-400"
+                >
+                  Upload Post-SIR →
+                </button>
+              )}
+              {pageType !== 'matching' && (
+                <button
+                  onClick={() => navigate('/upload/matching')}
+                  className="text-sm text-purple-600 hover:text-purple-700 dark:text-purple-400"
+                >
+                  Run Matching →
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </PageContainer>
+  );
+};
+
+export default UploadPage;

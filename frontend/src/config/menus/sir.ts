@@ -28,6 +28,11 @@ export const sirMenu: MenuConfig = {
           path: "/upload/matching",
           icon: "refresh",
         },
+        {
+          name: "View uploaded data",
+          path: "/upload/roll-data",
+          icon: "table",
+        },
       ],
     },
     {

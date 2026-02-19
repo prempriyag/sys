@@ -15,3 +15,4 @@ pdfplumber
 pymupdf
 pytesseract
 easyocr
+playwright

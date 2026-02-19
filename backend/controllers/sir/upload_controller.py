@@ -1,11 +1,16 @@
-from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Form
+from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Form, Body
+from fastapi.responses import Response
+from pydantic import BaseModel
+from pathlib import Path
+from typing import Optional as Opt
+import json
 from sqlalchemy.orm import Session
 from database.connection import get_db
 from models.sir.voter import VoterPre, VoterPost
 from models.sir.constituency import Constituency
 from models.sir.booth import Booth
 from services.normalization import NormalizationService
-from services.electoral_roll_pdf_extractor import extract_from_pdf
+from services.electoral_roll_pdf_extractor import extract_from_pdf, debug_pdf, get_pdf_page_texts
 import pandas as pd
 import io
 import tempfile
@@ -422,6 +427,197 @@ async def convert_scanned_pdf(file: UploadFile = File(...)):
     except Exception as e:
         logger.exception("Error uploading Post-SIR data")
         raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
+
+
+def _get_pdf_folder() -> Path:
+    """Return backend/pdf folder path. Create if missing."""
+    folder = Path(__file__).resolve().parent.parent.parent / "pdf"
+    folder.mkdir(parents=True, exist_ok=True)
+    return folder
+
+
+@router.get("/pdf-file")
+async def serve_pdf_file(filename: str):
+    """
+    Serve a PDF file from backend/pdf folder for preview (e.g. in ABBYY-like zone editor).
+    """
+    folder = _get_pdf_folder()
+    try:
+        path = (folder / filename).resolve()
+        path.relative_to(folder.resolve())
+    except (ValueError, OSError):
+        raise HTTPException(status_code=404, detail="PDF not found")
+    if not path.exists() or path.suffix.lower() != ".pdf":
+        raise HTTPException(status_code=404, detail="PDF not found")
+    from fastapi.responses import FileResponse
+    return FileResponse(path, media_type="application/pdf", filename=filename)
+
+
+@router.get("/pdf-files")
+async def list_pdf_files():
+    """
+    List PDF files in backend/pdf folder. Copy your PDF there, then select from dropdown.
+    """
+    folder = _get_pdf_folder()
+    files = sorted(f.name for f in folder.iterdir() if f.suffix.lower() == ".pdf")
+    return {"files": files, "folder": str(folder)}
+
+
+class ExtractByPathRequest(BaseModel):
+    filename: str
+    constituency_name: Opt[str] = None
+    booth_number: Opt[str] = None
+    use_ocr: bool = False
+    extraction_config: Opt[dict] = None
+
+
+@router.post("/extract-pdf-by-path")
+async def extract_pdf_by_path(body: ExtractByPathRequest = Body(...)):
+    """
+    Extract from a PDF in backend/pdf folder (select filename from dropdown).
+    Supports extraction_config for ABBYY-like coordinate tuning:
+    { cards_per_row: 9, header_top: 120, data_bottom: 750, margin_left: 20, margin_right: 20 }
+    """
+    folder = _get_pdf_folder()
+    path = folder / body.filename
+    if not path.exists() or path.suffix.lower() != ".pdf":
+        raise HTTPException(status_code=404, detail=f"PDF not found: {body.filename}")
+    try:
+        result = extract_from_pdf(
+            path,
+            default_constituency_name=body.constituency_name,
+            default_booth_number=body.booth_number,
+            use_ocr=body.use_ocr,
+            extraction_config=body.extraction_config,
+        )
+        return result
+    except ImportError:
+        raise HTTPException(status_code=500, detail="pdfplumber required. pip install pdfplumber")
+    except Exception as e:
+        logger.exception("Error extracting PDF by path")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/extract-pdf")
+async def extract_pdf_only(
+    file: UploadFile = File(...),
+    constituency_name: str = Form(None),
+    booth_number: str = Form(None),
+    use_ocr: str = Form("false"),
+    extraction_config_json: str = Form(None),
+):
+    """
+    Extract voter records from an ECI-style electoral roll PDF without saving to database.
+    When the PDF has no text (image-only), OCR runs automatically. Set use_ocr=true to force OCR.
+    extraction_config_json: Optional JSON for coordinate tuning, e.g. {"cards_per_row":9,"header_top":120,"data_bottom":750}
+    Returns { "records": [...], "metadata": {...}, "raw_page_texts": [...] } for preview.
+    """
+    if not file.filename or not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Only PDF files are allowed")
+    extraction_config = None
+    if extraction_config_json and extraction_config_json.strip():
+        try:
+            extraction_config = json.loads(extraction_config_json)
+        except json.JSONDecodeError:
+            pass
+    try:
+        content = await file.read()
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+            tmp.write(content)
+            tmp_path = tmp.name
+        try:
+            result = extract_from_pdf(
+                tmp_path,
+                default_constituency_name=constituency_name or None,
+                default_booth_number=booth_number or None,
+                use_ocr=use_ocr.lower() in ("true", "1", "yes"),
+                extraction_config=extraction_config,
+            )
+        finally:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+        return result
+    except ImportError as e:
+        raise HTTPException(status_code=500, detail="PDF extraction requires pdfplumber. Install with: pip install pdfplumber")
+    except Exception as e:
+        logger.exception("Error extracting PDF")
+        raise HTTPException(status_code=500, detail=f"Error processing PDF: {str(e)}")
+
+
+@router.post("/eci-download")
+async def eci_download_roll(
+    state: str = Form("Andhra Pradesh"),
+    revyear: str = Form("2025"),
+    district: str = Form("Kurnool"),
+    ac_name: str = Form("Kurnool"),
+):
+    """
+    Automate ECI electoral roll PDF download: pre-fill state, revyear, district, AC,
+    solve captcha via OCR, select first row, and return the PDF.
+    Requires: pip install playwright && playwright install chromium
+    Runs in a dedicated thread to avoid Windows event loop / subprocess conflicts.
+    """
+    try:
+        import asyncio
+        from services.eci_downloader import download_eci_roll_via_subprocess
+    except ImportError:
+        raise HTTPException(
+            status_code=501,
+            detail="ECI downloader not available. Install: pip install playwright && playwright install chromium",
+        )
+    loop = asyncio.get_event_loop()
+    pdf_bytes, error_msg = await loop.run_in_executor(
+        None,
+        lambda: download_eci_roll_via_subprocess(
+            state=state,
+            revyear=revyear,
+            district=district,
+            ac_name=ac_name,
+        ),
+    )
+    if error_msg:
+        raise HTTPException(status_code=502, detail=error_msg)
+    if not pdf_bytes:
+        raise HTTPException(status_code=502, detail="No PDF was downloaded from ECI portal")
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": "attachment; filename=eci_electoral_roll.pdf"},
+    )
+
+
+@router.post("/debug-pdf")
+async def debug_pdf_upload(file: UploadFile = File(...)):
+    """
+    Return raw extracted text and structure for first 5 pages (layout and default).
+    Use when extract-pdf returns 0 records to see what the PDF actually yields.
+    """
+    if not file.filename or not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Only PDF files are allowed")
+    try:
+        import pdfplumber
+    except ImportError:
+        raise HTTPException(status_code=500, detail="pdfplumber required. pip install pdfplumber")
+    try:
+        content = await file.read()
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+            tmp.write(content)
+            tmp_path = tmp.name
+        try:
+            debug_info = debug_pdf(tmp_path)
+            # Full page texts (no truncation) using chars fallback when extract_text is empty
+            debug_info["page_texts_full"] = get_pdf_page_texts(tmp_path, max_pages=20)
+            return debug_info
+        finally:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+    except Exception as e:
+        logger.exception("Error debugging PDF")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/pre-sir-pdf")

@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "@fontsource/outfit/latin.css";
 
 @custom-variant dark (&:is(.dark *));
 

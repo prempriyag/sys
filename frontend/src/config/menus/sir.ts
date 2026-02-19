@@ -33,6 +33,11 @@ export const sirMenu: MenuConfig = {
           path: "/upload/roll-data",
           icon: "table",
         },
+        {
+          name: "Extract PDF (Preview)",
+          path: "/upload/pdf-extract",
+          icon: "file-text",
+        },
       ],
     },
     {

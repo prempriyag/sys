@@ -102,7 +102,7 @@ export default function ForgotPassword() {
   if (success && !isResetMode) {
     return (
       <>
-        <PageMeta title="Check your email | DigiScript" description="Password reset" />
+        <PageMeta title="Check your email" description="Password reset" />
         <AuthLayout>
           <div className="auth-form-container">
             <div className="p-6 rounded-lg bg-green-500/15 border border-green-500/30">
@@ -129,7 +129,7 @@ export default function ForgotPassword() {
   return (
     <>
       <PageMeta
-        title={isResetMode ? "Reset Password | DigiScript" : "Forgot Password | DigiScript"}
+        title={isResetMode ? "Reset Password" : "Forgot Password"}
         description="DigiScript password reset"
       />
       <AuthLayout>

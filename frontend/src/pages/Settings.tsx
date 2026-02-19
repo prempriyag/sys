@@ -455,7 +455,7 @@ export default function Settings() {
         setLogoIconUrl(defaultUrl);
         await saveSettings({ logoIconUrl: defaultUrl });
         break;
-      case "light":
+     {/* case "light":
         defaultUrl = "/images/logo/connors-color.png";
         setLogoLightPreview(defaultUrl);
         setLogoLightUrl(defaultUrl);
@@ -466,7 +466,7 @@ export default function Settings() {
         setLogoDarkPreview(defaultUrl);
         setLogoDarkUrl(defaultUrl);
         await saveSettings({ logoDarkUrl: defaultUrl });
-        break;
+        break; */}
     }
   };
 
@@ -871,7 +871,7 @@ export default function Settings() {
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          Ktech SSO Client Id
+                          Para Wheel SSO Client Id
                         </label>
                         <input
                           type="text"
@@ -1012,7 +1012,7 @@ export default function Settings() {
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          Ktech SSO TenantId
+                          Para Wheel SSO TenantId
                         </label>
                         <input
                           type="text"
@@ -1023,7 +1023,7 @@ export default function Settings() {
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          Ktech SSO Client Secret
+                          Para Wheel SSO Client Secret
                         </label>
                         <input
                           type="password"
@@ -1377,14 +1377,14 @@ export default function Settings() {
                     </label>
                     <div className="flex items-center gap-4 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/50">
                       <div className="flex h-16 w-32 items-center justify-center rounded-lg bg-white p-3 dark:bg-gray-900">
-                        <img
+                       {/* <img
                           src={logoLightPreview}
                           alt="Light Logo"
                           className="h-full w-full object-contain"
                           onError={(e) => {
                             (e.target as HTMLImageElement).src = "/images/logo/connors-color.png";
                           }}
-                        />
+                        />*/}
                       </div>
                       <div className="flex-1">
                         <p className="text-sm font-medium text-gray-700 dark:text-gray-300">

@@ -160,7 +160,7 @@ PASSWORD_FORMAT = '<a href="#" data-toggle="tooltip" title="The password must ad
 SYSTEM_NAME = 'DigiScript'
 
 # Copyright (dynamic year)
-COPY_RIGHTS = f'<strong>Copyright &copy; {datetime.now().year} DigiScript Automation - Powered by <a href="https://www.ktechproducts.com" target="_blank">KTech Products</a>.</strong> All rights reserved.'
+COPY_RIGHTS = f'<strong>Copyright &copy; {datetime.now().year} Automation - Powered by <a href="https://www.ktechproducts.com" target="_blank">KTech Products</a>.</strong> All rights reserved.'
 
 VERSION = 'V.202401.01'
 

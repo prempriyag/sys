@@ -58,10 +58,10 @@ export default function DigiScriptReports() {
   return (
     <PageWrapper>
       <PageMeta
-        title="DigiScript Reports | College Module"
-        description="DigiScript reports and management"
+        title="Reports | College Module"
+        description="reports and management"
       />
-      <PageBreadcrumb pageTitle="DigiScript Reports" />
+      <PageBreadcrumb pageTitle="Reports" />
 
       <PageContainer>
 

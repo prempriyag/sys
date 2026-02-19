@@ -95,8 +95,8 @@ export default function TwoWayVerify() {
   return (
     <>
       <PageMeta
-        title="Two Way Verification | DigiScript"
-        description="DigiScript Two Way Verification"
+        title="Two Way Verification"
+        description="Two Way Verification"
       />
       <AuthLayout>
         <div className="auth-form-container">

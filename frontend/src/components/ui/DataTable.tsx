@@ -604,7 +604,7 @@ const DataTableComponent = (props: DataTableProps, ref: React.ForwardedRef<DataT
   return (
     <div className="w-full" style={{ width: '100%', overflow: 'hidden', maxWidth: '100%' }}>
       {/* Toolbar: Page Limit, Search, Export, Column Visibility */}
-      <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between p-2.5">
+      <div className="mb-4 p-2.5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         {/* Page Limit - Moved to top */}
         <div className="flex items-center">
           <span className="text-sm text-gray-600 dark:text-gray-400">
@@ -759,7 +759,7 @@ const DataTableComponent = (props: DataTableProps, ref: React.ForwardedRef<DataT
             scrollBehavior: 'smooth'
           }}
         >
-          <div style={{ width: '100%' }}>
+          <div style={{ width: 'max-content' }}>
             <Table className="border-collapse" style={hasExplicitWidths ? { tableLayout: 'fixed', width: totalTableWidth > 0 ? `${totalTableWidth}px` : '100%' } : { width: '100%' }}>
             {hasExplicitWidths && (
               <colgroup>
@@ -800,8 +800,8 @@ const DataTableComponent = (props: DataTableProps, ref: React.ForwardedRef<DataT
                       }`}
                       onClick={() => column.orderable !== false && handleSort(originalIndex)}
                     >
-                      <p className={`font-medium text-gray-900 text-theme-xs dark:text-gray-900 ${
-                        order.column === originalIndex ? "text-brand-500" : ""
+                      <p className={`font-medium  text-theme-xs  ${
+                        order.column === originalIndex ? "" : ""
                       }`}>
                         {column.name || column.data}
                       </p>

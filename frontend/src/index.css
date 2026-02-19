@@ -1148,7 +1148,7 @@ table td textarea {
   position: absolute;
   inset: 0;
   z-index: 0;
-  background: url("/images/auth-bg.png") center center / cover no-repeat;
+  background: url("/images/security-bg.png") center center / cover no-repeat;
   animation: authBgPan 30s ease-in-out infinite alternate;
 }
 

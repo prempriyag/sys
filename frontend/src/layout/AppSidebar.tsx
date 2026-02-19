@@ -328,7 +328,7 @@ const AppSidebar = () => {
       onMouseEnter={() => !isExpanded && setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <div
+     {/* <div
         className={`py-4 flex ${
           !isExpanded && !isHovered ? "lg:justify-center" : "justify-center"
         }`}
@@ -343,7 +343,7 @@ const AppSidebar = () => {
                 width={220}
                 height={40}
                 onError={(e) => {
-                  (e.target as HTMLImageElement).src = "/images/logo/connors-color.png";
+                  (e.target as HTMLImageElement).src = "/images/logo/kk-logo.png";
                 }}
               />
               <img
@@ -353,7 +353,7 @@ const AppSidebar = () => {
                 width={220}
                 height={40}
                 onError={(e) => {
-                  (e.target as HTMLImageElement).src = "/images/logo/connors-white.png";
+                  (e.target as HTMLImageElement).src = "/images/logo/kk-logo.png";
                 }}
               />
             </>
@@ -370,7 +370,7 @@ const AppSidebar = () => {
             />
           )}
         </Link>
-      </div>
+      </div> */}
       {/* Divider between logo and menu */}
       <div className="mx-2 border-t border-brand-200/40 dark:border-gray-700/60" />
       <div className="flex flex-col overflow-y-auto duration-300 ease-linear no-scrollbar pt-2">

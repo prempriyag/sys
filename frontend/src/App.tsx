@@ -1,4 +1,4 @@
-import { Routes, Route } from "react-router";
+import { Routes, Route, Navigate } from "react-router";
 import SignIn from "./pages/AuthPages/SignIn";
 import SignUp from "./pages/AuthPages/SignUp";
 import ForgotPassword from "./pages/AuthPages/ForgotPassword";
@@ -64,7 +64,7 @@ export default function App() {
           {/* SIR Dashboard (Default) */}
           <Route index element={<SIRDashboard />} />
           <Route path="/dashboard" element={<SIRDashboard />} />
-
+          
           {/* Data Upload */}
           <Route path="/upload/pre-sir" element={<UploadPage type="pre" />} />
           <Route path="/upload/post-sir" element={<UploadPage type="post" />} />
@@ -93,9 +93,9 @@ export default function App() {
           <Route
             path="/users"
             element={
-              <PermissionRoute permission="user_management" action="VIEW">
+              // <PermissionRoute permission="user_management" action="VIEW">
                 <UserManagement />
-              </PermissionRoute>
+              // </PermissionRoute>
             }
           />
           <Route

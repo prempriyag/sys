@@ -47,7 +47,7 @@ class KPIEngine:
             # Deletion Velocity
             deletion_velocity = (deletions / total_pre * 100) if total_pre > 0 else 0.0
             
-            # Youth Intake %: Percentage of new voters (ADDED) who are age <= 30
+            # Youth Intake %: Percentage of new voters (ADDED) who are age <= 30 (overall)
             youth_additions = self.db.query(func.count(VoterPost.id))\
                 .join(MatchResult, VoterPost.id == MatchResult.post_voter_id)\
                 .filter(
@@ -55,8 +55,27 @@ class KPIEngine:
                     MatchResult.classification == 'ADDED',
                     VoterPost.age <= 30
                 ).scalar() or 0
-            
             youth_intake_percent = (youth_additions / additions * 100) if additions > 0 else 0.0
+
+            # SOP 5.1: Youth Intake in 18-19 and 20-25 age bands
+            youth_18_19 = self.db.query(func.count(VoterPost.id))\
+                .join(MatchResult, VoterPost.id == MatchResult.post_voter_id)\
+                .filter(
+                    VoterPost.booth_id == booth.id,
+                    MatchResult.classification == 'ADDED',
+                    VoterPost.age >= 18,
+                    VoterPost.age <= 19
+                ).scalar() or 0
+            youth_20_25 = self.db.query(func.count(VoterPost.id))\
+                .join(MatchResult, VoterPost.id == MatchResult.post_voter_id)\
+                .filter(
+                    VoterPost.booth_id == booth.id,
+                    MatchResult.classification == 'ADDED',
+                    VoterPost.age >= 20,
+                    VoterPost.age <= 25
+                ).scalar() or 0
+            youth_18_19_percent = (youth_18_19 / additions * 100) if additions > 0 else 0.0
+            youth_20_25_percent = (youth_20_25 / additions * 100) if additions > 0 else 0.0
             
             # Gender Shift %: Change in gender composition
             # Calculate pre-SIR gender distribution
@@ -119,6 +138,8 @@ class KPIEngine:
             kpi.net_change_percent = net_change_percent
             kpi.deletion_velocity = deletion_velocity
             kpi.youth_intake_percent = youth_intake_percent
+            kpi.youth_18_19_percent = youth_18_19_percent
+            kpi.youth_20_25_percent = youth_20_25_percent
             kpi.gender_shift_percent = gender_shift_percent
             kpi.anomaly_household_count = anomaly_household_count
             kpi.risk_category = risk

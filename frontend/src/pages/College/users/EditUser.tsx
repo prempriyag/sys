@@ -91,7 +91,7 @@ export default function EditUser() {
     try {
       await api.put(`${API_ENDPOINTS.USERS_UPDATE}/${userId}`, formData);
       // Navigate back to user management list
-      navigate("/college/users");
+      navigate("/users");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update user");
     } finally {
@@ -255,7 +255,7 @@ export default function EditUser() {
             <Button
               type="button"
               variant="outline"
-              onClick={() => navigate("/college/users")}
+              onClick={() => navigate("/users")}
               className="flex-1"
               disabled={loading}
             >

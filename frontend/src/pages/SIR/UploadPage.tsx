@@ -24,6 +24,10 @@ const UploadPage: React.FC<UploadPageProps> = ({ type }) => {
   const [constituencies, setConstituencies] = useState<any[]>([]);
   const [selectedConstituency, setSelectedConstituency] = useState<number | null>(null);
   const [matching, setMatching] = useState(false);
+  const [electoralPdf, setElectoralPdf] = useState<File | null>(null);
+  const [electoralConstituency, setElectoralConstituency] = useState('');
+  const [electoralBooth, setElectoralBooth] = useState('');
+  const [parsingElectoral, setParsingElectoral] = useState(false);
 
   useEffect(() => {
     loadConstituencies();
@@ -243,6 +247,103 @@ const UploadPage: React.FC<UploadPageProps> = ({ type }) => {
               </div>
             </div>
           )}
+
+          {/* Single tool: Electoral Roll PDF → CSV (digital or scanned) */}
+          <div className="border-t pt-8 mb-8">
+            <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">
+              Electoral Roll PDF to CSV
+            </h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+              Upload any ECI electoral roll PDF (digital or scanned voter cards). Text is extracted from digital PDFs; scanned PDFs are processed with OCR. Optionally add constituency name and booth/part number. Downloaded CSV is ready to upload as Pre-SIR or Post-SIR.
+            </p>
+            <div className="space-y-4">
+              <input
+                type="file"
+                accept="application/pdf"
+                onChange={(e) => setElectoralPdf(e.target.files?.[0] || null)}
+                className="block w-full text-sm text-gray-500 dark:text-gray-400
+                  file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold
+                  file:bg-amber-50 file:text-amber-700 dark:file:bg-amber-900/20 dark:file:text-amber-400
+                  hover:file:bg-amber-100 dark:hover:file:bg-amber-900/30 cursor-pointer"
+                disabled={parsingElectoral}
+              />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Constituency name (optional)</label>
+                  <input
+                    type="text"
+                    value={electoralConstituency}
+                    onChange={(e) => setElectoralConstituency(e.target.value)}
+                    placeholder="e.g. Chennai North"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                    disabled={parsingElectoral}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Booth / Part number (optional)</label>
+                  <input
+                    type="text"
+                    value={electoralBooth}
+                    onChange={(e) => setElectoralBooth(e.target.value)}
+                    placeholder="e.g. 20"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                    disabled={parsingElectoral}
+                  />
+                </div>
+              </div>
+              {electoralPdf && (
+                <p className="text-sm text-gray-600 dark:text-gray-300">
+                  Selected: {electoralPdf.name} ({(electoralPdf.size / 1024).toFixed(2)} KB)
+                </p>
+              )}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => { setElectoralPdf(null); setElectoralConstituency(''); setElectoralBooth(''); setStatus(''); }}
+                  className="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg text-sm"
+                >
+                  Clear
+                </button>
+                <button
+                  onClick={async () => {
+                    if (!electoralPdf) { alerterror('Please select a PDF'); return; }
+                    const fd = new FormData();
+                    fd.append('file', electoralPdf, electoralPdf.name);
+                    fd.append('constituency_name', electoralConstituency);
+                    fd.append('booth_number', electoralBooth);
+                    setParsingElectoral(true);
+                    setStatus('Parsing electoral roll PDF...');
+                    try {
+                      const res = await parseElectoralRollPdf(fd);
+                      const blob = res.data instanceof Blob ? res.data : new Blob([res.data]);
+                      const url = window.URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = (electoralPdf.name.replace(/\.pdf$/i, '') || 'electoral_roll') + '_parsed.csv';
+                      document.body.appendChild(a);
+                      a.click();
+                      a.remove();
+                      window.URL.revokeObjectURL(url);
+                      alertsuccess('CSV downloaded. You can upload it as Pre-SIR or Post-SIR.');
+                      setStatus('');
+                      setElectoralPdf(null);
+                      setElectoralConstituency('');
+                      setElectoralBooth('');
+                    } catch (e: any) {
+                      const msg = e.response?.data?.detail || e.message || 'Parse failed';
+                      alerterror(typeof msg === 'string' ? msg : JSON.stringify(msg));
+                      setStatus('');
+                    } finally {
+                      setParsingElectoral(false);
+                    }
+                  }}
+                  className="px-6 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition disabled:opacity-50"
+                  disabled={!electoralPdf || parsingElectoral}
+                >
+                  {parsingElectoral ? 'Parsing...' : 'Convert PDF to CSV'}
+                </button>
+              </div>
+            </div>
+          </div>
 
           {/* Run Matching */}
           {pageType === 'matching' && (

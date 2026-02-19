@@ -66,7 +66,7 @@ export default function AuthLayout({
       {/* Centered glassmorphism form */}
       <div className="relative z-10 flex items-center justify-center w-full min-h-screen px-4 py-8">
         <div className="auth-glass-card w-full max-w-md p-8 sm:p-10 auth-fade-in">
-          {/* Logo */}
+          {/* Logo 
           <div className="flex justify-center mb-6">
             <img
               width={180}
@@ -75,7 +75,7 @@ export default function AuthLayout({
               alt="Logo"
               className="drop-shadow-lg"
             />
-          </div>
+          </div>*/}
           {children}
         </div>
       </div>

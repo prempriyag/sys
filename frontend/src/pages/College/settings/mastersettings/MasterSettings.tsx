@@ -489,7 +489,7 @@ const MasterSettings: React.FC = () => {
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Ktech SSO Client Id
+                        kk surveys & strategies SSO Client Id
                       </label>
                       <input
                         type="text"
@@ -639,7 +639,7 @@ const MasterSettings: React.FC = () => {
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Ktech SSO TenantId
+                        kk surveys & strategies SSO TenantId
                       </label>
                       <input
                         type="text"
@@ -651,7 +651,7 @@ const MasterSettings: React.FC = () => {
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Ktech SSO Client Secret
+                        kk surveys & strategies SSO Client Secret
                       </label>
                       <input
                         type="password"

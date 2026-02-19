@@ -124,6 +124,15 @@ export const getRiskMap = (constituencyId: number) =>
 
 export const getConstituencies = () => 
     api.get(API_ENDPOINTS.SIR_DASHBOARD_CONSTITUENCIES);
+export const convertScannedPdf = (formData: FormData) =>
+    api.post(API_ENDPOINTS.SIR_CONVERT_PDF, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+
+/** SOP: Parse ECI electoral roll PDF (text or scanned); returns CSV file. */
+export const parseElectoralRollPdf = (formData: FormData) =>
+    api.post(API_ENDPOINTS.SIR_PARSE_ELECTORAL_PDF, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        responseType: 'blob',
+    });
 
 /** Summary of uploaded Pre-SIR and Post-SIR data per constituency/booth (see where your upload went). */
 export const getRollSummary = () =>

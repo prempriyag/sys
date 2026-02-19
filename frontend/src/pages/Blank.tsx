@@ -5,7 +5,7 @@ export default function Blank() {
   return (
     <div>
       <PageMeta
-        title="DigiScript Blank Dashboard | KTech Products"
+        title="Blank Dashboard | PARA WHEEL"
         description=""
       />
       <PageBreadcrumb pageTitle="Blank Page" />

@@ -27,6 +27,8 @@ async def get_booth_kpi(booth_id: int, db: Session = Depends(get_db)):
         "net_change_percent": float(kpi.net_change_percent) if kpi.net_change_percent else 0.0,
         "deletion_velocity": float(kpi.deletion_velocity) if kpi.deletion_velocity else 0.0,
         "youth_intake_percent": float(kpi.youth_intake_percent) if kpi.youth_intake_percent else 0.0,
+        "youth_18_19_percent": float(getattr(kpi, "youth_18_19_percent", None) or 0),
+        "youth_20_25_percent": float(getattr(kpi, "youth_20_25_percent", None) or 0),
         "gender_shift_percent": float(kpi.gender_shift_percent) if kpi.gender_shift_percent else 0.0,
         "anomaly_household_count": kpi.anomaly_household_count,
         "risk_category": kpi.risk_category,
@@ -44,10 +46,12 @@ async def get_constituency_kpi(constituency_id: int, db: Session = Depends(get_d
             "total_post": 0,
             "total_additions": 0,
             "total_deletions": 0,
-            "avg_net_change_percent": 0.0,
-            "avg_deletion_velocity": 0.0,
-            "avg_youth_intake_percent": 0.0,
-            "avg_gender_shift_percent": 0.0,
+        "avg_net_change_percent": 0.0,
+        "avg_deletion_velocity": 0.0,
+        "avg_youth_intake_percent": 0.0,
+        "avg_youth_18_19_percent": 0.0,
+        "avg_youth_20_25_percent": 0.0,
+        "avg_gender_shift_percent": 0.0,
             "total_anomaly_households": 0,
             "high_risk_booths": 0,
             "high_opportunity_booths": 0,
@@ -63,6 +67,8 @@ async def get_constituency_kpi(constituency_id: int, db: Session = Depends(get_d
     avg_net_change_percent = sum(float(k.net_change_percent or 0) for k in kpis) / len(kpis) if kpis else 0.0
     avg_deletion_velocity = sum(float(k.deletion_velocity or 0) for k in kpis) / len(kpis) if kpis else 0.0
     avg_youth_intake_percent = sum(float(k.youth_intake_percent or 0) for k in kpis) / len(kpis) if kpis else 0.0
+    avg_youth_18_19_percent = sum(float(getattr(k, "youth_18_19_percent", None) or 0) for k in kpis) / len(kpis) if kpis else 0.0
+    avg_youth_20_25_percent = sum(float(getattr(k, "youth_20_25_percent", None) or 0) for k in kpis) / len(kpis) if kpis else 0.0
     avg_gender_shift_percent = sum(float(k.gender_shift_percent or 0) for k in kpis) / len(kpis) if kpis else 0.0
     
     high_risk_booths = sum(1 for k in kpis if k.risk_category == "HIGH_RISK")
@@ -77,6 +83,8 @@ async def get_constituency_kpi(constituency_id: int, db: Session = Depends(get_d
         "avg_net_change_percent": avg_net_change_percent,
         "avg_deletion_velocity": avg_deletion_velocity,
         "avg_youth_intake_percent": avg_youth_intake_percent,
+        "avg_youth_18_19_percent": avg_youth_18_19_percent,
+        "avg_youth_20_25_percent": avg_youth_20_25_percent,
         "avg_gender_shift_percent": avg_gender_shift_percent,
         "total_anomaly_households": total_anomaly_households,
         "high_risk_booths": high_risk_booths,
@@ -117,6 +125,8 @@ async def get_booths_kpi(constituency_id: int, db: Session = Depends(get_db)):
             "net_change_percent": float(kpi.net_change_percent) if kpi and kpi.net_change_percent else 0.0,
             "deletion_velocity": float(kpi.deletion_velocity) if kpi and kpi.deletion_velocity else 0.0,
             "youth_intake_percent": float(kpi.youth_intake_percent) if kpi and kpi.youth_intake_percent else 0.0,
+            "youth_18_19_percent": float(getattr(kpi, "youth_18_19_percent", None) or 0) if kpi else 0.0,
+            "youth_20_25_percent": float(getattr(kpi, "youth_20_25_percent", None) or 0) if kpi else 0.0,
             "gender_shift_percent": float(kpi.gender_shift_percent) if kpi and kpi.gender_shift_percent else 0.0,
             "anomaly_household_count": kpi.anomaly_household_count if kpi else 0,
             "risk_category": kpi.risk_category if kpi else "NORMAL",

@@ -60,6 +60,54 @@ const DataTableComponent = (props: DataTableProps, ref: React.ForwardedRef<DataT
   const showColumnVisibility = props.showColumnVisibility !== false;
   const exportFileName = props.exportFileName || "export";
   const toolbarActions = props.toolbarActions;
+  const [showPdfMenu, setShowPdfMenu] = useState(false);
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [pdfConverting, setPdfConverting] = useState(false);
+
+  const handlePdfSelect = (f: File | null) => {
+    setPdfFile(f);
+  };
+
+  const handleConvertPDF = async () => {
+    if (!pdfFile) return;
+    setPdfConverting(true);
+    try {
+      const token = getAuthToken();
+      const fd = new FormData();
+      fd.append('file', pdfFile, pdfFile.name);
+
+      const resp = await fetch(`${API_BASE_URL}/api/upload/convert-scanned-pdf`, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        body: fd
+      });
+
+      if (!resp.ok) {
+        const err = await resp.text();
+        throw new Error(err || `HTTP ${resp.status}`);
+      }
+
+      const blob = await resp.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const disposition = resp.headers.get('content-disposition') || '';
+      const match = disposition.match(/filename="?([^\"]+)"?/);
+      const filename = match ? match[1] : `${pdfFile.name.replace(/\.pdf$/i,'')}_converted.csv`;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      setShowPdfMenu(false);
+      setPdfFile(null);
+    } catch (e) {
+      console.error('PDF convert error', e);
+      alert('Error converting PDF: ' + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setPdfConverting(false);
+    }
+  };
   
   // Apply default values (support both ajaxMethod and deprecated method prop)
   const method = ajaxMethod ?? props.method ?? "POST";
@@ -556,7 +604,7 @@ const DataTableComponent = (props: DataTableProps, ref: React.ForwardedRef<DataT
   return (
     <div className="w-full" style={{ width: '100%', overflow: 'hidden', maxWidth: '100%' }}>
       {/* Toolbar: Page Limit, Search, Export, Column Visibility */}
-      <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-4 p-2.5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         {/* Page Limit - Moved to top */}
         <div className="flex items-center">
           <span className="text-sm text-gray-600 dark:text-gray-400">
@@ -601,6 +649,42 @@ const DataTableComponent = (props: DataTableProps, ref: React.ForwardedRef<DataT
               >
                 📥 Export All
               </button>
+              {/* PDF convert menu */}
+              <div className="relative inline-block text-left">
+                <button
+                  onClick={() => setShowPdfMenu(prev => !prev)}
+                  className="ml-2 rounded border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700"
+                  title="Convert scanned PDF to CSV"
+                >
+                  📄 Convert PDF
+                </button>
+                {showPdfMenu && (
+                  <div className="absolute right-0 z-50 mt-1 w-64 rounded border border-gray-200 bg-white p-3 shadow-lg dark:border-gray-700 dark:bg-gray-800">
+                    <label className="text-xs text-gray-600 dark:text-gray-300">Select scanned PDF</label>
+                    <input
+                      type="file"
+                      accept="application/pdf"
+                      onChange={(e) => handlePdfSelect(e.target.files && e.target.files[0] ? e.target.files[0] : null)}
+                      className="mt-2 w-full text-sm"
+                    />
+                    <div className="mt-3 flex justify-end gap-2">
+                      <button
+                        onClick={() => { setShowPdfMenu(false); setPdfFile(null); }}
+                        className="rounded border border-gray-300 bg-white px-3 py-1 text-xs text-gray-700 hover:bg-gray-50"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleConvertPDF}
+                        disabled={!pdfFile || pdfConverting}
+                        className="rounded border border-brand-500 bg-brand-500 px-3 py-1 text-xs text-white disabled:opacity-50"
+                      >
+                        {pdfConverting ? 'Converting...' : 'Convert'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </>
           )}
           {showColumnVisibility && (
@@ -675,7 +759,7 @@ const DataTableComponent = (props: DataTableProps, ref: React.ForwardedRef<DataT
             scrollBehavior: 'smooth'
           }}
         >
-          <div style={{ width: '100%' }}>
+          <div style={{ width: 'max-content' }}>
             <Table className="border-collapse" style={hasExplicitWidths ? { tableLayout: 'fixed', width: totalTableWidth > 0 ? `${totalTableWidth}px` : '100%' } : { width: '100%' }}>
             {hasExplicitWidths && (
               <colgroup>
@@ -716,8 +800,8 @@ const DataTableComponent = (props: DataTableProps, ref: React.ForwardedRef<DataT
                       }`}
                       onClick={() => column.orderable !== false && handleSort(originalIndex)}
                     >
-                      <p className={`font-medium text-gray-900 text-theme-xs dark:text-gray-900 ${
-                        order.column === originalIndex ? "text-brand-500" : ""
+                      <p className={`font-medium  text-theme-xs  ${
+                        order.column === originalIndex ? "" : ""
                       }`}>
                         {column.name || column.data}
                       </p>

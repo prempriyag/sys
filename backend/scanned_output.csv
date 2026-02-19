@@ -1,0 +1,4 @@
+record_no,card_no,ref_id,name,relation_role,relation_name,house_number,age,gender,photo_available
+1,7,FBT2224673,Meharahbanu,Husband,Varisamohammed,"23/29, sanjay Gandhi nagar",54,Female,True
+2,8,WQD2815132,SHOBANA,Father,NAGARAJ,30,22,Female,True
+3,9,WQD2707750,VANMATHI M,Husband,MANIKANDAN,30B,27,Female,True

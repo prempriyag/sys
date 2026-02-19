@@ -3,9 +3,24 @@ FastAPI Main Application - SIR Impact Analysis System
 """
 import logging
 import os
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+
+
+class ForceCORSOriginMiddleware(BaseHTTPMiddleware):
+    """Ensure CORS response echoes request Origin for localhost (fixes proxy/cache sending wrong port)."""
+
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        origin = request.headers.get("origin")
+        if origin and (
+            origin.startswith("http://localhost") or origin.startswith("http://127.0.0.1")
+        ):
+            response.headers["Access-Control-Allow-Origin"] = origin
+        return response
 
 # Import core controllers
 from controllers import (
@@ -46,18 +61,26 @@ USERPROFILE_DIR = os.path.join(ASSETS_DIR, "userprofile")
 os.makedirs(USERPROFILE_DIR, exist_ok=True)
 app.mount("/assets", StaticFiles(directory=ASSETS_DIR), name="assets")
 
-# CORS Configuration – use built-in middleware so preflight gets correct Allow-Origin
+# Run first so it runs last on response and can override CORS header (echo request Origin for localhost)
+app.add_middleware(ForceCORSOriginMiddleware)
+
+# CORS Configuration – allow any localhost port (5173, 51590, 3000, etc.)
+# Include 51590 explicitly (Cursor/VS Code port forwarding often uses this port)
 CORS_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:5173",
+    "http://localhost:51590",
     "http://localhost:8000",
     "http://127.0.0.1:3000",
     "http://127.0.0.1:5173",
+    "http://127.0.0.1:51590",
     "http://127.0.0.1:8000",
 ]
+CORS_ORIGIN_REGEX = r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
+    allow_origin_regex=CORS_ORIGIN_REGEX,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
@@ -75,12 +98,16 @@ app.include_router(mastersettings_controller.router)
 
 # Import and include SIR controllers
 from controllers.sir import upload_router, matching_router, kpi_router, dashboard_router, analytics_router
+from controllers.sir.validation_controller import router as validation_router
+from controllers.sir.reports_controller import router as reports_router
 
 app.include_router(upload_router)
 app.include_router(matching_router)
 app.include_router(kpi_router)
 app.include_router(dashboard_router)
 app.include_router(analytics_router)
+app.include_router(validation_router)
+app.include_router(reports_router)
 
 @app.get("/")
 async def root():

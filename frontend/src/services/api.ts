@@ -28,6 +28,80 @@ export const uploadPostSir = (formData: FormData) =>
         headers: { 'Content-Type': 'multipart/form-data' }
     });
 
+/** Upload Pre-SIR electoral roll as PDF (ECI format). Optional: constituency_name, booth_number. */
+export const uploadPreSirPdf = (formData: FormData) =>
+    api.post(API_ENDPOINTS.SIR_UPLOAD_PRE_PDF, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+    });
+
+/** Upload Post-SIR electoral roll as PDF (ECI format). Optional: constituency_name, booth_number. */
+export const uploadPostSirPdf = (formData: FormData) =>
+    api.post(API_ENDPOINTS.SIR_UPLOAD_POST_PDF, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+    });
+
+/** Extract electoral roll from PDF only (no DB save). Returns { records, metadata } for preview. */
+export const extractPdfRoll = (formData: FormData) =>
+    api.post(API_ENDPOINTS.SIR_EXTRACT_PDF, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+    });
+
+/** List PDF files in backend/pdf folder. Uses fetch fallback to avoid auth blocking. */
+export const listPdfFiles = async (): Promise<{ data: { files: string[]; folder: string } }> => {
+    try {
+        const res = await api.get(API_ENDPOINTS.SIR_PDF_FILES);
+        return res;
+    } catch {
+        const url = `${API_BASE_URL}${API_ENDPOINTS.SIR_PDF_FILES}`;
+        const r = await fetch(url, { credentials: 'omit' });
+        if (!r.ok) throw new Error(`Failed to load PDF list: ${r.status}`);
+        const data = await r.json();
+        return { data };
+    }
+};
+
+/** Fetch PDF from backend/pdf as blob URL (supports auth). */
+export const getPdfBlobUrl = async (filename: string): Promise<string> => {
+    const res = await api.get(`${API_ENDPOINTS.SIR_PDF_FILE}?filename=${encodeURIComponent(filename)}`, {
+        responseType: 'blob',
+    });
+    return URL.createObjectURL(res.data as Blob);
+};
+
+/** Extract from PDF in backend/pdf folder by filename. Supports extraction_config for coordinate tuning. */
+export const extractPdfByPath = (body: {
+    filename: string;
+    constituency_name?: string;
+    booth_number?: string;
+    use_ocr?: boolean;
+    extraction_config?: Record<string, number | string>;
+}) => api.post(API_ENDPOINTS.SIR_EXTRACT_PDF_BY_PATH, body);
+
+/** Debug PDF: returns raw page text and structure (when extraction returns 0 records). */
+export const debugPdfRoll = (formData: FormData) =>
+    api.post(API_ENDPOINTS.SIR_DEBUG_PDF, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+    });
+
+/** Download electoral roll PDF from ECI portal (automated: pre-fill, captcha OCR, select first row). Returns blob for PDF download. */
+export const downloadEciRoll = async (params: {
+    state?: string;
+    revyear?: string;
+    district?: string;
+    ac_name?: string;
+}): Promise<Blob> => {
+    const formData = new FormData();
+    formData.append('state', params.state ?? 'Andhra Pradesh');
+    formData.append('revyear', params.revyear ?? '2025');
+    formData.append('district', params.district ?? 'Kurnool');
+    formData.append('ac_name', params.ac_name ?? 'Kurnool');
+    const res = await api.post(API_ENDPOINTS.SIR_ECI_DOWNLOAD, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        responseType: 'blob',
+    });
+    return res.data;
+};
+
 export const runMatching = (constituencyId: number) => 
     api.post(`${API_ENDPOINTS.SIR_MATCHING_RUN}/${constituencyId}`);
 
@@ -58,6 +132,16 @@ export const parseElectoralRollPdf = (formData: FormData) =>
     api.post(API_ENDPOINTS.SIR_PARSE_ELECTORAL_PDF, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
         responseType: 'blob',
+    });
+
+/** Summary of uploaded Pre-SIR and Post-SIR data per constituency/booth (see where your upload went). */
+export const getRollSummary = () =>
+    api.get(API_ENDPOINTS.SIR_DASHBOARD_ROLL_SUMMARY);
+
+/** Sample of voter records for a constituency (pre or post roll) to verify extracted data. */
+export const getRollSample = (constituencyId: number, roll: 'pre' | 'post', limit: number = 50) =>
+    api.get(API_ENDPOINTS.SIR_DASHBOARD_ROLL_SAMPLE, {
+        params: { constituency_id: constituencyId, roll, limit }
     });
 
 // SIR Analytics APIs

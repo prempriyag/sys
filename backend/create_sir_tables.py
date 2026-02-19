@@ -11,6 +11,7 @@ from models.sir.booth import Booth
 from models.sir.voter import VoterPre, VoterPost
 from models.sir.kpi import BoothKPI
 from models.sir.match_result import MatchResult
+from models.sir.field_validation import FieldValidationResult
 
 def enable_postgis():
     """Enable PostGIS extension if not already enabled"""
@@ -37,6 +38,7 @@ def create_tables():
         VoterPost.__table__,
         BoothKPI.__table__,
         MatchResult.__table__,
+        FieldValidationResult.__table__,
     ])
     print("SIR tables created successfully!")
 

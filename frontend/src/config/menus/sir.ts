@@ -29,6 +29,16 @@ export const sirMenu: MenuConfig = {
           path: "/upload/matching",
           icon: "refresh",
         },
+        {
+          name: "View uploaded data",
+          path: "/upload/roll-data",
+          icon: "table",
+        },
+        {
+          name: "Extract PDF (Preview)",
+          path: "/upload/pdf-extract",
+          icon: "file-text",
+        },
       ],
     },
     {

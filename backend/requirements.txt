@@ -11,3 +11,8 @@ python-jose[cryptography]
 passlib[bcrypt]
 requests
 aiofiles
+pdfplumber
+pymupdf
+pytesseract
+easyocr
+playwright

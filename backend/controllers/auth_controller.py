@@ -643,13 +643,13 @@ def _build_reset_email_html(link: str) -> str:
     return f"""<table style="width:100%; border-collapse:collapse;">
 <tr><td colspan="2" style="background:#b31f24;color:white;padding:10px;text-align:center;font-size:17px;">Reset Your DigiScript Password</td></tr>
 <tr><td colspan="2" style="padding:10px; border:1px solid #ccc;">
-<h4>Dear DigiScript User,</h4>
+<h4>Dear PARA WHEEL User,</h4>
 <p>We received a request to reset the password for your account. If you did not make this request, please ignore this email.</p>
 <p><strong>To reset your password, please follow the link below:</strong></p>
 <p><a href="{link}" style="color:blue;">Click Here</a></p>
 <p>If clicking the link does not work, copy and paste it into your browser's address bar.</p>
 <p>The link expires in 30 minutes. Password must be at least 8 characters with uppercase, lowercase, number, and special character.</p>
-<p>DigiScript - Powered by <a href="https://www.ktechproducts.com">KTech Products</a></p>
+<p>PARA WHEEL - Powered by <a href="https://www.ktechproducts.com">KTech Products</a></p>
 </td></tr></table>"""
 
 

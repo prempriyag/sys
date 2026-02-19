@@ -1,7 +1,5 @@
 fastapi
 uvicorn
-pydantic-settings
-email-validator
 sqlalchemy
 psycopg2-binary
 geoalchemy2

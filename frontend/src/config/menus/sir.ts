@@ -1,5 +1,6 @@
 import { MenuConfig } from "../../types/menu";
 
+
 // SIR Impact Analysis menu configuration
 export const sirMenu: MenuConfig = {
   module: "sir" as const,
@@ -42,7 +43,7 @@ export const sirMenu: MenuConfig = {
     },
     {
       name: "Booth Analysis",
-      icon: "map",
+      icon: "bar-chart",
       subItems: [
         {
           name: "Booth KPIs",
@@ -52,7 +53,7 @@ export const sirMenu: MenuConfig = {
         {
           name: "Risk Heatmap",
           path: "/booths/risk-map",
-          icon: "map",
+          icon: "bar-chart",
         },
         {
           name: "Booth Details",
@@ -119,7 +120,7 @@ export const sirMenu: MenuConfig = {
     {
       name: "Master Settings",
       path: "/master-settings",
-      icon: "cog",
+      icon: "sliders",
       // permission: "master_settings", // Removed for now - show to all users
     },
     {
@@ -130,7 +131,7 @@ export const sirMenu: MenuConfig = {
     {
       name: "Profile",
       path: "/profile",
-      icon: "user",
+      icon: "user-circle",
     },
   ],
 };

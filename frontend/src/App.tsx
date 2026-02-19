@@ -35,6 +35,7 @@ import AppLayout from "./layout/AppLayout";
 import { ScrollToTop } from "./components/common/ScrollToTop";
 import ToastContainer from "./components/ui/toast/ToastContainer";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
+import PermissionRoute from "./components/auth/PermissionRoute";
 
 export default function App() {
   return (
@@ -63,7 +64,7 @@ export default function App() {
           {/* SIR Dashboard (Default) */}
           <Route index element={<SIRDashboard />} />
           <Route path="/dashboard" element={<SIRDashboard />} />
-
+          
           {/* Data Upload */}
           <Route path="/upload/pre-sir" element={<UploadPage type="pre" />} />
           <Route path="/upload/post-sir" element={<UploadPage type="post" />} />
@@ -88,11 +89,31 @@ export default function App() {
           <Route path="/reports/action-plan" element={<Reports type="action-plan" />} />
           <Route path="/reports/constituency" element={<Reports type="constituency" />} />
 
-          {/* User Management - /college/users redirects for backward compatibility */}
-          <Route path="/college/users" element={<Navigate to="/users" replace />} />
-          <Route path="/users" element={<UserManagement />} />
-          <Route path="/users/add" element={<AddUser />} />
-          <Route path="/users/edit/:id" element={<EditUser />} />
+          {/* User Management */}
+          <Route
+            path="/users"
+            element={
+              // <PermissionRoute permission="user_management" action="VIEW">
+                <UserManagement />
+              // </PermissionRoute>
+            }
+          />
+          <Route
+            path="/users/add"
+            element={
+              <PermissionRoute permission="user_management" action="ADD">
+                <AddUser />
+              </PermissionRoute>
+            }
+          />
+          <Route
+            path="/users/edit/:id"
+            element={
+              <PermissionRoute permission="user_management" action="UPDATE">
+                <EditUser />
+              </PermissionRoute>
+            }
+          />
 
           {/* Roles & Permissions */}
           <Route path="/roles" element={<Roles />} />

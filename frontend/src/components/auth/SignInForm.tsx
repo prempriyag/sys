@@ -24,7 +24,7 @@ export default function SignInForm() {
         </p>
       </div>
       <div>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+        <div className="grid grid-cols-1 gap-3 mb-1.5">
           <button
             onClick={() => redirectToClientSSO(window.location.href)}
             className="auth-sso-btn"
@@ -55,7 +55,7 @@ export default function SignInForm() {
             </svg>
             Sign in with CSC
           </button>
-          <button
+          {/*<button
             onClick={() => redirectToKTechSSO(window.location.href)}
             className="auth-sso-btn"
           >
@@ -70,9 +70,9 @@ export default function SignInForm() {
               <path d="M15.6705 1.875H18.4272L12.4047 8.75833L19.4897 18.125H13.9422L9.59717 12.4442L4.62554 18.125H1.86721L8.30887 10.7625L1.51221 1.875H7.20054L11.128 7.0675L15.6705 1.875ZM14.703 16.475H16.2305L6.37054 3.43833H4.73137L14.703 16.475Z" />
             </svg>
             Sign in with KTech
-          </button>
+          </button>*/}
         </div>
-        <div className="relative py-4">
+        {/*<div className="relative py-4">
           <div className="absolute inset-0 flex items-center">
             <div className="w-full border-t border-white/20"></div>
           </div>
@@ -81,7 +81,15 @@ export default function SignInForm() {
               Or
             </span>
           </div>
-        </div>
+        </div>*/}
+        {/*<div className="flex items-center py-4">
+  <div className="flex-1 border-t border-white/20"></div>
+  <span className="px-4 py-1 text-white/50 bg-transparent backdrop-blur-sm rounded">
+    Or
+  </span>
+  <div className="flex-1 border-t border-white/20"></div>
+</div>*/}
+
         <form
           onSubmit={async (e) => {
             e.preventDefault();
@@ -108,7 +116,7 @@ export default function SignInForm() {
               </label>
               <input
                 type="email"
-                placeholder="info@ktechproducts.com"
+                placeholder="info@kksurveys.in"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="auth-input"

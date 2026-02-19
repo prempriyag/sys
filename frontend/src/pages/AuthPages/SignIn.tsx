@@ -37,8 +37,8 @@ export default function SignIn() {
   return (
     <>
       <PageMeta
-        title="DigiScript SignIn | KTech Products"
-        description="DigiScript KTech Products"
+        title="SignIn | PARA WHEEL"
+        description="PARA WHEEL"
       />
       <AuthLayout>
         <SignInForm />

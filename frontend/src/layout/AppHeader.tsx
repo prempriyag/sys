@@ -114,22 +114,22 @@ const AppHeader: React.FC = () => {
 
           {/* Logo - mobile view only */}
           <Link to="/" className="flex-shrink-0 lg:hidden">
-            <img
+           {/* <img
               className="dark:hidden object-contain h-6 sm:h-8"
               src="./images/logo/auth-logo.png"
               alt="Logo"
               onError={(e) => {
                 (e.target as HTMLImageElement).src = "/images/logo/connors-color.png";
               }}
-            />
-            <img
+            /> */}
+          {/*   <img
               className="hidden dark:block object-contain h-6 sm:h-8"
               src="./images/logo/auth-logo.png"
               alt="Logo"
               onError={(e) => {
                 (e.target as HTMLImageElement).src = "/images/logo/connors-white.png";
               }}
-            />
+            /> */}
           </Link>
 
           {/* Logo for horizontal menu on desktop */}
@@ -138,14 +138,14 @@ const AppHeader: React.FC = () => {
               to={currentModule === "college" ? "college/dashboard" : `/${currentModule}/dashboard`}
               className="hidden lg:block ml-4"
             >
-              <img
+            {/*  <img
                 className="dark:hidden object-contain h-10"
                 src={logoLightUrl}
                 alt="Logo"
                 onError={(e) => {
                   (e.target as HTMLImageElement).src = "/images/logo/connors-color.png";
                 }}
-              />
+              />  
               <img
                 className="hidden dark:block object-contain h-10"
                 src={logoDarkUrl}
@@ -153,7 +153,7 @@ const AppHeader: React.FC = () => {
                 onError={(e) => {
                   (e.target as HTMLImageElement).src = "/images/logo/connors-white.png";
                 }}
-              />
+              /> */}
             </Link>
           )}
         </div>

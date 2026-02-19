@@ -113,7 +113,6 @@ export const API_ENDPOINTS = {
   SIR_KPI_CALCULATE: "/api/kpi/calculate",
   SIR_KPI_BOOTHS: "/api/kpi/booths",
   SIR_DASHBOARD_RISK_MAP: "/api/sir/dashboard/risk-map",
-  SIR_DASHBOARD_AGGREGATES: "/api/sir/dashboard/aggregates",
   SIR_DASHBOARD_CONSTITUENCIES: "/api/sir/dashboard/constituencies",
   SIR_DASHBOARD_ROLL_SUMMARY: "/api/sir/dashboard/roll-summary",
   SIR_DASHBOARD_ROLL_SAMPLE: "/api/sir/dashboard/roll-sample",

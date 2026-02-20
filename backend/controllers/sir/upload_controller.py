@@ -429,6 +429,46 @@ async def convert_scanned_pdf(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
 
 
+def _compute_accuracy_summary(records: list, extraction_mode: str = "text", validation_stats: dict = None) -> dict:
+    """Compute accuracy estimate from extracted records. Includes structural metrics when validation_stats present."""
+    if not records:
+        return {"completeness_percent": 0, "estimated_accuracy": "N/A", "field_coverage": {}, "extraction_mode": extraction_mode}
+    n = len(records)
+    # Completeness: records with epic + name + (age or gender)
+    complete = sum(1 for r in records if (r.get("epic_number") or "").strip() and (r.get("name") or "").strip() and ((r.get("age") is not None) or (r.get("gender") or "").strip()))
+    completeness = round(100 * complete / n, 1) if n else 0
+    # Field coverage
+    def _has_val(r, k):
+        v = r.get(k)
+        return v is not None and (v != "" if isinstance(v, str) else True)
+    field_coverage = {k: round(100 * sum(1 for r in records if _has_val(r, k)) / n, 1) for k in ["epic_number", "name", "relative_name", "age", "gender", "house_no", "address"]}
+    # Estimated accuracy range (heuristic)
+    base = 90 if extraction_mode == "text" else 75
+    adj = min(10, completeness / 10)
+    est_min = base - (100 - completeness) // 10
+    est_max = min(98, base + adj)
+    out = {
+        "completeness_percent": completeness,
+        "estimated_accuracy_range": f"{max(50, est_min)}–{est_max}%",
+        "field_coverage": field_coverage,
+        "extraction_mode": extraction_mode,
+        "records_total": n,
+        "records_complete": complete,
+    }
+    # Structural metrics from validation layer
+    if validation_stats:
+        out["epic_valid_pct"] = validation_stats.get("epic_valid_pct", 0)
+        out["age_valid_pct"] = validation_stats.get("age_valid_pct", 0)
+        out["gender_valid_pct"] = validation_stats.get("gender_valid_pct", 0)
+        out["duplicate_epic_count"] = validation_stats.get("duplicate_epic_count", 0)
+        out["low_confidence_count"] = validation_stats.get("low_confidence_count", 0)
+        out["multi_epic_warnings"] = validation_stats.get("multi_epic_warnings", 0)
+        out["possible_cross_card_merge_count"] = validation_stats.get("possible_cross_card_merge_count", 0)
+        avg_conf = sum(r.get("confidence_score", 0) for r in records) / n if n else 0
+        out["avg_confidence_score"] = round(avg_conf * 100, 1)
+    return out
+
+
 def _get_pdf_folder() -> Path:
     """Return backend/pdf folder path. Create if missing."""
     folder = Path(__file__).resolve().parent.parent.parent / "pdf"
@@ -490,6 +530,10 @@ async def extract_pdf_by_path(body: ExtractByPathRequest = Body(...)):
             use_ocr=body.use_ocr,
             extraction_config=body.extraction_config,
         )
+        mode = "ocr" if body.use_ocr else "text"
+        result["accuracy_summary"] = _compute_accuracy_summary(
+            result.get("records") or [], mode, result.get("metadata", {}).get("validation_stats")
+        )
         return result
     except ImportError:
         raise HTTPException(status_code=500, detail="pdfplumber required. pip install pdfplumber")
@@ -538,6 +582,10 @@ async def extract_pdf_only(
                 os.unlink(tmp_path)
             except OSError:
                 pass
+        mode = "ocr" if use_ocr.lower() in ("true", "1", "yes") else "text"
+        result["accuracy_summary"] = _compute_accuracy_summary(
+            result.get("records") or [], mode, result.get("metadata", {}).get("validation_stats")
+        )
         return result
     except ImportError as e:
         raise HTTPException(status_code=500, detail="PDF extraction requires pdfplumber. Install with: pip install pdfplumber")

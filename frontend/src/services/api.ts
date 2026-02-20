@@ -83,6 +83,15 @@ export const debugPdfRoll = (formData: FormData) =>
         headers: { 'Content-Type': 'multipart/form-data' }
     });
 
+/** Production v1: Extract voters (auto-detect text vs scanned). Returns { data, metadata, extraction_mode, errors, warnings }. */
+export const extractVotersV1 = (formData: FormData) =>
+    api.post(API_ENDPOINTS.EXTRACTOR_V1_EXTRACT, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+    });
+
+/** Production v1: Extractor health (OCR engines, OpenCV, PyMuPDF availability). */
+export const extractorHealth = () => api.get(API_ENDPOINTS.EXTRACTOR_V1_HEALTH);
+
 /** Download electoral roll PDF from ECI portal (automated: pre-fill, captcha OCR, select first row). Returns blob for PDF download. */
 export const downloadEciRoll = async (params: {
     state?: string;

@@ -100,8 +100,10 @@ app.include_router(mastersettings_controller.router)
 from controllers.sir import upload_router, matching_router, kpi_router, dashboard_router, analytics_router
 from controllers.sir.validation_controller import router as validation_router
 from controllers.sir.reports_controller import router as reports_router
+from controllers.sir.extractor_controller import router as extractor_router
 
 app.include_router(upload_router)
+app.include_router(extractor_router)
 app.include_router(matching_router)
 app.include_router(kpi_router)
 app.include_router(dashboard_router)

@@ -16,3 +16,5 @@ pymupdf
 pytesseract
 easyocr
 playwright
+opencv-python-headless
+pdf2image

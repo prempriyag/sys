@@ -11,6 +11,8 @@ export interface ZoneConfig {
   margin_left: number;
   margin_right: number;
   cards_per_row: number;
+  rows_per_page?: number;
+  row_gap?: number;
 }
 
 const PAGE_WIDTH = 595;

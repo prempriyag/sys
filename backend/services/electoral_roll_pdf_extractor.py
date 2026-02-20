@@ -42,16 +42,43 @@ SUMMARY PAGE (last):
 """
 import re
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
 
-def _extract_text_via_ocr(pdf_path: Path, max_pages: Optional[int] = 50) -> List[str]:
+def _preprocess_image_for_ocr(img) -> "Any":
+    """Apply OpenCV preprocessing for better OCR (grayscale, blur, Otsu threshold)."""
+    try:
+        import cv2
+        import numpy as np
+        from PIL import Image
+    except ImportError:
+        return img
+    if hasattr(img, "size"):
+        arr = np.array(img)
+        gray = cv2.cvtColor(arr, cv2.COLOR_RGB2GRAY) if len(arr.shape) == 3 else arr
+    else:
+        gray = cv2.imread(str(img), cv2.IMREAD_GRAYSCALE)
+        if gray is None:
+            return img
+    blur = cv2.GaussianBlur(gray, (5, 5), 0)
+    _, thresh = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    return Image.fromarray(thresh)
+
+
+def _extract_text_via_ocr(
+    pdf_path: Path,
+    max_pages: Optional[int] = 50,
+    dpi: int = 200,
+    preprocess: bool = False,
+) -> List[str]:
     """
     Extract text from PDF using OCR (for scanned/image PDFs with no text layer).
     Tries pdf2image (needs poppler) first; if that fails, uses PyMuPDF (no poppler needed).
+    preprocess: Apply OpenCV preprocessing (grayscale, blur, Otsu) for better accuracy.
     Requires: pytesseract + Tesseract OCR; and either pdf2image+poppler OR pymupdf.
     """
     try:
@@ -64,7 +91,7 @@ def _extract_text_via_ocr(pdf_path: Path, max_pages: Optional[int] = 50) -> List
     # 1) Try pdf2image (requires poppler on PATH - often missing on Windows)
     try:
         from pdf2image import convert_from_path
-        images = convert_from_path(str(pdf_path), first_page=1, last_page=max_pages, dpi=200)
+        images = convert_from_path(str(pdf_path), first_page=1, last_page=max_pages, dpi=dpi)
     except Exception as e:
         err = str(e).lower()
         if "poppler" in err or "page count" in err or "unable" in err:
@@ -74,9 +101,10 @@ def _extract_text_via_ocr(pdf_path: Path, max_pages: Optional[int] = 50) -> List
                 import tempfile
                 import io
                 doc = fitz.open(str(pdf_path))
+                scale = dpi / 72.0
+                mat = fitz.Matrix(scale, scale)
                 for i in range(min(len(doc), max_pages)):
                     page = doc[i]
-                    mat = fitz.Matrix(2.0, 2.0)  # 2x scale for better OCR
                     pix = page.get_pixmap(matrix=mat, alpha=False)
                     img_bytes = pix.tobytes("png")
                     try:
@@ -104,6 +132,12 @@ def _extract_text_via_ocr(pdf_path: Path, max_pages: Optional[int] = 50) -> List
     if not images:
         return []
 
+    if preprocess:
+        images = [_preprocess_image_for_ocr(img) for img in images]
+
+    def _ocr_one(img):
+        return pytesseract.image_to_string(img)
+
     def _img_to_numpy(img):
         """Convert PIL Image or file path to numpy array for EasyOCR."""
         import numpy as np
@@ -112,9 +146,13 @@ def _extract_text_via_ocr(pdf_path: Path, max_pages: Optional[int] = 50) -> List
         from PIL import Image
         return np.array(Image.open(img))
 
-    # Try Tesseract first
+    # Try Tesseract first (parallel for speed when multiple pages)
     try:
-        return [pytesseract.image_to_string(img) for img in images]
+        max_workers = min(4, len(images))
+        if max_workers <= 1:
+            return [_ocr_one(img) for img in images]
+        with ThreadPoolExecutor(max_workers=max_workers) as ex:
+            return list(ex.map(_ocr_one, images))
     except Exception as e:
         err_msg = str(e).lower()
         if "tesseract" not in err_msg and "path" not in err_msg:
@@ -282,8 +320,8 @@ RE_RECORD_START_SERIAL_ONLY = re.compile(r"^\s*(\d+)\s*$")
 RE_FATHER = re.compile(r"father\s*name\s*[:\-]\s*(.+)", re.IGNORECASE)
 RE_HUSBAND = re.compile(r"husband\s*name\s*[:\-]\s*(.+)", re.IGNORECASE)
 RE_MOTHER = re.compile(r"mother\s*name\s*[:\-]\s*(.+)", re.IGNORECASE)
-# "Name: xxx" (elector name with prefix, sample line 77)
-RE_NAME_PREFIX = re.compile(r"^name\s*[:\-]\s*(.+)", re.IGNORECASE)
+# "Name: xxx" or "Nama: xxx" (elector name with prefix)
+RE_NAME_PREFIX = re.compile(r"^(?:name|nama|namo|namc|namne|narne)\s*[:\-]\s*(.+)", re.IGNORECASE)
 # "House Number: xxx" or "House No: xxx"
 RE_HOUSE_NUMBER_PREFIX = re.compile(r"house\s*(?:number|no\.?)\s*[:\-]\s*(.+)", re.IGNORECASE)
 # "Age: 32 Gender: Male Photo" on same line
@@ -295,22 +333,55 @@ RE_AGE = re.compile(r"^\d{1,3}$")
 RE_GENDER = re.compile(r"^(Male|Female|M|F)$", re.IGNORECASE)
 
 # ----- OCR-tolerant patterns (scanned TN ECI cards) -----
-# Father/Husband/Mother with typos: Falhe Naine, Falner Name, Falhar Namie
-RE_FATHER_FUZZY = re.compile(r"(?:falhe?r?|father|falner|falhar)\s*(?:naine?|name|namie)?\s*[:\-\"]?\s*(.*)$", re.IGNORECASE)
-RE_HUSBAND_FUZZY = re.compile(r"husband\s*(?:name)?\s*[:\-]?\s*(.*)$", re.IGNORECASE)
-RE_MOTHER_FUZZY = re.compile(r"mother\s*(?:name)?\s*[:\-]?\s*(.*)$", re.IGNORECASE)
-# House Number with typos: Housc Numoor, Houso Numbci, Houso Numbor
-RE_HOUSE_NUMBER_FUZZY = re.compile(r"hous[eoc]?\s*num[bp]?[eo]*r?\s*[:\-]?\s*(.*)$", re.IGNORECASE)
-# Name with optional colon and value on same line
-RE_NAME_FUZZY = re.compile(r"^name\s*[:\-]?\s*(.*)$", re.IGNORECASE)
-# Age then optional "Gender" typo (Genocr, Gendcr, Cendor): "32 Genocr", "26 Gendcr", "Age 24 Cendor"
-RE_AGE_FUZZY = re.compile(r"(?:age|ago|aga)\s*[:\-]?\s*(\d{1,3})\s*(?:genocr|gendcr|cendor|gender)?", re.IGNORECASE)
-RE_AGE_LEADING = re.compile(r"^(\d{1,3})\s+(?:genocr|gendcr|cendor|gender)", re.IGNORECASE)
-# Gender value with OCR: Mole, Ma 0, Foma 0, Male, Female
-RE_GENDER_FUZZY = re.compile(r"^(?:ma?\s*0?|male|mole|m)\s*$", re.IGNORECASE)
-RE_GENDER_FEMALE_FUZZY = re.compile(r"^(?:foma?\s*0?|female|f)\s*$", re.IGNORECASE)
+# Name: "Name" / "Nama" / "Namo" / "Namc" / "Namne" / "Narne" (OCR typos)
+RE_NAME_FUZZY = re.compile(r"^(?:name|nama|namo|namc|namne|narne)\s*[:\-]?\s*(.*)$", re.IGNORECASE)
+# Father/Husband/Mother: Fatnar Namo, Fether Name, Falher Narne, Fatner Narie
+RE_FATHER_FUZZY = re.compile(
+    r"(?:falhe?r?|father|falner|falhar|fatnar|fether|fatner)\s*(?:naine?|name|namie|nama|namo|narne|narie)?\s*[:\-\"]?\s*(.*)$",
+    re.IGNORECASE
+)
+RE_HUSBAND_FUZZY = re.compile(r"(?:husband|husoand)\s*(?:name|nama)?\s*[:\-]?\s*(.*)$", re.IGNORECASE)
+RE_MOTHER_FUZZY = re.compile(r"mother\s*(?:name|nama|namo)?\s*[:\-]?\s*(.*)$", re.IGNORECASE)
+# House Number: Fouse, Houso Numbar, Hou8e, Houga, Houea, Housa, House Numoor, Numper, Husoand
+RE_HOUSE_NUMBER_FUZZY = re.compile(
+    r"(?:house?|fouse?|houso|hou8e?|houga|houea|housa)\s*(?:num(?:ber|bet|bor|bar|bep|oor|per)?|numbet|numbar|numbor|numoor|numper)?\s*[:\-]?\s*(.*)$",
+    re.IGNORECASE
+)
+# Age + Gender label typos: Gerer, Gondar, Gerder, Genocr, Gendcr, Cendor
+RE_AGE_FUZZY = re.compile(
+    r"(?:age|ago|aga)\s*[:\-]?\s*(\d{1,3})\s*(?:genocr|gendcr|cendor|cender|gender|gerer|gondar|gerder)?",
+    re.IGNORECASE
+)
+RE_AGE_LEADING = re.compile(
+    r"^(\d{1,3})\s+(?:genocr|gendcr|cendor|cender|gender|gerer|gondar|gerder)",
+    re.IGNORECASE
+)
+RE_AGE_GENDER_LINE_FUZZY = re.compile(
+    r"(?:age|ago|aga)\s*[:\-]?\s*(\d{1,3})\s*(?:genocr|gendcr|cendor|cender|gender|gerer|gondar|gerder|gonder|gendar|gander)\s*[:\-]?\s*(Male|Female|M|F|Mala|Ferala|Femalo|Famale|Ma e|Fema e|Farna|MA 4)?",
+    re.IGNORECASE
+)
+# Gender value with OCR: Mole, Mala, Ma e, MA 4 (Male), Ferala, Fema e, Femalo, Famale (Female)
+RE_GENDER_FUZZY = re.compile(r"^(?:ma\s*e|ma\s*4|ma?\s*0?|male|mole|mala|m)\s*$", re.IGNORECASE)
+RE_GENDER_FEMALE_FUZZY = re.compile(r"^(?:farna\s*8?|fema\s*e|foma?\s*0?|female|ferala|femalo|famale|f)\s*$", re.IGNORECASE)
 # Reject dates as house_no: 09-May, Oct-99, 12-Jan
 RE_DATE_LIKE = re.compile(r"^(?:\d{1,2}[-/](?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*[-/]\d{2,4})\s*$", re.IGNORECASE)
+
+
+def _normalize_house_no(s: str) -> str:
+    """Fix common OCR errors in house numbers: C→0, O→0 (8/1C00→8/100)."""
+    if not s or len(s) > 80:
+        return s
+    s = s.strip()
+    # In digit/slash context, C and O are often misread as 0
+    out = []
+    for i, c in enumerate(s):
+        prev_ok = (out and out[-1] in "0123456789/") or (i > 0 and s[i - 1] in "0123456789/")
+        next_ok = i + 1 < len(s) and s[i + 1] in "0123456789/"
+        if c.upper() in ("C", "O") and (prev_ok or next_ok):
+            out.append("0")
+        else:
+            out.append(c)
+    return "".join(out)
 
 
 def _is_date_like(s: str) -> bool:
@@ -327,17 +398,172 @@ def _is_date_like(s: str) -> bool:
     return False
 
 
-# ----- Position-aware extraction (TN ECI: 3 sections × 3 cards = 9 per row) -----
-# Extraction config: cards_per_row, header_top (y above which = header), data_bottom (y below which = footer)
+# ----- Position-aware extraction -----
+# Layout: 3 cards per row × 10 rows = 30 voters per page (configurable)
+# Extraction config: cards_per_row, rows_per_page, row_gap, header_top, data_bottom
+# Default EPIC corrections: (from_prefix, to_prefix) applied to first 3 chars
+EPIC_CORRECTIONS_DEFAULT = [
+    ("WOD", "WQD"),   # O confused with Q
+    ("WQ0", "WQD"),   # 0 confused with D
+    ("WQd", "WQD"),   # lowercase d
+]
+# Digit part substitutions (0↔6 common OCR): applied to chars after position 3
+EPIC_DIGIT_CORRECTIONS_DEFAULT = [
+    ("0", "6"),   # OCR often reads 6 as 0
+]
+
 EXTRACTION_CONFIG_DEFAULTS = {
-    "cards_per_row": 9,       # 3 sections × 3 cards each
-    "sections_per_row": 3,
-    "cards_per_section": 3,
+    "cards_per_row": 3,       # 3 cards per row (10 rows × 3 = 30 per page)
+    "rows_per_page": 10,
+    "row_gap": 25,            # Vertical gap (px) between cards; if word top - prev_top > row_gap → new card
     "header_top": 120,        # Skip content above this y (page header)
     "data_bottom": 750,       # Skip content below this y (footer, page numbers)
     "margin_left": 20,
     "margin_right": 20,
+    "epic_corrections": None,       # Optional list of (from, to) for EPIC prefix; None = use default
+    "epic_digit_corrections": None, # Optional list of (from, to) for digit part; None = use default (0→6)
+    "epic_fix_digit_0_as_6": True,  # When True, replace 0→6 in EPIC digit part (common OCR error)
 }
+
+
+# EPIC valid pattern: 3 letters + 6–7 digits (TN format)
+RE_EPIC_VALID = re.compile(r"^[A-Za-z]{3}[0-9]{6,7}(/[0-9]+)?$", re.IGNORECASE)
+
+
+def _normalize_epic(epic: str, config: Optional[Dict[str, Any]] = None) -> str:
+    """
+    Apply EPIC corrections safely:
+    1. Prefix: WOD→WQD, WQ0→WQD (always apply).
+    2. Digit 0→6: ONLY when epic fails validation and correction yields valid format.
+    """
+    if not epic or len(epic) < 4:
+        return epic
+    cfg = config or {}
+    # 1. Prefix corrections (safe, always apply)
+    prefix = epic[:3].upper()
+    corrections = cfg.get("epic_corrections") or EPIC_CORRECTIONS_DEFAULT
+    for from_p, to_p in corrections or []:
+        if isinstance(from_p, str) and isinstance(to_p, str) and prefix == from_p.upper():
+            prefix = to_p.upper()
+            break
+    rest = epic[3:]
+    result = prefix + rest
+    # 2. Digit corrections: ONLY if invalid and correction yields valid
+    if not RE_EPIC_VALID.match(result) and cfg.get("epic_fix_digit_0_as_6", True):
+        digit_corr = cfg.get("epic_digit_corrections") or EPIC_DIGIT_CORRECTIONS_DEFAULT
+        for from_d, to_d in digit_corr or []:
+            if isinstance(from_d, str) and isinstance(to_d, str) and from_d in rest:
+                candidate = prefix + rest.replace(from_d, to_d)
+                if RE_EPIC_VALID.match(candidate):
+                    return candidate
+    return result
+
+
+def _validate_and_score_records(records: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    """
+    Structural intelligence layer:
+    - Logical validation (age 18-120, gender valid, house_no length, EPIC format)
+    - Per-record confidence scoring (EPIC 40%, Name 20%, Age 15%, Gender 15%, House 10%)
+    - Duplicate detection
+    - low_confidence flag when score < 70%
+    """
+    AGE_MIN, AGE_MAX = 18, 120
+    HOUSE_NO_MAX_LEN = 15
+    VALID_GENDERS = {"M", "F", "O", "MALE", "FEMALE", "OTHER"}
+    CONFIDENCE_WEIGHTS = {"epic": 0.40, "name": 0.20, "age": 0.15, "gender": 0.15, "house_no": 0.10}
+    LOW_CONFIDENCE_THRESHOLD = 0.70
+
+    seen_epics: set = set()
+    stats = {
+        "epic_valid_count": 0,
+        "age_valid_count": 0,
+        "gender_valid_count": 0,
+        "duplicate_epic_count": 0,
+        "low_confidence_count": 0,
+        "multi_epic_warnings": 0,
+        "possible_cross_card_merge_count": 0,
+    }
+
+    for r in records:
+        warnings = list(r.get("_warnings", []))
+        epic = (r.get("epic_number") or "").strip()
+        epic_valid = bool(RE_EPIC_VALID.match(epic)) if epic else False
+        if epic_valid:
+            stats["epic_valid_count"] += 1
+        if epic in seen_epics and epic:
+            warnings.append("duplicate_epic")
+            r["is_duplicate"] = True
+            stats["duplicate_epic_count"] += 1
+        else:
+            r["is_duplicate"] = False
+            if epic:
+                seen_epics.add(epic)
+
+        age = r.get("age")
+        age_valid = age is not None and AGE_MIN <= age <= AGE_MAX
+        if age_valid:
+            stats["age_valid_count"] += 1
+        elif age is not None and (age < AGE_MIN or age > AGE_MAX):
+            warnings.append("age_out_of_range")
+
+        gender = (r.get("gender") or "").strip().upper()
+        gender_valid = gender in VALID_GENDERS or gender in ("M", "F")
+        if gender_valid and gender:
+            stats["gender_valid_count"] += 1
+        if gender and gender not in VALID_GENDERS and gender not in ("M", "F"):
+            warnings.append("gender_invalid")
+
+        house_no = (r.get("house_no") or "").strip()
+        if house_no and len(house_no) > HOUSE_NO_MAX_LEN:
+            warnings.append("house_no_too_long")
+            r["house_no"] = house_no[:HOUSE_NO_MAX_LEN]
+
+        if "multiple_epics_in_card" in warnings:
+            stats["multi_epic_warnings"] += 1
+        if "possible_cross_card_merge" in warnings:
+            stats["possible_cross_card_merge_count"] += 1
+
+        # Confidence score
+        score = 0.0
+        if epic_valid:
+            score += CONFIDENCE_WEIGHTS["epic"]
+        elif epic:
+            score += CONFIDENCE_WEIGHTS["epic"] * 0.5
+        if (r.get("name") or "").strip():
+            score += CONFIDENCE_WEIGHTS["name"]
+        if age_valid:
+            score += CONFIDENCE_WEIGHTS["age"]
+        if gender_valid and gender:
+            score += CONFIDENCE_WEIGHTS["gender"]
+        if house_no and len(house_no) <= HOUSE_NO_MAX_LEN:
+            score += CONFIDENCE_WEIGHTS["house_no"]
+
+        r["confidence_score"] = round(score, 2)
+        r["low_confidence"] = score < LOW_CONFIDENCE_THRESHOLD
+        if r["low_confidence"]:
+            stats["low_confidence_count"] += 1
+        r["_warnings"] = warnings
+
+    n = len(records)
+    stats["epic_valid_pct"] = round(100 * stats["epic_valid_count"] / n, 1) if n else 0
+    stats["age_valid_pct"] = round(100 * stats["age_valid_count"] / n, 1) if n else 0
+    stats["gender_valid_pct"] = round(100 * stats["gender_valid_count"] / n, 1) if n else 0
+    return records, stats
+
+
+def _merge_ocr_config(extraction_config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Merge extraction_config with env-based config for OCR (dpi, max_pages, preprocess)."""
+    try:
+        from config.extraction_config import get_extraction_config
+        ecfg = get_extraction_config()
+        base = {
+            "ocr_dpi": ecfg.ocr_dpi,
+            "ocr_max_pages": ecfg.ocr_max_pages,
+            "ocr_preprocess": ecfg.ocr_preprocess,
+        }
+    except Exception:
+        base = {"ocr_dpi": 200, "ocr_max_pages": 1000, "ocr_preprocess": False}
+    return {**base, **(extraction_config or {})}
 
 
 def _extract_cards_by_position(
@@ -348,15 +574,20 @@ def _extract_cards_by_position(
     config: Optional[Dict[str, Any]] = None,
 ) -> List[Dict[str, Any]]:
     """
-    Extract voter cards using word positions. TN ECI format: 9 cards per row
-    (3 sections × 3 cards). Divides page into columns by x0, groups words per card.
+    Extract voter cards using word positions. Divides page into columns by x0,
+    groups words per card. Layout: cards_per_row columns × rows_per_page rows.
     """
     cfg = {**EXTRACTION_CONFIG_DEFAULTS, **(config or {})}
-    cards_per_row = int(cfg.get("cards_per_row", 9))
+    cards_per_row = int(cfg.get("cards_per_row", 3))
     header_top = float(cfg.get("header_top", 120))
     data_bottom = float(cfg.get("data_bottom", 750))
     margin_left = float(cfg.get("margin_left", 20))
     margin_right = float(cfg.get("margin_right", 20))
+    # row_gap: vertical gap (px) above which we start a new card
+    rows_per_page = int(cfg.get("rows_per_page", 10))
+    row_gap = float(cfg.get("row_gap", 0)) or (
+        (data_bottom - header_top) / max(1, rows_per_page) * 0.4
+    )
 
     words = page.extract_words(x_tolerance=3, y_tolerance=3) or []
     page_width = float(getattr(page, "width", 612))
@@ -396,7 +627,6 @@ def _extract_cards_by_position(
     for col_idx in by_col:
         by_col[col_idx].sort(key=lambda x: x[0])
 
-    row_gap = 20
     all_cards: List[Tuple[int, List[str]]] = []  # (col_idx, lines)
     for col_idx in range(cards_per_row):
         col_words = by_col.get(col_idx, [])
@@ -437,6 +667,8 @@ def _extract_cards_by_position(
             "page_number": page_number,
         }
         _parse_one_card_block(lines, rec)
+        if multi_epic:
+            rec["_warnings"] = rec.get("_warnings", []) + ["multiple_epics_in_card"]
         if rec.get("name") or rec.get("epic_number"):
             records.append(rec)
     return records
@@ -448,19 +680,28 @@ def _parse_one_card_block(
 ) -> None:
     """
     Fill one voter record from a list of lines (one card).
-    Uses OCR-tolerant patterns: fuzzy Father/House/Age/Gender labels and values.
+    Extracts serial_number, uses OCR-tolerant patterns for labels/values.
     """
     i = 0
+    # Serial number: "1 WQD2616720" or standalone "1","2",... at card start
+    if block:
+        m = RE_RECORD_START.match(block[0])
+        if m:
+            rec["serial_number"] = m.group(1)
+            i = 1
+        elif re.match(r"^\d{1,4}$", block[0].strip()) and len(block) > 1:
+            rec["serial_number"] = block[0].strip()
+            i = 1
     while i < len(block):
         bl = block[i].strip()
-        if not bl or bl.lower() in ("photo", "available", "pnoio"):
+        if not bl or bl.lower() in ("photo", "available", "pnoio", "ptoto", "pnoto", "avallable", "availabl", "availablc", "avallablo"):
             i += 1
             continue
         # Name: "Name : value" or "Name" then next line is value
         m_name = RE_NAME_PREFIX.match(bl) or RE_NAME_FUZZY.match(bl)
         if m_name:
             val = (m_name.group(1) or "").strip().rstrip("-")
-            if val and val.lower() not in ("name", "naine", "namie"):
+            if val and val.lower() not in ("name", "naine", "namie", "nama", "namo", "namc"):
                 rec["name"] = val
             elif i + 1 < len(block):
                 next_val = block[i + 1].strip()
@@ -475,7 +716,7 @@ def _parse_one_card_block(
         m_m = RE_MOTHER.search(bl) or RE_MOTHER_FUZZY.match(bl)
         if m_f:
             val = (m_f.group(1) or "").strip().rstrip("-").rstrip('"').strip()
-            label_like = re.sub(r"[\s\"]+", "", val).lower() in ("name", "naine", "namie") or len(val) < 3
+            label_like = re.sub(r"[\s\"]+", "", val).lower() in ("name", "naine", "namie", "nama", "namo", "namc", "narne", "narie") or len(val) < 3
             if val and not label_like:
                 rec["relative_name"] = val
             elif i + 1 < len(block):
@@ -508,11 +749,11 @@ def _parse_one_card_block(
             # Only use captured value if it looks like a real house no (has digit/slash or sufficient length)
             sensible = val and not _is_date_like(val) and (re.search(r"[\d/]", val) or len(val) > 3)
             if sensible and not RE_EPIC.match(val):
-                rec["house_no"] = val
+                rec["house_no"] = _normalize_house_no(val)
             elif i + 1 < len(block):
                 val2 = block[i + 1].strip()
                 if val2 and not _is_date_like(val2) and not RE_EPIC.match(val2):
-                    rec["house_no"] = val2
+                    rec["house_no"] = _normalize_house_no(val2)
                     i += 1
             i += 1
             continue
@@ -538,8 +779,13 @@ def _parse_one_card_block(
                 i += 1
             i += 1
             continue
-        # Age + optional Gender on same line: "32 Genocr", "Age 24 Cendor", "Ago 26 Gendcr"
-        m_age_line = RE_AGE_GENDER_LINE.search(bl) or RE_AGE_FUZZY.search(bl) or RE_AGE_LEADING.match(bl)
+        # Age + optional Gender on same line: "32 Genocr", "Age 24 Gerer Female", "Aga 24 Gondar Ferala"
+        m_age_line = (
+            RE_AGE_GENDER_LINE.search(bl)
+            or RE_AGE_GENDER_LINE_FUZZY.search(bl)
+            or RE_AGE_FUZZY.search(bl)
+            or RE_AGE_LEADING.match(bl)
+        )
         if m_age_line:
             try:
                 a = int(m_age_line.group(1))
@@ -547,8 +793,15 @@ def _parse_one_card_block(
                     rec["age"] = a
             except ValueError:
                 pass
-            # Next line may be gender value (Mole, Foma 0)
-            if i + 1 < len(block):
+            # Gender may be in group(2) (same line) or next line
+            g_val = m_age_line.group(2) if m_age_line.lastindex >= 2 else None
+            if g_val:
+                g_upper = g_val.upper()
+                if g_upper.startswith("M") or g_val.lower() in ("mala",):
+                    rec["gender"] = "M"
+                elif g_upper.startswith("F") or g_val.lower() in ("ferala",):
+                    rec["gender"] = "F"
+            elif i + 1 < len(block):
                 g_line = block[i + 1].strip()
                 if RE_GENDER.match(g_line):
                     rec["gender"] = "M" if g_line.upper().startswith("M") else "F"
@@ -589,7 +842,7 @@ def _parse_one_card_block(
         is_house_label = "hous" in bl_lower and ("num" in bl_lower or "no" in bl_lower)
         if not rec.get("house_no") and RE_HOUSE_NO.match(bl) and len(bl) <= 80 and not is_house_label:
             if not RE_EPIC.match(bl) and not RE_EPIC_ANYWHERE.search(bl) and not _is_date_like(bl):
-                rec["house_no"] = bl
+                rec["house_no"] = _normalize_house_no(bl)
             i += 1
             continue
         # Name fallback: first non-label line that looks like a name
@@ -673,6 +926,7 @@ def _try_parse_column_layout(
     for j in range(num_cards):
         rec: Dict[str, Any] = {
             "epic_number": epics[j] if j < len(epics) else "",
+            "serial_number": str(j + 1) if num_cards <= 10 else None,  # best-effort for grid
             "name": None,
             "relative_name": "",
             "age": None,
@@ -694,15 +948,55 @@ def _parse_voter_cards_from_text(
     default_booth: str,
     default_constituency: str,
     page_number: int = 1,
+    extraction_config: Optional[Dict[str, Any]] = None,
 ) -> List[Dict[str, Any]]:
     """
     Parse voter entries from card-style layout (TN ECI format).
-    Supports: (1) Column grid layout (EPIC1, EPIC2, EPIC3 then row-major cells);
-    (2) Sequential cards (Serial+EPIC then block of lines per card).
-    Uses OCR-tolerant patterns for scanned PDFs.
+    Flow: (1) Record segmentation (EPIC-split or grid reorder), (2) Column layout, (3) Sequential.
     """
+    cfg = extraction_config or {}
+    cards_per_row = int(cfg.get("cards_per_row", 3))
+    rows_per_page = int(cfg.get("rows_per_page", 2))
     lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
-    # Try column layout first (scanned grid: N EPICs then rows of N cells)
+
+    # 1) Record segmentation layer: ensures one-block-per-card before parsing
+    try:
+        from .record_segmentation import segment_page_text, count_structural_anomalies
+        blocks = segment_page_text(text, cards_per_row=cards_per_row, rows_per_page=rows_per_page)
+        if blocks:
+            records = []
+            for block in blocks:
+                if not block:
+                    continue
+                epics_in = [ln for ln in block if RE_EPIC.match(ln)]
+                epic = epics_in[0] if epics_in else None
+                if not epic:
+                    continue
+                rec: Dict[str, Any] = {
+                    "epic_number": epic,
+                    "serial_number": None,
+                    "name": None,
+                    "relative_name": "",
+                    "age": None,
+                    "gender": None,
+                    "house_no": "",
+                    "address": "",
+                    "booth_number": default_booth,
+                    "constituency_name": default_constituency,
+                    "page_number": page_number,
+                }
+                _parse_one_card_block(block, rec)
+                anomalies = count_structural_anomalies(block)
+                if anomalies:
+                    rec["_warnings"] = rec.get("_warnings", []) + ["possible_cross_card_merge"] + anomalies
+                if rec.get("name") or rec.get("epic_number"):
+                    records.append(rec)
+            if records:
+                return records
+    except ImportError:
+        pass
+
+    # 2) Column grid layout (legacy)
     col_result = _try_parse_column_layout(lines, default_booth, default_constituency, page_number)
     if col_result:
         return col_result
@@ -722,12 +1016,13 @@ def _parse_voter_cards_from_text(
             serial_str, epic = m.group(1), m.group(2)
         elif RE_EPIC.match(line):
             epic = line.strip()
-            serial_str = ""
+            serial_str = None
         else:
             i += 1
             continue
         rec: Dict[str, Any] = {
             "epic_number": epic,
+            "serial_number": serial_str,
             "name": None,
             "relative_name": "",
             "age": None,
@@ -775,12 +1070,17 @@ def _parse_voter_cards_fallback(
     epic_indices = [i for i, line in enumerate(lines) if RE_EPIC.match(line) and not any(s in line.lower() for s in skip_keywords)]
     for idx in epic_indices:
         epic = lines[idx].strip()
+        # Serial may be on previous line (standalone digit)
+        serial_num = None
+        if idx > 0 and re.match(r"^\d{1,4}$", lines[idx - 1]):
+            serial_num = lines[idx - 1]
         block = lines[idx + 1 : min(idx + 10, len(lines))]
         # Stop at next EPIC
         stop = next((j for j, ln in enumerate(block) if RE_EPIC.match(ln)), len(block))
         block = block[:stop]
         rec: Dict[str, Any] = {
             "epic_number": epic,
+            "serial_number": serial_num,
             "name": None,
             "relative_name": "",
             "age": None,
@@ -1055,7 +1355,7 @@ def extract_from_pdf(
                 except Exception as e:
                     logger.debug("Position-based extraction failed for page %s: %s", page_no, e)
             if not card_records and len(all_records) == page_record_count_before and text.strip():
-                card_records = _parse_voter_cards_from_text(text, booth, constituency, page_no)
+                card_records = _parse_voter_cards_from_text(text, booth, constituency, page_no, extraction_config)
                 if not card_records and RE_EPIC_ANYWHERE.search(text):
                     card_records = _parse_voter_cards_fallback(text, booth, constituency, page_no)
             if card_records:
@@ -1070,7 +1370,13 @@ def extract_from_pdf(
     # If no text was extracted from any page (image-only PDF), run OCR automatically
     all_text_empty = all((not (p.get("text") or "").strip()) for p in raw_page_texts)
     if not all_records and all_text_empty:
-        ocr_texts = _extract_text_via_ocr(pdf_path)
+        cfg = _merge_ocr_config(extraction_config)
+        ocr_texts = _extract_text_via_ocr(
+            pdf_path,
+            max_pages=cfg.get("ocr_max_pages", 1000),
+            dpi=cfg.get("ocr_dpi", 200),
+            preprocess=cfg.get("ocr_preprocess", False),
+        )
         if ocr_texts:
             logger.info("OCR extracted text from %s pages (image-only PDF)", len(ocr_texts))
             raw_page_texts = [{"page": i + 1, "length": len(t), "text": t} for i, t in enumerate(ocr_texts)]
@@ -1082,7 +1388,7 @@ def extract_from_pdf(
                 booth = pn
             for ocr_page_idx, page_text in enumerate(ocr_texts):
                 page_no = ocr_page_idx + 1
-                card_records = _parse_voter_cards_from_text(page_text, booth, constituency, page_no)
+                card_records = _parse_voter_cards_from_text(page_text, booth, constituency, page_no, extraction_config)
                 if not card_records and RE_EPIC_ANYWHERE.search(page_text):
                     card_records = _parse_voter_cards_fallback(page_text, booth, constituency, page_no)
                 if card_records:
@@ -1092,7 +1398,13 @@ def extract_from_pdf(
             pages_processed = len(ocr_texts)
     # Legacy: explicit use_ocr when text was empty
     elif not all_records and use_ocr and (not first_page_text or not first_page_text.strip()):
-        ocr_texts = _extract_text_via_ocr(pdf_path)
+        cfg = _merge_ocr_config(extraction_config)
+        ocr_texts = _extract_text_via_ocr(
+            pdf_path,
+            max_pages=cfg.get("ocr_max_pages", 1000),
+            dpi=cfg.get("ocr_dpi", 200),
+            preprocess=cfg.get("ocr_preprocess", False),
+        )
         if ocr_texts:
             raw_page_texts = [{"page": i + 1, "length": len(t), "text": t} for i, t in enumerate(ocr_texts)]
             first_page_text = ocr_texts[0] if ocr_texts else ""
@@ -1103,7 +1415,7 @@ def extract_from_pdf(
                 booth = pn
             for ocr_page_idx, page_text in enumerate(ocr_texts):
                 page_no = ocr_page_idx + 1
-                card_records = _parse_voter_cards_from_text(page_text, booth, constituency, page_no)
+                card_records = _parse_voter_cards_from_text(page_text, booth, constituency, page_no, extraction_config)
                 if not card_records and RE_EPIC_ANYWHERE.search(page_text):
                     card_records = _parse_voter_cards_fallback(page_text, booth, constituency, page_no)
                 if card_records:
@@ -1123,12 +1435,19 @@ def extract_from_pdf(
     if not constituency_name and all_records:
         constituency_name = all_records[0].get("constituency_name") or ""
 
-    # Apply metadata to all records that don't have booth/constituency
+    # Apply metadata and EPIC normalization (WOD→WQD, WQ0→WQD for OCR errors)
+    cfg = extraction_config or {}
     for r in all_records:
         if not r.get("booth_number") and part_no:
             r["booth_number"] = part_no
         if not r.get("constituency_name") and constituency_name:
             r["constituency_name"] = constituency_name
+        if r.get("epic_number"):
+            r["epic_number"] = _normalize_epic(r["epic_number"], cfg)
+        r.setdefault("serial_number", None)
+
+    # Structural layer: validation, confidence scoring, duplicate detection
+    all_records, validation_stats = _validate_and_score_records(all_records)
 
     meta = {
         "constituency_name": constituency_name or "",
@@ -1138,6 +1457,7 @@ def extract_from_pdf(
         "raw_headers": raw_headers,
     }
     meta.update(_extract_extended_metadata(first_page_text))
+    meta["validation_stats"] = validation_stats
     return {
         "records": all_records,
         "metadata": meta,
@@ -1204,8 +1524,8 @@ def _append_from_text_lines(
             if p in ("M", "F", "Male", "Female"):
                 rec["gender"] = "M" if p.upper().startswith("M") else "F"
                 break
-            if i >= 4 and p and re.match(r"^[0-9/\-\.]+$", p) and not rec.get("house_no"):
-                rec["house_no"] = p
+            if i >= 4 and p and re.match(r"^[0-9/\-\.A-Za-z]+$", p) and not rec.get("house_no"):
+                rec["house_no"] = _normalize_house_no(p)
                 break
         if rec.get("name") or rec.get("epic_number"):
             records.append(rec)

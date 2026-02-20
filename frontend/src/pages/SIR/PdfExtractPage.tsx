@@ -3,12 +3,14 @@ import { extractPdfRoll, extractPdfByPath, listPdfFiles, getPdfBlobUrl, debugPdf
 import PageContainer from '../../components/common/PageContainer';
 import PageMeta from '../../components/common/PageMeta';
 import ThemedLoader from '../../components/common/ThemedLoader';
-import { alerterror } from '../../utils/toast';
+import { alerterror, alertsuccess } from '../../utils/toast';
 import PdfZoneEditor, { ZoneConfig } from '../../components/SIR/PdfZoneEditor';
+import { CopyIcon } from '../../icons';
 
 /** Extracted voter record (matches backend electoral_roll_pdf_extractor schema). */
 interface ExtractedRecord {
   epic_number: string | null;
+  serial_number?: string | null;
   name: string | null;
   relative_name: string | null;
   age: number | null;
@@ -18,6 +20,9 @@ interface ExtractedRecord {
   booth_number: string | null;
   constituency_name: string | null;
   page_number?: number;
+  confidence_score?: number;
+  is_duplicate?: boolean;
+  low_confidence?: boolean;
 }
 
 interface ExtractMetadata {
@@ -48,9 +53,29 @@ interface ExtractMetadata {
   net_electors_total?: string;
 }
 
-/** Extraction config for ABBYY-like coordinate tuning (3 sections × 3 cards = 9 per row). */
+/** Accuracy summary from extraction engine. */
+interface AccuracySummary {
+  completeness_percent?: number;
+  estimated_accuracy_range?: string;
+  field_coverage?: Record<string, number>;
+  extraction_mode?: string;
+  records_total?: number;
+  records_complete?: number;
+  epic_valid_pct?: number;
+  age_valid_pct?: number;
+  gender_valid_pct?: number;
+  duplicate_epic_count?: number;
+  low_confidence_count?: number;
+  multi_epic_warnings?: number;
+  possible_cross_card_merge_count?: number;
+  avg_confidence_score?: number;
+}
+
+/** Extraction config for ABBYY-like coordinate tuning (3 cards/row × 10 rows = 30 per page). */
 interface ExtractionConfig {
   cards_per_row?: number;
+  rows_per_page?: number;
+  row_gap?: number;
   header_top?: number;
   data_bottom?: number;
   margin_left?: number;
@@ -58,7 +83,9 @@ interface ExtractionConfig {
 }
 
 const DEFAULT_CONFIG: ExtractionConfig = {
-  cards_per_row: 9,
+  cards_per_row: 3,
+  rows_per_page: 10,
+  row_gap: 25,
   header_top: 120,
   data_bottom: 750,
   margin_left: 20,
@@ -67,7 +94,9 @@ const DEFAULT_CONFIG: ExtractionConfig = {
 
 function toZoneConfig(c: ExtractionConfig): ZoneConfig {
   return {
-    cards_per_row: c.cards_per_row ?? 9,
+    cards_per_row: c.cards_per_row ?? 3,
+    rows_per_page: c.rows_per_page ?? 10,
+    row_gap: c.row_gap ?? 25,
     header_top: c.header_top ?? 120,
     data_bottom: c.data_bottom ?? 750,
     margin_left: c.margin_left ?? 20,
@@ -76,10 +105,18 @@ function toZoneConfig(c: ExtractionConfig): ZoneConfig {
 }
 
 const PdfExtractPage: React.FC = () => {
+  const copyToClipboard = (text: string | number | null | undefined) => {
+    const str = String(text ?? '').trim();
+    if (!str) return;
+    navigator.clipboard.writeText(str).then(() => {
+      alertsuccess('Copied to clipboard!');
+    }).catch(() => {});
+  };
+
+  const [viewMode, setViewMode] = useState<'table' | 'cards'>('cards');
   const [file, setFile] = useState<File | null>(null);
   const [constituencyName, setConstituencyName] = useState('');
   const [boothNumber, setBoothNumber] = useState('');
-  const [useOcr, setUseOcr] = useState(false);
   const [loading, setLoading] = useState(false);
   const [records, setRecords] = useState<ExtractedRecord[]>([]);
   const [metadata, setMetadata] = useState<ExtractMetadata | null>(null);
@@ -94,6 +131,7 @@ const PdfExtractPage: React.FC = () => {
   const [extractionConfig, setExtractionConfig] = useState<ExtractionConfig>({ ...DEFAULT_CONFIG });
   const [showConfig, setShowConfig] = useState(false);
   const [previewPage, setPreviewPage] = useState(3);
+  const [accuracySummary, setAccuracySummary] = useState<AccuracySummary | null>(null);
 
   const blobUrlRef = React.useRef<string | null>(null);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
@@ -202,32 +240,35 @@ const PdfExtractPage: React.FC = () => {
     setMetadata(null);
     setRawPageTexts([]);
     setDebugInfo(null);
+    setAccuracySummary(null);
     try {
       if (useFolder) {
         const res = await extractPdfByPath({
           filename: selectedFilename,
           constituency_name: constituencyName.trim() || undefined,
           booth_number: boothNumber.trim() || undefined,
-          use_ocr: useOcr,
+          use_ocr: false,
           extraction_config: hasConfig ? cfg : undefined,
         });
-        const data = res.data as { records?: ExtractedRecord[]; metadata?: ExtractMetadata; raw_page_texts?: { page: number; length: number; text: string }[] };
+        const data = res.data as { records?: ExtractedRecord[]; metadata?: ExtractMetadata; raw_page_texts?: { page: number; length: number; text: string }[]; accuracy_summary?: AccuracySummary };
         setRecords(data.records ?? []);
         setMetadata(data.metadata ?? null);
         setRawPageTexts(data.raw_page_texts ?? []);
+        setAccuracySummary(data.accuracy_summary ?? null);
       } else {
         const formData = new FormData();
         formData.append('file', file!);
         if (constituencyName.trim()) formData.append('constituency_name', constituencyName.trim());
         if (boothNumber.trim()) formData.append('booth_number', boothNumber.trim());
-        formData.append('use_ocr', useOcr ? 'true' : 'false');
+        formData.append('use_ocr', 'false'); // OCR runs automatically when PDF has no text layer
         if (hasConfig) formData.append('extraction_config_json', JSON.stringify(cfg));
 
         const res = await extractPdfRoll(formData);
-        const data = res.data as { records?: ExtractedRecord[]; metadata?: ExtractMetadata; raw_page_texts?: { page: number; length: number; text: string }[] };
+        const data = res.data as { records?: ExtractedRecord[]; metadata?: ExtractMetadata; raw_page_texts?: { page: number; length: number; text: string }[]; accuracy_summary?: AccuracySummary };
         setRecords(data.records ?? []);
         setMetadata(data.metadata ?? null);
         setRawPageTexts(data.raw_page_texts ?? []);
+        setAccuracySummary(data.accuracy_summary ?? null);
       }
     } catch (e: any) {
       const msg = e.response?.data?.detail || e.message || 'Extraction failed';
@@ -270,8 +311,8 @@ const PdfExtractPage: React.FC = () => {
         </div>
 
         <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 text-sm text-blue-900 dark:text-blue-100">
-          <p className="font-semibold mb-2">Supported format: Tamil Nadu ECI electoral roll (e.g. ELECTORAL ROLL 2026 S22)</p>
-          <p className="mb-2">Data extracted — easy reference:</p>
+          <p className="font-semibold mb-2">OCR-style extraction — same format as OCR module for easy verification</p>
+          <p className="mb-2">Supported: Tamil Nadu ECI electoral roll (e.g. ELECTORAL ROLL 2026 S22). Data extracted:</p>
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <p className="font-medium mb-1">From first page (cover)</p>
@@ -303,7 +344,8 @@ const PdfExtractPage: React.FC = () => {
               </ul>
             </div>
           </div>
-          <p className="mt-2 text-blue-800 dark:text-blue-200">Layout: 3 sections per row × 3 cards per section = 9 voters per row. Move PDF to backend/pdf folder to select from dropdown.</p>
+          <p className="mt-2 text-blue-800 dark:text-blue-200">Layout: 3 cards per row × 10 rows = 30 voters per page. Move PDF to backend/pdf folder to select from dropdown.</p>
+          <p className="mt-1 text-xs text-blue-700 dark:text-blue-300">See backend/docs/EXTRACTION_ENGINE_HOW_IT_WORKS.md for how the engine works and accuracy details.</p>
         </div>
 
         <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 max-w-4xl">
@@ -414,18 +456,9 @@ const PdfExtractPage: React.FC = () => {
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                 />
               </div>
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="use-ocr"
-                  checked={useOcr}
-                  onChange={(e) => setUseOcr(e.target.checked)}
-                  className="rounded border-gray-300 dark:border-gray-600"
-                />
-                <label htmlFor="use-ocr" className="text-sm text-gray-700 dark:text-gray-300">
-                  Use OCR (for scanned/image-only PDFs — slower, requires Tesseract/PyMuPDF)
-                </label>
-              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                OCR runs automatically for scanned/image-only PDFs (no text layer).
+              </p>
             </div>
 
             <div className="border-t border-gray-200 dark:border-gray-600 pt-4">
@@ -437,16 +470,40 @@ const PdfExtractPage: React.FC = () => {
                 {showConfig ? '▼' : '▶'} Extraction format (ABBYY-like coordinates)
               </button>
               {showConfig && (
-                <div className="mt-3 grid grid-cols-2 sm:grid-cols-5 gap-3 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
+                <div className="mt-3 grid grid-cols-2 sm:grid-cols-6 gap-3 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
                   <div>
                     <label className="block text-xs text-gray-500 dark:text-gray-400 mb-0.5">Cards/row</label>
                     <input
                       type="number"
-                      min={3}
+                      min={1}
                       max={12}
                       value={extractionConfig.cards_per_row ?? ''}
                       onChange={(e) => setExtractionConfig((c) => ({ ...c, cards_per_row: e.target.value ? parseInt(e.target.value, 10) : undefined }))}
-                      placeholder="9"
+                      placeholder="3"
+                      className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-0.5">Rows/page</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={20}
+                      value={extractionConfig.rows_per_page ?? ''}
+                      onChange={(e) => setExtractionConfig((c) => ({ ...c, rows_per_page: e.target.value ? parseInt(e.target.value, 10) : undefined }))}
+                      placeholder="10"
+                      className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-0.5">Row gap (px)</label>
+                    <input
+                      type="number"
+                      min={10}
+                      max={60}
+                      value={extractionConfig.row_gap ?? ''}
+                      onChange={(e) => setExtractionConfig((c) => ({ ...c, row_gap: e.target.value ? parseFloat(e.target.value) : undefined }))}
+                      placeholder="25"
                       className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800"
                     />
                   </div>
@@ -512,7 +569,7 @@ const PdfExtractPage: React.FC = () => {
           </div>
         </div>
 
-        {/* ABBYY-style: PDF + zones (left) | Extracted data (right) */}
+        {/* ABBYY-style: PDF + zones (left) | Extracted data (right) - OCR-style */}
         {pdfUrl && (
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -540,11 +597,29 @@ const PdfExtractPage: React.FC = () => {
               </div>
             </div>
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col">
-              <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Extracted data</h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Click Submit above to extract. Records appear here.
-                </p>
+              <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Extracted records (OCR-style)</h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Click Submit to extract. Click copy icon to copy value.</p>
+                </div>
+                {records.length > 0 && (
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setViewMode('cards')}
+                      className={`px-2 py-1 text-xs rounded ${viewMode === 'cards' ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'}`}
+                    >
+                      Cards
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setViewMode('table')}
+                      className={`px-2 py-1 text-xs rounded ${viewMode === 'table' ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'}`}
+                    >
+                      Table
+                    </button>
+                  </div>
+                )}
               </div>
               <div className="flex-1 overflow-auto p-4 min-h-[300px]">
                 {records.length === 0 && !loading && (
@@ -552,7 +627,71 @@ const PdfExtractPage: React.FC = () => {
                     No records yet. Adjust zones if needed, then click Submit.
                   </p>
                 )}
-                {records.length > 0 && (
+                {records.length > 0 && viewMode === 'cards' && (
+                  <div className="space-y-3 max-h-[60vh] overflow-y-auto">
+                    {records.slice(0, 100).map((r, idx) => (
+                      <div key={idx} className="rounded-lg border border-gray-200 dark:border-gray-600 p-3 bg-gray-50 dark:bg-gray-900/50 text-sm">
+                        <div className="grid grid-cols-[100px_1fr] gap-x-3 gap-y-1.5">
+                          <span className="text-gray-500 dark:text-gray-400">EPIC No</span>
+                          <span className="inline-flex items-center gap-1">
+                            <span className="text-gray-900 dark:text-white">{r.epic_number ?? '—'}</span>
+                            {(r.epic_number ?? '').trim() && (
+                              <button type="button" onClick={() => copyToClipboard(r.epic_number)} className="text-gray-400 hover:text-indigo-600" title="Copy">
+                                <CopyIcon className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </span>
+                          <span className="text-gray-500 dark:text-gray-400">Name</span>
+                          <span className="inline-flex items-center gap-1">
+                            <span className="text-gray-900 dark:text-white font-medium">{r.name ?? '—'}</span>
+                            {(r.name ?? '').trim() && (
+                              <button type="button" onClick={() => copyToClipboard(r.name)} className="text-gray-400 hover:text-indigo-600" title="Copy">
+                                <CopyIcon className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </span>
+                          <span className="text-gray-500 dark:text-gray-400">Father/Husband</span>
+                          <span className="inline-flex items-center gap-1">
+                            <span className="text-gray-700 dark:text-gray-300">{r.relative_name ?? '—'}</span>
+                            {(r.relative_name ?? '').trim() && (
+                              <button type="button" onClick={() => copyToClipboard(r.relative_name)} className="text-gray-400 hover:text-indigo-600" title="Copy">
+                                <CopyIcon className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </span>
+                          <span className="text-gray-500 dark:text-gray-400">House No</span>
+                          <span className="inline-flex items-center gap-1">
+                            <span className="text-gray-700 dark:text-gray-300">{r.house_no ?? '—'}</span>
+                            {(r.house_no ?? '').trim() && (
+                              <button type="button" onClick={() => copyToClipboard(r.house_no)} className="text-gray-400 hover:text-indigo-600" title="Copy">
+                                <CopyIcon className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </span>
+                          <span className="text-gray-500 dark:text-gray-400">Age</span>
+                          <span className="text-gray-700 dark:text-gray-300">{r.age ?? '—'}</span>
+                          <span className="text-gray-500 dark:text-gray-400">Gender</span>
+                          <span className="text-gray-700 dark:text-gray-300">{r.gender ?? '—'}</span>
+                          <span className="text-gray-500 dark:text-gray-400">Address</span>
+                          <span className="inline-flex items-center gap-1 col-span-1">
+                            <span className="text-gray-700 dark:text-gray-300 truncate max-w-[200px]" title={r.address ?? ''}>{r.address ?? '—'}</span>
+                            {(r.address ?? '').trim() && (
+                              <button type="button" onClick={() => copyToClipboard(r.address)} className="text-gray-400 hover:text-indigo-600 flex-shrink-0" title="Copy">
+                                <CopyIcon className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </span>
+                          <span className="text-gray-500 dark:text-gray-400">Page</span>
+                          <span className="text-gray-600 dark:text-gray-400">{r.page_number ?? '—'}</span>
+                        </div>
+                      </div>
+                    ))}
+                    {records.length > 100 && (
+                      <p className="text-xs text-gray-500 dark:text-gray-400 py-2">Showing first 100 of {records.length}</p>
+                    )}
+                  </div>
+                )}
+                {records.length > 0 && viewMode === 'table' && (
                   <div className="overflow-x-auto max-h-[60vh]">
                     <table className="min-w-full text-sm">
                       <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0">
@@ -569,10 +708,28 @@ const PdfExtractPage: React.FC = () => {
                       <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
                         {records.slice(0, 100).map((r, idx) => (
                           <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                            <td className="px-2 py-1.5 text-gray-900 dark:text-white">{r.page_number ?? '—'}</td>
-                            <td className="px-2 py-1.5 text-gray-900 dark:text-white">{r.epic_number ?? '—'}</td>
-                            <td className="px-2 py-1.5 text-gray-900 dark:text-white">{r.name ?? '—'}</td>
-                            <td className="px-2 py-1.5 text-gray-600 dark:text-gray-300">{r.relative_name ?? '—'}</td>
+                            <td className="px-2 py-1.5">{r.page_number ?? '—'}</td>
+                            <td className="px-2 py-1.5">
+                              <span className="inline-flex items-center gap-1">
+                                {r.epic_number ?? '—'}
+                                {(r.epic_number ?? '').trim() && (
+                                  <button type="button" onClick={() => copyToClipboard(r.epic_number)} className="text-gray-400 hover:text-indigo-600" title="Copy">
+                                    <CopyIcon className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                              </span>
+                            </td>
+                            <td className="px-2 py-1.5">
+                              <span className="inline-flex items-center gap-1">
+                                {r.name ?? '—'}
+                                {(r.name ?? '').trim() && (
+                                  <button type="button" onClick={() => copyToClipboard(r.name)} className="text-gray-400 hover:text-indigo-600" title="Copy">
+                                    <CopyIcon className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                              </span>
+                            </td>
+                            <td className="px-2 py-1.5">{r.relative_name ?? '—'}</td>
                             <td className="px-2 py-1.5">{r.age ?? '—'}</td>
                             <td className="px-2 py-1.5">{r.gender ?? '—'}</td>
                             <td className="px-2 py-1.5">{r.house_no ?? '—'}</td>
@@ -595,18 +752,18 @@ const PdfExtractPage: React.FC = () => {
           </div>
         )}
 
-        {/* Extracted data below (full view) */}
+        {/* Extracted data below - OCR module style layout */}
         {(metadata !== null || records.length > 0 || rawPageTexts.length > 0 || (debugInfo?.page_texts_full?.length ?? 0) > 0) && (
           <div className="space-y-4">
-            {/* 1. Entire raw extracted text (show first so user sees what was read from PDF) */}
+            {/* 1. Raw OCR / extracted text — what was read from the PDF */}
             {pageTextsToShow.length > 0 && (
               <div className="bg-white dark:bg-gray-800 rounded-xl shadow border border-gray-200 dark:border-gray-700 overflow-hidden">
                 <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                    1. Raw extracted text (entire) — what was read from the PDF
+                    1. Raw OCR / extracted text — what was read from the PDF
                   </h3>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    Full text per page. Used for parsing constituency, Part No., and voter cards.
+                    Full text per page. Used to parse voter cards. Scanned PDFs (no text layer) trigger OCR automatically.
                   </p>
                 </div>
                 <div className="p-4 space-y-4 max-h-[70vh] overflow-y-auto">
@@ -616,7 +773,7 @@ const PdfExtractPage: React.FC = () => {
                         Page {p.page} — {p.length} characters
                       </div>
                       <pre className="p-4 text-xs whitespace-pre-wrap break-words font-mono bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200 min-h-[80px]">
-                        {p.text || '(empty — image-only PDF: OCR runs automatically; if still empty, enable "Use OCR" above and install: pip install pymupdf pytesseract + Tesseract from https://github.com/UB-Mannheim/tesseract/wiki)'}
+                        {p.text || '(empty — scanned PDF; OCR runs automatically. If still empty, install: pip install pymupdf pytesseract + Tesseract from https://github.com/UB-Mannheim/tesseract/wiki)'}
                       </pre>
                     </div>
                   ))}
@@ -624,10 +781,78 @@ const PdfExtractPage: React.FC = () => {
               </div>
             )}
 
-            {/* 2. Metadata */}
+            {/* 2. Accuracy summary — how extraction performed */}
+            {accuracySummary && records.length > 0 && (
+              <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow border border-gray-200 dark:border-gray-700">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Extraction accuracy</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+                  <div>
+                    <span className="text-gray-500 dark:text-gray-400">Mode</span>
+                    <p className="font-medium text-gray-900 dark:text-white">{accuracySummary.extraction_mode === 'ocr' ? 'OCR (scanned)' : 'Text (digital)'}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500 dark:text-gray-400">Completeness</span>
+                    <p className="font-medium text-gray-900 dark:text-white">{accuracySummary.completeness_percent ?? 0}%</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500 dark:text-gray-400">Est. accuracy</span>
+                    <p className="font-medium text-gray-900 dark:text-white">{accuracySummary.estimated_accuracy_range ?? '—'}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500 dark:text-gray-400">Records</span>
+                    <p className="font-medium text-gray-900 dark:text-white">{accuracySummary.records_complete ?? 0} / {accuracySummary.records_total ?? 0} complete</p>
+                  </div>
+                </div>
+                {(accuracySummary.epic_valid_pct != null || accuracySummary.avg_confidence_score != null || (accuracySummary.duplicate_epic_count ?? 0) > 0 || (accuracySummary.low_confidence_count ?? 0) > 0) && (
+                  <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Structural metrics</p>
+                    <div className="flex flex-wrap gap-2">
+                      {accuracySummary.epic_valid_pct != null && (
+                        <span className="text-xs px-2 py-1 rounded bg-gray-100 dark:bg-gray-700">EPIC valid: {accuracySummary.epic_valid_pct}%</span>
+                      )}
+                      {accuracySummary.age_valid_pct != null && (
+                        <span className="text-xs px-2 py-1 rounded bg-gray-100 dark:bg-gray-700">Age valid: {accuracySummary.age_valid_pct}%</span>
+                      )}
+                      {accuracySummary.gender_valid_pct != null && (
+                        <span className="text-xs px-2 py-1 rounded bg-gray-100 dark:bg-gray-700">Gender valid: {accuracySummary.gender_valid_pct}%</span>
+                      )}
+                      {accuracySummary.avg_confidence_score != null && (
+                        <span className="text-xs px-2 py-1 rounded bg-gray-100 dark:bg-gray-700">Avg confidence: {accuracySummary.avg_confidence_score}%</span>
+                      )}
+                      {(accuracySummary.duplicate_epic_count ?? 0) > 0 && (
+                        <span className="text-xs px-2 py-1 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200">Duplicates: {accuracySummary.duplicate_epic_count}</span>
+                      )}
+                      {(accuracySummary.low_confidence_count ?? 0) > 0 && (
+                        <span className="text-xs px-2 py-1 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200">Low confidence: {accuracySummary.low_confidence_count}</span>
+                      )}
+                      {(accuracySummary.possible_cross_card_merge_count ?? 0) > 0 && (
+                        <span className="text-xs px-2 py-1 rounded bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200">Possible merge: {accuracySummary.possible_cross_card_merge_count}</span>
+                      )}
+                    </div>
+                  </div>
+                )}
+                {accuracySummary.field_coverage && Object.keys(accuracySummary.field_coverage).length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Field coverage (% of records with value)</p>
+                    <div className="flex flex-wrap gap-2">
+                      {Object.entries(accuracySummary.field_coverage).map(([k, v]) => (
+                        <span key={k} className="text-xs px-2 py-1 rounded bg-gray-100 dark:bg-gray-700">
+                          {k.replace(/_/g, ' ')}: {v}%
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                  Text PDF: typically 90–98% accurate. Scanned PDF: 75–90%. Adjust extraction format or enable OCR if needed.
+                </p>
+              </div>
+            )}
+
+            {/* 3. Document metadata (constituency, booth, revision, etc.) */}
             {metadata && (
               <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow border border-gray-200 dark:border-gray-700">
-                <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">2. Extraction metadata</h3>
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Document metadata</h3>
                 <dl className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
                   {metadata.constituency_name != null && (
                     <>
@@ -760,7 +985,7 @@ const PdfExtractPage: React.FC = () => {
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow border border-gray-200 dark:border-gray-700 overflow-hidden">
               <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  3. Extracted records ({records.length})
+                  Extracted voter records ({records.length}) — click copy icon to copy
                 </h3>
               </div>
               {records.length === 0 ? (
@@ -800,14 +1025,35 @@ const PdfExtractPage: React.FC = () => {
                     <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
                       {records.map((r, idx) => (
                         <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                          <td className="px-3 py-2 text-gray-900 dark:text-white">{r.page_number ?? '—'}</td>
-                          <td className="px-3 py-2 text-gray-900 dark:text-white">{r.epic_number ?? '—'}</td>
-                          <td className="px-3 py-2 text-gray-900 dark:text-white">{r.name ?? '—'}</td>
+                          <td className="px-3 py-2">{r.page_number ?? '—'}</td>
+                          <td className="px-3 py-2">
+                            <span className="inline-flex items-center gap-1">
+                              {r.epic_number ?? '—'}
+                              {(r.epic_number ?? '').trim() && (
+                                <button type="button" onClick={() => copyToClipboard(r.epic_number)} className="text-gray-400 hover:text-indigo-600" title="Copy"><CopyIcon className="w-3.5 h-3.5" /></button>
+                              )}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2">
+                            <span className="inline-flex items-center gap-1">
+                              {r.name ?? '—'}
+                              {(r.name ?? '').trim() && (
+                                <button type="button" onClick={() => copyToClipboard(r.name)} className="text-gray-400 hover:text-indigo-600" title="Copy"><CopyIcon className="w-3.5 h-3.5" /></button>
+                              )}
+                            </span>
+                          </td>
                           <td className="px-3 py-2 text-gray-600 dark:text-gray-300">{r.relative_name ?? '—'}</td>
                           <td className="px-3 py-2">{r.age ?? '—'}</td>
                           <td className="px-3 py-2">{r.gender ?? '—'}</td>
                           <td className="px-3 py-2">{r.house_no ?? '—'}</td>
-                          <td className="px-3 py-2 max-w-[200px] truncate text-gray-600 dark:text-gray-300" title={r.address ?? ''}>{r.address ?? '—'}</td>
+                          <td className="px-3 py-2 max-w-[200px] truncate text-gray-600 dark:text-gray-300" title={r.address ?? ''}>
+                            <span className="inline-flex items-center gap-1">
+                              {r.address ?? '—'}
+                              {(r.address ?? '').trim() && (
+                                <button type="button" onClick={() => copyToClipboard(r.address)} className="text-gray-400 hover:text-indigo-600 flex-shrink-0" title="Copy"><CopyIcon className="w-3.5 h-3.5" /></button>
+                              )}
+                            </span>
+                          </td>
                           <td className="px-3 py-2 text-gray-600 dark:text-gray-300">{r.booth_number ?? '—'}</td>
                           <td className="px-3 py-2 text-gray-600 dark:text-gray-300">{r.constituency_name ?? '—'}</td>
                         </tr>

@@ -107,6 +107,9 @@ export const API_ENDPOINTS = {
   SIR_PDF_FILE: "/api/upload/pdf-file",
   SIR_DEBUG_PDF: "/api/upload/debug-pdf",
   SIR_ECI_DOWNLOAD: "/api/upload/eci-download",
+  // Production extractor v1 (auto-detect text vs scanned, validation)
+  EXTRACTOR_V1_EXTRACT: "/api/v1/extract-voters",
+  EXTRACTOR_V1_HEALTH: "/api/v1/extractor/health",
   SIR_MATCHING_RUN: "/api/matching/run",
   SIR_KPI_BOOTH: "/api/kpi/booth",
   SIR_KPI_CONSTITUENCY: "/api/kpi/constituency",

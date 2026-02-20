@@ -13,6 +13,11 @@ requests
 aiofiles
 pdfplumber
 pymupdf
+Pillow
 pytesseract
+numpy
+opencv-python-headless
 easyocr
 playwright
+opencv-python-headless
+pdf2image

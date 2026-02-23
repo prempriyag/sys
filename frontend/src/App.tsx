@@ -15,6 +15,7 @@ import SIRDashboard from "./pages/SIR/Dashboard";
 import UploadPage from "./pages/SIR/UploadPage";
 import RollDataPage from "./pages/SIR/RollDataPage";
 import PdfExtractPage from "./pages/SIR/PdfExtractPage";
+import OcrPdfDetector from "./pages/SIR/OcrPdfDetector";
 import BoothAnalysis from "./pages/SIR/BoothAnalysis";
 import BoothKPIs from "./pages/SIR/BoothKPIs";
 import RiskHeatmap from "./pages/SIR/RiskHeatmap";
@@ -71,6 +72,7 @@ export default function App() {
           <Route path="/upload/matching" element={<UploadPage type="matching" />} />
           <Route path="/upload/roll-data" element={<RollDataPage />} />
           <Route path="/upload/pdf-extract" element={<PdfExtractPage />} />
+          <Route path="/upload/ocr-pdf-detector" element={<OcrPdfDetector />} />
           <Route path="/upload" element={<UploadPage />} />
 
           {/* Booth Analysis */}

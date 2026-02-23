@@ -92,6 +92,9 @@ export const extractVotersV1 = (formData: FormData) =>
 /** Production v1: Extractor health (OCR engines, OpenCV, PyMuPDF availability). */
 export const extractorHealth = () => api.get(API_ENDPOINTS.EXTRACTOR_V1_HEALTH);
 
+/** Database connection info (no password). */
+export const getDbInfo = () => api.get(API_ENDPOINTS.DB_INFO);
+
 /** Download electoral roll PDF from ECI portal (automated: pre-fill, captcha OCR, select first row). Returns blob for PDF download. */
 export const downloadEciRoll = async (params: {
     state?: string;

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { extractPdfRoll, extractPdfByPath, listPdfFiles, getPdfBlobUrl, debugPdfRoll, downloadEciRoll } from '../../services/api';
+import { extractPdfRoll, extractPdfByPath, listPdfFiles, getPdfBlobUrl, debugPdfRoll, downloadEciRoll, getDbInfo } from '../../services/api';
 import PageContainer from '../../components/common/PageContainer';
 import PageMeta from '../../components/common/PageMeta';
 import ThemedLoader from '../../components/common/ThemedLoader';
@@ -121,7 +121,16 @@ const PdfExtractPage: React.FC = () => {
   const [records, setRecords] = useState<ExtractedRecord[]>([]);
   const [metadata, setMetadata] = useState<ExtractMetadata | null>(null);
   const [rawPageTexts, setRawPageTexts] = useState<{ page: number; length: number; text: string }[]>([]);
-  const [debugInfo, setDebugInfo] = useState<{ page_texts_full?: { page: number; length: number; text: string }[] } | null>(null);
+  const [debugInfo, setDebugInfo] = useState<{
+    first_page_text?: string;
+    first_page_text_length?: number;
+    table_count?: number;
+    table_count_text_strategy?: number;
+    table_preview?: Array<{ table_index: number; strategy?: string; row_count: number; first_3_rows: any[] }>;
+    page_texts_full?: { page: number; length: number; text: string }[];
+  } | null>(null);
+  const [dbInfo, setDbInfo] = useState<any | null>(null);
+  const [dbLoading, setDbLoading] = useState(false);
   const [eciLoading, setEciLoading] = useState(false);
   const [selectedFilename, setSelectedFilename] = useState<string>('');
   const [pdfFiles, setPdfFiles] = useState<string[]>([]);
@@ -186,6 +195,22 @@ const PdfExtractPage: React.FC = () => {
   useEffect(() => {
     loadPdfList();
   }, [loadPdfList]);
+
+  const loadDbInfo = useCallback(async () => {
+    setDbLoading(true);
+    try {
+      const res = await getDbInfo();
+      setDbInfo(res.data);
+    } catch (e: any) {
+      setDbInfo(null);
+    } finally {
+      setDbLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadDbInfo();
+  }, [loadDbInfo]);
 
   const handleEciDownload = async () => {
     setEciLoading(true);
@@ -288,7 +313,7 @@ const PdfExtractPage: React.FC = () => {
     setDebugInfo(null);
     try {
       const res = await debugPdfRoll(formData);
-      setDebugInfo(res.data as { page_texts_full?: { page: number; length: number; text: string }[] });
+      setDebugInfo(res.data as any);
     } catch (e: any) {
       alerterror(e.response?.data?.detail || e.message || 'Debug failed');
     }
@@ -303,6 +328,32 @@ const PdfExtractPage: React.FC = () => {
         description="Upload an ECI-style electoral roll PDF and preview extracted voter data"
       />
       <div className="space-y-6">
+        {/* DB info */}
+        <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow border border-gray-200 dark:border-gray-700 max-w-4xl">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold text-gray-900 dark:text-white">DB Detail</h2>
+              {dbInfo?.database ? (
+                <p className="text-xs text-gray-600 dark:text-gray-300 mt-1">
+                  {dbInfo.status} | {dbInfo.database.driver} | {dbInfo.database.user}@{dbInfo.database.host}/{dbInfo.database.name}{" "}
+                  {dbInfo.database.version ? `| ${dbInfo.database.version}` : ""}
+                </p>
+              ) : (
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  DB info not available
+                </p>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={loadDbInfo}
+              disabled={dbLoading}
+              className="text-sm px-3 py-1.5 rounded border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50"
+            >
+              {dbLoading ? 'Loading...' : 'Refresh DB Info'}
+            </button>
+          </div>
+        </div>
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Extract PDF Roll</h1>
           <p className="text-gray-500 dark:text-gray-400 mt-1">
@@ -755,6 +806,51 @@ const PdfExtractPage: React.FC = () => {
         {/* Extracted data below - OCR module style layout */}
         {(metadata !== null || records.length > 0 || rawPageTexts.length > 0 || (debugInfo?.page_texts_full?.length ?? 0) > 0) && (
           <div className="space-y-4">
+            {/* PDF table detail (pdfplumber table extraction preview) */}
+            {file && (
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow border border-gray-200 dark:border-gray-700 overflow-hidden">
+                <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">0. PDF table detail</h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      Shows what pdfplumber detects as tables on the first page (helps diagnose layout issues).
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleDebug}
+                    className="text-sm px-3 py-1.5 rounded border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                    title="Calls /api/upload/debug-pdf"
+                  >
+                    Load table preview
+                  </button>
+                </div>
+                <div className="p-4 text-sm">
+                  <div className="text-gray-700 dark:text-gray-300">
+                    tables: {String(debugInfo?.table_count ?? 0)} | tables (text strategy): {String(debugInfo?.table_count_text_strategy ?? 0)}
+                  </div>
+                  {debugInfo?.table_preview?.length ? (
+                    <div className="mt-3 space-y-2">
+                      {debugInfo.table_preview.slice(0, 2).map((t) => (
+                        <div key={t.table_index} className="rounded border border-gray-200 dark:border-gray-700 p-2">
+                          <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">
+                            table {t.table_index} {t.strategy ? `(${t.strategy})` : ""} | rows: {t.row_count}
+                          </div>
+                          <pre className="text-xs whitespace-pre-wrap break-words font-mono bg-gray-50 dark:bg-gray-900 p-2 rounded">
+                            {JSON.stringify(t.first_3_rows, null, 2)}
+                          </pre>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="mt-2 text-gray-500 dark:text-gray-400 text-xs">
+                      No table preview loaded yet (click “Load table preview”).
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* 1. Raw OCR / extracted text — what was read from the PDF */}
             {pageTextsToShow.length > 0 && (
               <div className="bg-white dark:bg-gray-800 rounded-xl shadow border border-gray-200 dark:border-gray-700 overflow-hidden">

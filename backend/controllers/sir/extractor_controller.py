@@ -6,6 +6,7 @@ Endpoints:
 - GET /api/v1/extractor/health - Health check including OCR availability
 """
 import asyncio
+import importlib.util
 import logging
 import os
 import tempfile
@@ -34,6 +35,11 @@ async def extractor_health():
     Health check for extraction service.
     Reports availability of OCR engines (Tesseract, EasyOCR), OpenCV, PyMuPDF, pdfplumber.
     """
+    # Keep this endpoint lightweight. Importing EasyOCR can take minutes (torch init)
+    # and will slow down the UI if called on page load.
+    def _has_module(name: str) -> bool:
+        return importlib.util.find_spec(name) is not None
+
     def check_tesseract() -> bool:
         try:
             import pytesseract
@@ -42,40 +48,12 @@ async def extractor_health():
         except Exception:
             return False
 
-    def check_easyocr() -> bool:
-        try:
-            import easyocr
-            return True
-        except ImportError:
-            return False
-
-    def check_opencv() -> bool:
-        try:
-            import cv2
-            return True
-        except ImportError:
-            return False
-
-    def check_pymupdf() -> bool:
-        try:
-            import fitz
-            return True
-        except ImportError:
-            return False
-
-    def check_pdfplumber() -> bool:
-        try:
-            import pdfplumber
-            return True
-        except ImportError:
-            return False
-
     loop = asyncio.get_event_loop()
     tesseract = await loop.run_in_executor(None, check_tesseract)
-    easyocr = await loop.run_in_executor(None, check_easyocr)
-    opencv = await loop.run_in_executor(None, check_opencv)
-    pymupdf = await loop.run_in_executor(None, check_pymupdf)
-    pdfplumber = await loop.run_in_executor(None, check_pdfplumber)
+    easyocr = _has_module("easyocr")
+    opencv = _has_module("cv2")
+    pymupdf = _has_module("fitz")
+    pdfplumber = _has_module("pdfplumber")
 
     ocr_ok = tesseract or easyocr
     return ExtractorHealthResponse(

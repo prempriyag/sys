@@ -4,7 +4,6 @@ import PageContainer from '../../components/common/PageContainer';
 import PageMeta from '../../components/common/PageMeta';
 import ThemedLoader from '../../components/common/ThemedLoader';
 import { alerterror, alertsuccess } from '../../utils/toast';
-import PdfZoneEditor, { ZoneConfig } from '../../components/SIR/PdfZoneEditor';
 import { CopyIcon } from '../../icons';
 
 /** Extracted voter record (matches backend electoral_roll_pdf_extractor schema). */
@@ -92,17 +91,6 @@ const DEFAULT_CONFIG: ExtractionConfig = {
   margin_right: 20,
 };
 
-function toZoneConfig(c: ExtractionConfig): ZoneConfig {
-  return {
-    cards_per_row: c.cards_per_row ?? 3,
-    rows_per_page: c.rows_per_page ?? 10,
-    row_gap: c.row_gap ?? 25,
-    header_top: c.header_top ?? 120,
-    data_bottom: c.data_bottom ?? 750,
-    margin_left: c.margin_left ?? 20,
-    margin_right: c.margin_right ?? 20,
-  };
-}
 
 const PdfExtractPage: React.FC = () => {
   const copyToClipboard = (text: string | number | null | undefined) => {
@@ -113,7 +101,6 @@ const PdfExtractPage: React.FC = () => {
     }).catch(() => {});
   };
 
-  const [viewMode, setViewMode] = useState<'table' | 'cards'>('cards');
   const [file, setFile] = useState<File | null>(null);
   const [constituencyName, setConstituencyName] = useState('');
   const [boothNumber, setBoothNumber] = useState('');
@@ -138,42 +125,8 @@ const PdfExtractPage: React.FC = () => {
   const [pdfListLoading, setPdfListLoading] = useState(true);
   const [pdfListError, setPdfListError] = useState<string | null>(null);
   const [extractionConfig, setExtractionConfig] = useState<ExtractionConfig>({ ...DEFAULT_CONFIG });
-  const [showConfig, setShowConfig] = useState(false);
-  const [previewPage, setPreviewPage] = useState(3);
   const [accuracySummary, setAccuracySummary] = useState<AccuracySummary | null>(null);
 
-  const blobUrlRef = React.useRef<string | null>(null);
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (blobUrlRef.current) {
-      URL.revokeObjectURL(blobUrlRef.current);
-      blobUrlRef.current = null;
-    }
-    if (selectedFilename) {
-      let cancelled = false;
-      getPdfBlobUrl(selectedFilename).then((url) => {
-        if (!cancelled) {
-          blobUrlRef.current = url;
-          setPdfUrl(url);
-        }
-      }).catch(() => setPdfUrl(null));
-      return () => { cancelled = true; };
-    }
-    if (file) {
-      const url = URL.createObjectURL(file);
-      blobUrlRef.current = url;
-      setPdfUrl(url);
-    } else {
-      setPdfUrl(null);
-    }
-    return () => {
-      if (blobUrlRef.current) {
-        URL.revokeObjectURL(blobUrlRef.current);
-        blobUrlRef.current = null;
-      }
-    };
-  }, [selectedFilename, file]);
 
   const loadPdfList = useCallback(async () => {
     setPdfListLoading(true);
@@ -512,95 +465,6 @@ const PdfExtractPage: React.FC = () => {
               </p>
             </div>
 
-            <div className="border-t border-gray-200 dark:border-gray-600 pt-4">
-              <button
-                type="button"
-                onClick={() => setShowConfig(!showConfig)}
-                className="text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
-              >
-                {showConfig ? '▼' : '▶'} Extraction format (ABBYY-like coordinates)
-              </button>
-              {showConfig && (
-                <div className="mt-3 grid grid-cols-2 sm:grid-cols-6 gap-3 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
-                  <div>
-                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-0.5">Cards/row</label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={12}
-                      value={extractionConfig.cards_per_row ?? ''}
-                      onChange={(e) => setExtractionConfig((c) => ({ ...c, cards_per_row: e.target.value ? parseInt(e.target.value, 10) : undefined }))}
-                      placeholder="3"
-                      className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-0.5">Rows/page</label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={20}
-                      value={extractionConfig.rows_per_page ?? ''}
-                      onChange={(e) => setExtractionConfig((c) => ({ ...c, rows_per_page: e.target.value ? parseInt(e.target.value, 10) : undefined }))}
-                      placeholder="10"
-                      className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-0.5">Row gap (px)</label>
-                    <input
-                      type="number"
-                      min={10}
-                      max={60}
-                      value={extractionConfig.row_gap ?? ''}
-                      onChange={(e) => setExtractionConfig((c) => ({ ...c, row_gap: e.target.value ? parseFloat(e.target.value) : undefined }))}
-                      placeholder="25"
-                      className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-0.5">Header top (y)</label>
-                    <input
-                      type="number"
-                      value={extractionConfig.header_top ?? ''}
-                      onChange={(e) => setExtractionConfig((c) => ({ ...c, header_top: e.target.value ? parseFloat(e.target.value) : undefined }))}
-                      placeholder="120"
-                      className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-0.5">Data bottom (y)</label>
-                    <input
-                      type="number"
-                      value={extractionConfig.data_bottom ?? ''}
-                      onChange={(e) => setExtractionConfig((c) => ({ ...c, data_bottom: e.target.value ? parseFloat(e.target.value) : undefined }))}
-                      placeholder="750"
-                      className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-0.5">Margin left</label>
-                    <input
-                      type="number"
-                      value={extractionConfig.margin_left ?? ''}
-                      onChange={(e) => setExtractionConfig((c) => ({ ...c, margin_left: e.target.value ? parseFloat(e.target.value) : undefined }))}
-                      placeholder="20"
-                      className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-0.5">Margin right</label>
-                    <input
-                      type="number"
-                      value={extractionConfig.margin_right ?? ''}
-                      onChange={(e) => setExtractionConfig((c) => ({ ...c, margin_right: e.target.value ? parseFloat(e.target.value) : undefined }))}
-                      placeholder="20"
-                      className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800"
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
 
             <button
               type="button"
@@ -620,188 +484,6 @@ const PdfExtractPage: React.FC = () => {
           </div>
         </div>
 
-        {/* ABBYY-style: PDF + zones (left) | Extracted data (right) - OCR-style */}
-        {pdfUrl && (
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow border border-gray-200 dark:border-gray-700 overflow-hidden">
-              <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Document — extraction zones</h3>
-                <div className="flex items-center gap-2">
-                  <label className="text-xs text-gray-500 dark:text-gray-400">Page</label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={previewPage}
-                    onChange={(e) => setPreviewPage(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                    className="w-14 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800"
-                  />
-                </div>
-              </div>
-              <div className="p-4">
-                <PdfZoneEditor
-                  pdfUrl={pdfUrl}
-                  config={toZoneConfig(extractionConfig)}
-                  onConfigChange={(c) => setExtractionConfig((prev) => ({ ...prev, ...c }))}
-                  page={previewPage}
-                  editable={true}
-                />
-              </div>
-            </div>
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col">
-              <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Extracted records (OCR-style)</h3>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Click Submit to extract. Click copy icon to copy value.</p>
-                </div>
-                {records.length > 0 && (
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setViewMode('cards')}
-                      className={`px-2 py-1 text-xs rounded ${viewMode === 'cards' ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'}`}
-                    >
-                      Cards
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setViewMode('table')}
-                      className={`px-2 py-1 text-xs rounded ${viewMode === 'table' ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'}`}
-                    >
-                      Table
-                    </button>
-                  </div>
-                )}
-              </div>
-              <div className="flex-1 overflow-auto p-4 min-h-[300px]">
-                {records.length === 0 && !loading && (
-                  <p className="text-gray-500 dark:text-gray-400 text-sm text-center py-8">
-                    No records yet. Adjust zones if needed, then click Submit.
-                  </p>
-                )}
-                {records.length > 0 && viewMode === 'cards' && (
-                  <div className="space-y-3 max-h-[60vh] overflow-y-auto">
-                    {records.slice(0, 100).map((r, idx) => (
-                      <div key={idx} className="rounded-lg border border-gray-200 dark:border-gray-600 p-3 bg-gray-50 dark:bg-gray-900/50 text-sm">
-                        <div className="grid grid-cols-[100px_1fr] gap-x-3 gap-y-1.5">
-                          <span className="text-gray-500 dark:text-gray-400">EPIC No</span>
-                          <span className="inline-flex items-center gap-1">
-                            <span className="text-gray-900 dark:text-white">{r.epic_number ?? '—'}</span>
-                            {(r.epic_number ?? '').trim() && (
-                              <button type="button" onClick={() => copyToClipboard(r.epic_number)} className="text-gray-400 hover:text-indigo-600" title="Copy">
-                                <CopyIcon className="w-3.5 h-3.5" />
-                              </button>
-                            )}
-                          </span>
-                          <span className="text-gray-500 dark:text-gray-400">Name</span>
-                          <span className="inline-flex items-center gap-1">
-                            <span className="text-gray-900 dark:text-white font-medium">{r.name ?? '—'}</span>
-                            {(r.name ?? '').trim() && (
-                              <button type="button" onClick={() => copyToClipboard(r.name)} className="text-gray-400 hover:text-indigo-600" title="Copy">
-                                <CopyIcon className="w-3.5 h-3.5" />
-                              </button>
-                            )}
-                          </span>
-                          <span className="text-gray-500 dark:text-gray-400">Father/Husband</span>
-                          <span className="inline-flex items-center gap-1">
-                            <span className="text-gray-700 dark:text-gray-300">{r.relative_name ?? '—'}</span>
-                            {(r.relative_name ?? '').trim() && (
-                              <button type="button" onClick={() => copyToClipboard(r.relative_name)} className="text-gray-400 hover:text-indigo-600" title="Copy">
-                                <CopyIcon className="w-3.5 h-3.5" />
-                              </button>
-                            )}
-                          </span>
-                          <span className="text-gray-500 dark:text-gray-400">House No</span>
-                          <span className="inline-flex items-center gap-1">
-                            <span className="text-gray-700 dark:text-gray-300">{r.house_no ?? '—'}</span>
-                            {(r.house_no ?? '').trim() && (
-                              <button type="button" onClick={() => copyToClipboard(r.house_no)} className="text-gray-400 hover:text-indigo-600" title="Copy">
-                                <CopyIcon className="w-3.5 h-3.5" />
-                              </button>
-                            )}
-                          </span>
-                          <span className="text-gray-500 dark:text-gray-400">Age</span>
-                          <span className="text-gray-700 dark:text-gray-300">{r.age ?? '—'}</span>
-                          <span className="text-gray-500 dark:text-gray-400">Gender</span>
-                          <span className="text-gray-700 dark:text-gray-300">{r.gender ?? '—'}</span>
-                          <span className="text-gray-500 dark:text-gray-400">Address</span>
-                          <span className="inline-flex items-center gap-1 col-span-1">
-                            <span className="text-gray-700 dark:text-gray-300 truncate max-w-[200px]" title={r.address ?? ''}>{r.address ?? '—'}</span>
-                            {(r.address ?? '').trim() && (
-                              <button type="button" onClick={() => copyToClipboard(r.address)} className="text-gray-400 hover:text-indigo-600 flex-shrink-0" title="Copy">
-                                <CopyIcon className="w-3.5 h-3.5" />
-                              </button>
-                            )}
-                          </span>
-                          <span className="text-gray-500 dark:text-gray-400">Page</span>
-                          <span className="text-gray-600 dark:text-gray-400">{r.page_number ?? '—'}</span>
-                        </div>
-                      </div>
-                    ))}
-                    {records.length > 100 && (
-                      <p className="text-xs text-gray-500 dark:text-gray-400 py-2">Showing first 100 of {records.length}</p>
-                    )}
-                  </div>
-                )}
-                {records.length > 0 && viewMode === 'table' && (
-                  <div className="overflow-x-auto max-h-[60vh]">
-                    <table className="min-w-full text-sm">
-                      <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0">
-                        <tr>
-                          <th className="px-2 py-1.5 text-left font-medium text-gray-700 dark:text-gray-200">Page</th>
-                          <th className="px-2 py-1.5 text-left font-medium text-gray-700 dark:text-gray-200">EPIC</th>
-                          <th className="px-2 py-1.5 text-left font-medium text-gray-700 dark:text-gray-200">Name</th>
-                          <th className="px-2 py-1.5 text-left font-medium text-gray-700 dark:text-gray-200">Relative</th>
-                          <th className="px-2 py-1.5 text-left font-medium text-gray-700 dark:text-gray-200">Age</th>
-                          <th className="px-2 py-1.5 text-left font-medium text-gray-700 dark:text-gray-200">Gender</th>
-                          <th className="px-2 py-1.5 text-left font-medium text-gray-700 dark:text-gray-200">House</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
-                        {records.slice(0, 100).map((r, idx) => (
-                          <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                            <td className="px-2 py-1.5">{r.page_number ?? '—'}</td>
-                            <td className="px-2 py-1.5">
-                              <span className="inline-flex items-center gap-1">
-                                {r.epic_number ?? '—'}
-                                {(r.epic_number ?? '').trim() && (
-                                  <button type="button" onClick={() => copyToClipboard(r.epic_number)} className="text-gray-400 hover:text-indigo-600" title="Copy">
-                                    <CopyIcon className="w-3.5 h-3.5" />
-                                  </button>
-                                )}
-                              </span>
-                            </td>
-                            <td className="px-2 py-1.5">
-                              <span className="inline-flex items-center gap-1">
-                                {r.name ?? '—'}
-                                {(r.name ?? '').trim() && (
-                                  <button type="button" onClick={() => copyToClipboard(r.name)} className="text-gray-400 hover:text-indigo-600" title="Copy">
-                                    <CopyIcon className="w-3.5 h-3.5" />
-                                  </button>
-                                )}
-                              </span>
-                            </td>
-                            <td className="px-2 py-1.5">{r.relative_name ?? '—'}</td>
-                            <td className="px-2 py-1.5">{r.age ?? '—'}</td>
-                            <td className="px-2 py-1.5">{r.gender ?? '—'}</td>
-                            <td className="px-2 py-1.5">{r.house_no ?? '—'}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                    {records.length > 100 && (
-                      <p className="text-xs text-gray-500 dark:text-gray-400 py-2">Showing first 100 of {records.length}</p>
-                    )}
-                  </div>
-                )}
-                {loading && (
-                  <div className="flex items-center justify-center py-12">
-                    <ThemedLoader size={24} />
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Extracted data below - OCR module style layout */}
         {(metadata !== null || records.length > 0 || rawPageTexts.length > 0 || (debugInfo?.page_texts_full?.length ?? 0) > 0) && (

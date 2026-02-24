@@ -69,117 +69,430 @@ def _preprocess_image_for_ocr(img) -> "Any":
     return Image.fromarray(thresh)
 
 
-def _extract_text_via_ocr(
-    pdf_path: Path,
-    max_pages: Optional[int] = 50,
-    dpi: int = 200,
-    preprocess: bool = False,
-) -> List[str]:
+def _img_to_pil(img) -> "Any":
+    """Ensure img is a PIL Image (convert from path or numpy if needed)."""
+    if hasattr(img, "size"):
+        return img
+    from PIL import Image
+    if isinstance(img, str):
+        return Image.open(img)
+    import numpy as np
+    if isinstance(img, np.ndarray):
+        return Image.fromarray(img)
+    return img
+
+
+def _cluster_x_into_columns(words: List[dict], num_cols: int) -> List[List[dict]]:
     """
-    Extract text from PDF using OCR (for scanned/image PDFs with no text layer).
-    Tries pdf2image (needs poppler) first; if that fails, uses PyMuPDF (no poppler needed).
-    preprocess: Apply OpenCV preprocessing (grayscale, blur, Otsu) for better accuracy.
-    Requires: pytesseract + Tesseract OCR; and either pdf2image+poppler OR pymupdf.
+    Assign words to columns using dynamic gap-based X clustering.
+
+    Instead of equal-width zones (fragile with skewed scans), we:
+    1. Sort all word X-centres.
+    2. Find the (num_cols - 1) largest gaps between consecutive centres.
+    3. Use those gaps as column boundaries.
+
+    This handles slight card misalignment and scan skew robustly.
+    """
+    if not words or num_cols <= 1:
+        return [words] if words else [[] for _ in range(num_cols)]
+
+    centers = sorted(set(w["x"] + w["w"] // 2 for w in words))
+    if len(centers) < num_cols:
+        # Fallback: equal split by page width
+        if not words:
+            return [[] for _ in range(num_cols)]
+        max_x = max(w["x"] + w["w"] for w in words)
+        col_width = max(1, max_x // num_cols)
+        cols: List[List[dict]] = [[] for _ in range(num_cols)]
+        for w in words:
+            cx = w["x"] + w["w"] // 2
+            cols[min(cx // col_width, num_cols - 1)].append(w)
+        return cols
+
+    # Find largest gaps between consecutive X-centres
+    gaps = [(centers[i + 1] - centers[i], centers[i], centers[i + 1])
+            for i in range(len(centers) - 1)]
+    gaps.sort(key=lambda g: -g[0])
+    # Take the (num_cols - 1) largest gaps as split boundaries
+    boundaries = sorted([(lo + hi) // 2 for _, lo, hi in gaps[: num_cols - 1]])
+
+    cols = [[] for _ in range(num_cols)]
+    for w in words:
+        cx = w["x"] + w["w"] // 2
+        col_idx = sum(1 for b in boundaries if cx >= b)
+        cols[min(col_idx, num_cols - 1)].append(w)
+    return cols
+
+
+def _cluster_words_into_lines(col_words: List[dict]) -> List[List[dict]]:
+    """
+    Group words into text lines using vertical overlap (not absolute Y gap).
+
+    Two words belong to the same line if their vertical extents overlap:
+        overlap = min(y1+h1, y2+h2) - max(y1, y2) > 0
+
+    This handles tall characters (e.g. "Father Name:") that shift the top-Y
+    slightly, which would break a fixed y_gap threshold.
+    Falls back to a generous y_gap (half the median word height) when overlap
+    is zero but words are very close.
+    """
+    if not col_words:
+        return []
+
+    col_words = sorted(col_words, key=lambda w: (w["y"], w["x"]))
+
+    # Estimate typical word height for fallback gap
+    heights = [w["h"] for w in col_words if w["h"] > 0]
+    median_h = sorted(heights)[len(heights) // 2] if heights else 20
+    fallback_gap = max(4, median_h // 2)
+
+    lines: List[List[dict]] = []
+    current: List[dict] = [col_words[0]]
+
+    for w in col_words[1:]:
+        prev = current[-1]
+        # Vertical overlap between w and the last word in current line
+        overlap = min(prev["y"] + prev["h"], w["y"] + w["h"]) - max(prev["y"], w["y"])
+        gap = w["y"] - (prev["y"] + prev["h"])
+        if overlap > 0 or gap <= fallback_gap:
+            current.append(w)
+        else:
+            lines.append(current)
+            current = [w]
+    lines.append(current)
+    return lines
+
+
+# Tolerant EPIC anchor: matches WQD2616720, WOD2614042, WQd2705291, WQD2/24243
+# Allows 1-2 letter OCR noise in prefix, slash in numeric part, lowercase letters.
+_RE_EPIC_ANCHOR = re.compile(
+    r"^[A-Za-z]{2,4}[0-9][A-Za-z0-9/]{4,}$",
+)
+# Stricter validation used after normalisation
+_RE_EPIC_STRICT = re.compile(r"^[A-Z]{3}[0-9]{6,7}(/[0-9]+)?$", re.IGNORECASE)
+
+
+def _looks_like_epic(text: str) -> bool:
+    """Return True if the text looks like an EPIC (tolerant of OCR noise)."""
+    t = text.strip()
+    # Must start with 2-4 letters then digits
+    if not _RE_EPIC_ANCHOR.match(t):
+        return False
+    # Must contain at least 6 digits total
+    digit_count = sum(1 for c in t if c.isdigit())
+    return digit_count >= 6
+
+
+def _ocr_page_spatial(img, num_cols: int = 3, conf_threshold: int = 40) -> List[List[str]]:
+    """
+    Production-grade spatial OCR for 3-column electoral roll pages.
+
+    Pipeline:
+      1. image_to_data  → per-word bounding boxes + confidence
+      2. Dynamic X clustering (gap-based, not equal-width) → columns
+      3. Vertical-overlap line clustering within each column
+      4. Tolerant EPIC anchor detection → split into per-card blocks
+
+    Fixes:
+      - Fixed equal-width zones → dynamic gap clustering (handles skew/misalignment)
+      - Absolute y_gap threshold → vertical overlap (handles tall text lines)
+      - Strict EPIC regex → tolerant anchor (catches WOD/WQd/slash variants)
     """
     try:
         import pytesseract
+        from pytesseract import Output
     except ImportError:
-        logger.warning("OCR skipped: install pytesseract (and Tesseract OCR) for scanned PDFs.")
         return []
 
+    pil_img = _img_to_pil(img)
+
+    try:
+        data = pytesseract.image_to_data(pil_img, output_type=Output.DICT)
+    except Exception as e:
+        logger.warning("image_to_data failed: %s", e)
+        return []
+
+    # Step 1: collect valid words with bounding boxes
+    words: List[dict] = []
+    for i in range(len(data["text"])):
+        try:
+            conf = int(data["conf"][i])
+        except (ValueError, TypeError):
+            conf = -1
+        text = str(data["text"][i]).strip()
+        if conf >= conf_threshold and text:
+            words.append({
+                "text": text,
+                "x": int(data["left"][i]),
+                "y": int(data["top"][i]),
+                "w": int(data["width"][i]),
+                "h": int(data["height"][i]),
+            })
+
+    if not words:
+        return []
+
+    # Step 2: dynamic X clustering → columns (left to right order)
+    raw_cols = _cluster_x_into_columns(words, num_cols)
+    # Sort columns left-to-right by their median X centre
+    def _col_median_x(col: List[dict]) -> float:
+        if not col:
+            return 0.0
+        xs = sorted(w["x"] + w["w"] // 2 for w in col)
+        return xs[len(xs) // 2]
+    columns = sorted(raw_cols, key=_col_median_x)
+
+    # Step 3 + 4: per column → lines → card blocks
+    all_blocks: List[List[str]] = []
+    for col_words in columns:
+        if not col_words:
+            continue
+
+        # Cluster into text lines using vertical overlap
+        line_groups = _cluster_words_into_lines(col_words)
+
+        # Build text lines (words sorted left→right within each line)
+        text_lines: List[str] = []
+        for line_words in line_groups:
+            line_words.sort(key=lambda w: w["x"])
+            text_lines.append(" ".join(w["text"] for w in line_words))
+
+        # Split into card blocks at EPIC anchors
+        card_blocks: List[List[str]] = []
+        current_block: List[str] = []
+        for line in text_lines:
+            stripped = line.strip()
+            if _looks_like_epic(stripped):
+                if current_block:
+                    card_blocks.append(current_block)
+                current_block = [stripped]
+            elif current_block:
+                if stripped:
+                    current_block.append(stripped)
+            # Lines before first EPIC (page header, etc.) are discarded
+        if current_block:
+            card_blocks.append(current_block)
+
+        all_blocks.extend(card_blocks)
+
+    logger.debug("_ocr_page_spatial: %d columns → %d card blocks", num_cols, len(all_blocks))
+    return all_blocks
+
+
+def _render_pdf_images(
+    pdf_path: Path,
+    max_pages: int = 1000,
+    dpi: int = 200,
+) -> List["Any"]:
+    """
+    Render PDF pages to PIL Images.
+    Tries pdf2image (needs poppler) first; falls back to PyMuPDF.
+    """
     images = []
-    # 1) Try pdf2image (requires poppler on PATH - often missing on Windows)
     try:
         from pdf2image import convert_from_path
         images = convert_from_path(str(pdf_path), first_page=1, last_page=max_pages, dpi=dpi)
+        return images
     except Exception as e:
         err = str(e).lower()
-        if "poppler" in err or "page count" in err or "unable" in err:
-            # 2) Fallback: PyMuPDF (no poppler) - pip install pymupdf
-            try:
-                import fitz  # PyMuPDF
-                import tempfile
-                import io
-                doc = fitz.open(str(pdf_path))
-                scale = dpi / 72.0
-                mat = fitz.Matrix(scale, scale)
-                for i in range(min(len(doc), max_pages)):
-                    page = doc[i]
-                    pix = page.get_pixmap(matrix=mat, alpha=False)
-                    img_bytes = pix.tobytes("png")
-                    try:
-                        from PIL import Image
-                        img = Image.open(io.BytesIO(img_bytes))
-                    except ImportError:
-                        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
-                            tmp.write(img_bytes)
-                            tmp.flush()
-                            img = tmp.name
-                    images.append(img)
-                doc.close()
-            except ImportError:
-                logger.warning(
-                    "OCR failed (poppler not in PATH). Install PyMuPDF for OCR without poppler: pip install pymupdf"
-                )
-                return []
-            except Exception as e2:
-                logger.warning("OCR via PyMuPDF failed: %s", e2)
-                return []
-        else:
-            logger.warning("OCR failed: %s", e)
+        if "poppler" not in err and "page count" not in err and "unable" not in err:
+            logger.warning("pdf2image failed: %s", e)
             return []
 
+    # Fallback: PyMuPDF
+    try:
+        import fitz
+        import io
+        from PIL import Image
+        doc = fitz.open(str(pdf_path))
+        scale = dpi / 72.0
+        mat = fitz.Matrix(scale, scale)
+        for i in range(min(len(doc), max_pages)):
+            pix = doc[i].get_pixmap(matrix=mat, alpha=False)
+            img = Image.open(io.BytesIO(pix.tobytes("png")))
+            images.append(img)
+        doc.close()
+        return images
+    except ImportError:
+        logger.warning("OCR failed: poppler not in PATH and PyMuPDF not installed (pip install pymupdf).")
+        return []
+    except Exception as e2:
+        logger.warning("OCR via PyMuPDF failed: %s", e2)
+        return []
+
+
+def _extract_text_via_ocr(
+    pdf_path: Path,
+    max_pages: Optional[int] = 1000,
+    dpi: int = 200,
+    preprocess: bool = False,
+    num_cols: int = 3,
+) -> List[str]:
+    """
+    Extract text from each PDF page using spatial OCR.
+
+    Primary path (Tesseract available):
+      - Renders each page to an image.
+      - Uses image_to_data() to get per-word bounding boxes.
+      - Splits words into X-axis column zones (num_cols wide).
+      - Within each zone, clusters words by Y proximity into lines.
+      - Within each column, splits lines into card blocks by EPIC anchor.
+      - Returns one "virtual page text" per PDF page where each card block
+        is separated by a blank line, columns are concatenated left→right.
+
+    Fallback (Tesseract not available):
+      - EasyOCR with spatial ordering (sorted by bounding-box Y then X).
+
+    This fixes the "only every 3rd card" bug: image_to_string() reads the
+    page top-to-bottom, mixing all 3 columns into one stream.  Spatial OCR
+    keeps each column separate so every card is correctly segmented.
+    """
+    images = _render_pdf_images(pdf_path, max_pages=max_pages or 1000, dpi=dpi)
     if not images:
         return []
 
     if preprocess:
         images = [_preprocess_image_for_ocr(img) for img in images]
 
-    def _ocr_one(img):
-        return pytesseract.image_to_string(img)
-
     def _img_to_numpy(img):
-        """Convert PIL Image or file path to numpy array for EasyOCR."""
         import numpy as np
         if hasattr(img, "size"):
             return np.array(img)
         from PIL import Image
-        return np.array(Image.open(img))
+        return np.array(Image.open(img) if isinstance(img, str) else img)
 
-    # Try Tesseract first (parallel for speed when multiple pages)
+    # Try Tesseract spatial path
     try:
+        import pytesseract
+        from pytesseract import Output  # noqa: F401 – verify import works
+
+        def _spatial_one(img) -> str:
+            blocks = _ocr_page_spatial(img, num_cols=num_cols)
+            if not blocks:
+                # Fallback: plain image_to_string for this page
+                return pytesseract.image_to_string(img)
+            # Join card blocks with blank-line separator so downstream
+            # segment_page_text / _parse_voter_cards_from_text can handle them,
+            # but since blocks are already per-card we mark them with a sentinel.
+            return "\n\n".join("\n".join(b) for b in blocks)
+
         max_workers = min(4, len(images))
         if max_workers <= 1:
-            return [_ocr_one(img) for img in images]
+            return [_spatial_one(img) for img in images]
         with ThreadPoolExecutor(max_workers=max_workers) as ex:
-            return list(ex.map(_ocr_one, images))
+            return list(ex.map(_spatial_one, images))
+
     except Exception as e:
         err_msg = str(e).lower()
         if "tesseract" not in err_msg and "path" not in err_msg:
             logger.warning("Tesseract OCR failed: %s", e)
             return []
-        # Fallback: EasyOCR (no system Tesseract needed) - pip install easyocr
+
+        # Fallback: EasyOCR with spatial sort
         try:
             import easyocr
-            import numpy as np
             reader = easyocr.Reader(["en"], gpu=False, verbose=False)
             result = []
             for img in images:
                 arr = _img_to_numpy(img)
                 detections = reader.readtext(arr)
-                page_text = "\n".join([t[1] for t in detections])
+                # detections: [(bbox, text, conf), ...]
+                # Sort by top-left Y then X for natural reading order
+                detections.sort(key=lambda d: (d[0][0][1], d[0][0][0]))
+                page_text = "\n".join(t[1] for t in detections)
                 result.append(page_text)
             logger.info("OCR completed using EasyOCR (Tesseract not in PATH).")
             return result
         except ImportError:
             logger.warning(
                 "Tesseract is not installed or not in PATH. "
-                "Either install Tesseract and add to PATH, or install EasyOCR: pip install easyocr"
+                "Install Tesseract or EasyOCR: pip install easyocr"
             )
             return []
         except Exception as e2:
             logger.warning("EasyOCR failed: %s", e2)
             return []
+
+
+def _extract_blocks_via_ocr(
+    pdf_path: Path,
+    max_pages: int = 1000,
+    dpi: int = 200,
+    preprocess: bool = False,
+    num_cols: int = 3,
+) -> List[List[List[str]]]:
+    """
+    Spatial OCR: returns per-page list of card blocks.
+    Each page → list of card blocks → each block = list of text lines.
+
+    Uses _ocr_page_spatial() (image_to_data bounding boxes) when Tesseract is
+    available.  Falls back to _extract_text_via_ocr() (flat text) otherwise,
+    returning each page as a single "block" for downstream text parsing.
+
+    Returns: [ page0_blocks, page1_blocks, ... ]
+      where page_blocks = [ [line, line, ...], [line, line, ...], ... ]
+    """
+    images = _render_pdf_images(pdf_path, max_pages=max_pages, dpi=dpi)
+    if not images:
+        return []
+
+    if preprocess:
+        images = [_preprocess_image_for_ocr(img) for img in images]
+
+    # Try Tesseract spatial path
+    try:
+        import pytesseract
+        from pytesseract import Output  # noqa: F401
+
+        def _spatial_page(img) -> List[List[str]]:
+            blocks = _ocr_page_spatial(img, num_cols=num_cols)
+            if blocks:
+                return blocks
+            # Fallback: plain string → treat whole page as one block
+            text = pytesseract.image_to_string(img)
+            lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+            return [lines] if lines else []
+
+        max_workers = min(4, len(images))
+        if max_workers <= 1:
+            result = [_spatial_page(img) for img in images]
+        else:
+            with ThreadPoolExecutor(max_workers=max_workers) as ex:
+                result = list(ex.map(_spatial_page, images))
+        logger.info(
+            "Spatial OCR: %d pages, total %d card blocks",
+            len(result),
+            sum(len(p) for p in result),
+        )
+        return result
+
+    except Exception as e:
+        err_msg = str(e).lower()
+        if "tesseract" not in err_msg and "path" not in err_msg:
+            logger.warning("Tesseract OCR failed: %s", e)
+            return []
+
+        # EasyOCR fallback: spatial sort, return as flat page blocks
+        try:
+            import easyocr
+            import numpy as np
+            reader = easyocr.Reader(["en"], gpu=False, verbose=False)
+            result = []
+            for img in images:
+                arr = np.array(img) if hasattr(img, "size") else np.array(__import__("PIL").Image.open(img))
+                detections = reader.readtext(arr)
+                detections.sort(key=lambda d: (d[0][0][1], d[0][0][0]))
+                lines = [t[1].strip() for t in detections if t[1].strip()]
+                result.append([lines] if lines else [])
+            logger.info("Spatial OCR (EasyOCR fallback): %d pages", len(result))
+            return result
+        except ImportError:
+            logger.warning("Tesseract not in PATH and EasyOCR not installed (pip install easyocr).")
+            return []
+        except Exception as e2:
+            logger.warning("EasyOCR failed: %s", e2)
+            return []
+
 
 # Column name variants seen in ECI/state electoral roll PDFs (case-insensitive)
 # Tamil Nadu / ECI format often uses: S.No, EPIC No, Name, Father's/Husband's Name, Age, Sex, House No, Address
@@ -309,10 +622,11 @@ def _map_row_to_record(headers: List[str], row: List[Any], default_booth: str, d
     return record
 
 
-# EPIC number pattern: letter + alphanumerics + 3+ digits, optional /digits (e.g. WQD2616720, W0D259/805)
-RE_EPIC = re.compile(r"^[A-Za-z][A-Za-z0-9]*[0-9]{3,}(/[0-9]+)?$", re.IGNORECASE)
+# EPIC number pattern: 2-5 letter prefix + digits (with optional embedded slashes from OCR)
+# Handles: WQD2616720, WQD2/24243, WOD22/2193, FBT2224673
+RE_EPIC = re.compile(r"^[A-Za-z][A-Za-z0-9]{1,4}[0-9][0-9/]{2,}[0-9]$", re.IGNORECASE)
 # EPIC anywhere in string (for finding in mixed lines)
-RE_EPIC_ANYWHERE = re.compile(r"[A-Za-z][A-Za-z0-9]*[0-9]{3,}(/[0-9]+)?")
+RE_EPIC_ANYWHERE = re.compile(r"[A-Za-z][A-Za-z0-9]{1,4}[0-9][0-9/]{2,}[0-9]")
 # Start of voter card: optional serial number then EPIC on same line or next
 RE_RECORD_START = re.compile(r"^\s*(\d+)\s+([A-Za-z]{2,4}[0-9]{5,})\s*$")
 RE_RECORD_START_SERIAL_ONLY = re.compile(r"^\s*(\d+)\s*$")
@@ -430,33 +744,75 @@ EXTRACTION_CONFIG_DEFAULTS = {
 RE_EPIC_VALID = re.compile(r"^[A-Za-z]{3}[0-9]{6,7}(/[0-9]+)?$", re.IGNORECASE)
 
 
-def _normalize_epic(epic: str, config: Optional[Dict[str, Any]] = None) -> str:
+def _normalize_epic(epic: str, config: Optional[Dict[str, Any]] = None) -> Tuple[str, bool]:
     """
-    Apply EPIC corrections safely:
-    1. Prefix: WOD→WQD, WQ0→WQD (always apply).
-    2. Digit 0→6: ONLY when epic fails validation and correction yields valid format.
+    Apply EPIC corrections safely. Returns (normalized_epic, prefix_was_corrected).
+
+    Steps:
+    1. Strip spaces, uppercase.
+    2. Remove spurious slash in numeric part (WQD2/24243 → WQD2724243).
+    3. Prefix corrections: WOD→WQD, WQ0→WQD, WQd→WQD (always apply).
+    4. Digit 0→6 in numeric part: ONLY when epic fails validation AND correction yields valid.
+       (Safe guard: never corrupt a structurally valid EPIC by blind digit replacement.)
     """
     if not epic or len(epic) < 4:
-        return epic
+        return epic, False
+    epic = epic.strip().upper().replace(" ", "")
     cfg = config or {}
-    # 1. Prefix corrections (safe, always apply)
-    prefix = epic[:3].upper()
+
+    # Remove spurious slash inside the numeric part (OCR reads "2/2" instead of "22")
+    prefix_raw = epic[:3]
+    rest_raw = epic[3:]
+    rest_raw = re.sub(r"(\d)/(\d)", r"\1\2", rest_raw)
+
+    # Prefix corrections (safe, always apply)
+    prefix = prefix_raw.upper()
+    prefix_corrected = False
     corrections = cfg.get("epic_corrections") or EPIC_CORRECTIONS_DEFAULT
     for from_p, to_p in corrections or []:
         if isinstance(from_p, str) and isinstance(to_p, str) and prefix == from_p.upper():
             prefix = to_p.upper()
+            prefix_corrected = True
             break
-    rest = epic[3:]
-    result = prefix + rest
-    # 2. Digit corrections: ONLY if invalid and correction yields valid
+    result = prefix + rest_raw
+
+    # Digit corrections: ONLY if the result fails strict validation
+    # (never replace digits in an already-valid EPIC — too risky without ground truth)
     if not RE_EPIC_VALID.match(result) and cfg.get("epic_fix_digit_0_as_6", True):
         digit_corr = cfg.get("epic_digit_corrections") or EPIC_DIGIT_CORRECTIONS_DEFAULT
         for from_d, to_d in digit_corr or []:
-            if isinstance(from_d, str) and isinstance(to_d, str) and from_d in rest:
-                candidate = prefix + rest.replace(from_d, to_d)
+            if isinstance(from_d, str) and isinstance(to_d, str) and from_d in rest_raw:
+                candidate = prefix + rest_raw.replace(from_d, to_d)
                 if RE_EPIC_VALID.match(candidate):
-                    return candidate
-    return result
+                    return candidate, prefix_corrected
+    return result, prefix_corrected
+
+
+def _normalize_gender(text: str) -> Optional[str]:
+    """
+    Normalize OCR-noisy gender values to 'M' or 'F'.
+    Handles: Male/Female, Ma e/Fema e, Mala/Ferala, Famale/Femalo, MA 4/Farna 8, etc.
+    Returns 'M', 'F', or None if unrecognisable.
+    """
+    if not text:
+        return None
+    t = text.strip().lower().replace(" ", "").replace(".", "")
+    # Female first (longer match, avoids "fema" matching "ma")
+    female_tokens = ("female", "fema", "femalo", "famale", "ferala", "farnale",
+                     "fema0", "fema8", "fema@", "femal")
+    male_tokens = ("male", "mala", "ma0", "ma8", "ma4", "mae", "mal")
+    for tok in female_tokens:
+        if t.startswith(tok) or tok in t:
+            return "F"
+    for tok in male_tokens:
+        if t.startswith(tok) or tok in t:
+            return "M"
+    # Single letter
+    if t in ("f",):
+        return "F"
+    if t in ("m",):
+        return "M"
+    return None
 
 
 def _validate_and_score_records(records: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
@@ -667,7 +1023,7 @@ def _extract_cards_by_position(
             "page_number": page_number,
         }
         _parse_one_card_block(lines, rec)
-        if multi_epic:
+        if len(epics_in_col) > 1:
             rec["_warnings"] = rec.get("_warnings", []) + ["multiple_epics_in_card"]
         if rec.get("name") or rec.get("epic_number"):
             records.append(rec)
@@ -770,11 +1126,9 @@ def _parse_one_card_block(
                     pass
                 if i + 2 < len(block):
                     g_line = block[i + 2].strip()
-                    if RE_GENDER_FUZZY.match(g_line):
-                        rec["gender"] = "M"
-                        i += 1
-                    elif RE_GENDER_FEMALE_FUZZY.match(g_line):
-                        rec["gender"] = "F"
+                    g_norm = _normalize_gender(g_line)
+                    if g_norm:
+                        rec["gender"] = g_norm
                         i += 1
                 i += 1
             i += 1
@@ -794,23 +1148,16 @@ def _parse_one_card_block(
             except ValueError:
                 pass
             # Gender may be in group(2) (same line) or next line
-            g_val = m_age_line.group(2) if m_age_line.lastindex >= 2 else None
+            g_val = m_age_line.group(2) if m_age_line.lastindex and m_age_line.lastindex >= 2 else None
             if g_val:
-                g_upper = g_val.upper()
-                if g_upper.startswith("M") or g_val.lower() in ("mala",):
-                    rec["gender"] = "M"
-                elif g_upper.startswith("F") or g_val.lower() in ("ferala",):
-                    rec["gender"] = "F"
+                g_norm = _normalize_gender(g_val)
+                if g_norm:
+                    rec["gender"] = g_norm
             elif i + 1 < len(block):
                 g_line = block[i + 1].strip()
-                if RE_GENDER.match(g_line):
-                    rec["gender"] = "M" if g_line.upper().startswith("M") else "F"
-                    i += 1
-                elif RE_GENDER_FUZZY.match(g_line):
-                    rec["gender"] = "M"
-                    i += 1
-                elif RE_GENDER_FEMALE_FUZZY.match(g_line):
-                    rec["gender"] = "F"
+                g_norm = _normalize_gender(g_line)
+                if g_norm:
+                    rec["gender"] = g_norm
                     i += 1
             i += 1
             continue
@@ -824,17 +1171,10 @@ def _parse_one_card_block(
                 pass
             i += 1
             continue
-        # Gender (exact or fuzzy: Mole, Ma 0, Foma 0) — check Female before Male so "Foma 0" isn't matched as "ma"
-        if RE_GENDER.match(bl):
-            rec["gender"] = "M" if bl.upper().startswith("M") else "F"
-            i += 1
-            continue
-        if RE_GENDER_FEMALE_FUZZY.match(bl):
-            rec["gender"] = "F"
-            i += 1
-            continue
-        if RE_GENDER_FUZZY.match(bl):
-            rec["gender"] = "M"
+        # Standalone gender line — use _normalize_gender for all OCR variants
+        g_norm = _normalize_gender(bl)
+        if g_norm and not rec.get("gender"):
+            rec["gender"] = g_norm
             i += 1
             continue
         # Standalone house number (not EPIC, not date, not a label line)
@@ -943,6 +1283,52 @@ def _try_parse_column_layout(
     return records if records else None
 
 
+def _parse_voter_cards_from_blocks(
+    blocks: List[List[str]],
+    default_booth: str,
+    default_constituency: str,
+    page_number: int = 1,
+) -> List[Dict[str, Any]]:
+    """
+    Parse voter records from pre-segmented card blocks (e.g. from spatial OCR).
+    Each block is a list of text lines for one voter card.
+    Bypasses segment_page_text — blocks are already correctly separated.
+    """
+    try:
+        from .record_segmentation import count_structural_anomalies
+    except ImportError:
+        count_structural_anomalies = lambda b: []  # noqa: E731
+
+    records: List[Dict[str, Any]] = []
+    for block in blocks:
+        if not block:
+            continue
+        epics_in = [ln for ln in block if RE_EPIC.match(ln.strip())]
+        epic = epics_in[0] if epics_in else None
+        if not epic:
+            continue
+        rec: Dict[str, Any] = {
+            "epic_number": epic,
+            "serial_number": None,
+            "name": None,
+            "relative_name": "",
+            "age": None,
+            "gender": None,
+            "house_no": "",
+            "address": "",
+            "booth_number": default_booth,
+            "constituency_name": default_constituency,
+            "page_number": page_number,
+        }
+        _parse_one_card_block(block, rec)
+        anomalies = count_structural_anomalies(block)
+        if anomalies:
+            rec["_warnings"] = rec.get("_warnings", []) + ["possible_cross_card_merge"] + anomalies
+        if rec.get("name") or rec.get("epic_number"):
+            records.append(rec)
+    return records
+
+
 def _parse_voter_cards_from_text(
     text: str,
     default_booth: str,
@@ -956,7 +1342,7 @@ def _parse_voter_cards_from_text(
     """
     cfg = extraction_config or {}
     cards_per_row = int(cfg.get("cards_per_row", 3))
-    rows_per_page = int(cfg.get("rows_per_page", 2))
+    rows_per_page = int(cfg.get("rows_per_page", 10))
     lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
 
     # 1) Record segmentation layer: ensures one-block-per-card before parsing
@@ -1341,11 +1727,18 @@ def extract_from_pdf(
                         if rec:
                             rec["page_number"] = page_num + 1
                             all_records.append(rec)
-            # If no records from tables, try position-based extraction first (TN ECI: 9 cards/row)
-            # Skip page 0 (cover) and page 1 (map) for position-based - they have no voter cards
+            # Try text-based segmentation (grid-aware) for voter card pages.
+            # Skip page 0 (cover) and page 1 (map) — they have no voter cards.
+            # Only run if tables extraction didn't already find records on this page.
             page_no = page_num + 1
             card_records: List[Dict[str, Any]] = []
-            if page_num >= 2 and RE_EPIC_ANYWHERE.search(text):
+            tables_added_records = len(all_records) > page_record_count_before
+            if page_num >= 2 and not tables_added_records and text.strip():
+                card_records = _parse_voter_cards_from_text(text, booth, constituency, page_no, extraction_config)
+                if not card_records and RE_EPIC_ANYWHERE.search(text):
+                    card_records = _parse_voter_cards_fallback(text, booth, constituency, page_no)
+            # Position-based extraction as last fallback when text-based yields nothing
+            if not card_records and not tables_added_records and page_num >= 2 and RE_EPIC_ANYWHERE.search(text):
                 try:
                     pos_records = _extract_cards_by_position(
                         page, page_no, booth, constituency, extraction_config
@@ -1354,75 +1747,76 @@ def extract_from_pdf(
                         card_records = pos_records
                 except Exception as e:
                     logger.debug("Position-based extraction failed for page %s: %s", page_no, e)
-            if not card_records and len(all_records) == page_record_count_before and text.strip():
-                card_records = _parse_voter_cards_from_text(text, booth, constituency, page_no, extraction_config)
-                if not card_records and RE_EPIC_ANYWHERE.search(text):
-                    card_records = _parse_voter_cards_fallback(text, booth, constituency, page_no)
             if card_records:
                 all_records.extend(card_records)
-            elif len(all_records) == page_record_count_before and text.strip():
+            elif not tables_added_records and text.strip():
                 _append_from_text_lines(text, all_records, booth, constituency, page_no)
             else:
                 for rec in all_records[page_record_count_before:]:
                     rec["page_number"] = page_no
             pages_processed += 1
 
-    # If no text was extracted from any page (image-only PDF), run OCR automatically
+    # If no text was extracted from any page (image-only PDF), run spatial OCR automatically
     all_text_empty = all((not (p.get("text") or "").strip()) for p in raw_page_texts)
-    if not all_records and all_text_empty:
+    run_ocr = (not all_records and all_text_empty) or (
+        not all_records and use_ocr and (not first_page_text or not first_page_text.strip())
+    )
+    if run_ocr:
         cfg = _merge_ocr_config(extraction_config)
-        ocr_texts = _extract_text_via_ocr(
+        ecfg = extraction_config or {}
+        num_cols = int(ecfg.get("cards_per_row", 3))
+        # Spatial OCR: returns per-page list of pre-segmented card blocks
+        page_blocks_list = _extract_blocks_via_ocr(
             pdf_path,
             max_pages=cfg.get("ocr_max_pages", 1000),
             dpi=cfg.get("ocr_dpi", 200),
             preprocess=cfg.get("ocr_preprocess", False),
+            num_cols=num_cols,
         )
-        if ocr_texts:
-            logger.info("OCR extracted text from %s pages (image-only PDF)", len(ocr_texts))
-            raw_page_texts = [{"page": i + 1, "length": len(t), "text": t} for i, t in enumerate(ocr_texts)]
-            first_page_text = ocr_texts[0] if ocr_texts else ""
-            cn, pn, pname = _extract_metadata_from_text(first_page_text)
+        if page_blocks_list:
+            # Build flat text for metadata extraction from first page
+            first_page_lines = [ln for block in (page_blocks_list[0] if page_blocks_list else []) for ln in block]
+            first_page_text_ocr = "\n".join(first_page_lines)
+            raw_page_texts = [
+                {"page": i + 1, "length": sum(len(b) for b in pg), "text": "\n".join(ln for b in pg for ln in b)}
+                for i, pg in enumerate(page_blocks_list)
+            ]
+            cn, pn, pname = _extract_metadata_from_text(first_page_text_ocr)
             if not constituency and cn:
                 constituency = cn
             if not booth and pn:
                 booth = pn
-            for ocr_page_idx, page_text in enumerate(ocr_texts):
+            if not first_page_text:
+                first_page_text = first_page_text_ocr
+
+            for ocr_page_idx, page_blocks in enumerate(page_blocks_list):
                 page_no = ocr_page_idx + 1
-                card_records = _parse_voter_cards_from_text(page_text, booth, constituency, page_no, extraction_config)
-                if not card_records and RE_EPIC_ANYWHERE.search(page_text):
-                    card_records = _parse_voter_cards_fallback(page_text, booth, constituency, page_no)
+                if not page_blocks:
+                    continue
+                # If spatial OCR returned multiple blocks → parse directly (already segmented)
+                if len(page_blocks) > 1:
+                    card_records = _parse_voter_cards_from_blocks(
+                        page_blocks, booth, constituency, page_no
+                    )
+                else:
+                    # Single block = flat text fallback; use text-based parser
+                    page_text = "\n".join(page_blocks[0]) if page_blocks else ""
+                    card_records = _parse_voter_cards_from_text(
+                        page_text, booth, constituency, page_no, extraction_config
+                    )
+                    if not card_records and RE_EPIC_ANYWHERE.search(page_text):
+                        card_records = _parse_voter_cards_fallback(page_text, booth, constituency, page_no)
                 if card_records:
                     all_records.extend(card_records)
                 else:
+                    page_text = "\n".join(ln for b in page_blocks for ln in b)
                     _append_from_text_lines(page_text, all_records, booth, constituency, page_no)
-            pages_processed = len(ocr_texts)
-    # Legacy: explicit use_ocr when text was empty
-    elif not all_records and use_ocr and (not first_page_text or not first_page_text.strip()):
-        cfg = _merge_ocr_config(extraction_config)
-        ocr_texts = _extract_text_via_ocr(
-            pdf_path,
-            max_pages=cfg.get("ocr_max_pages", 1000),
-            dpi=cfg.get("ocr_dpi", 200),
-            preprocess=cfg.get("ocr_preprocess", False),
-        )
-        if ocr_texts:
-            raw_page_texts = [{"page": i + 1, "length": len(t), "text": t} for i, t in enumerate(ocr_texts)]
-            first_page_text = ocr_texts[0] if ocr_texts else ""
-            cn, pn, pname = _extract_metadata_from_text(first_page_text)
-            if not constituency and cn:
-                constituency = cn
-            if not booth and pn:
-                booth = pn
-            for ocr_page_idx, page_text in enumerate(ocr_texts):
-                page_no = ocr_page_idx + 1
-                card_records = _parse_voter_cards_from_text(page_text, booth, constituency, page_no, extraction_config)
-                if not card_records and RE_EPIC_ANYWHERE.search(page_text):
-                    card_records = _parse_voter_cards_fallback(page_text, booth, constituency, page_no)
-                if card_records:
-                    all_records.extend(card_records)
-                else:
-                    _append_from_text_lines(page_text, all_records, booth, constituency, page_no)
-            pages_processed = len(ocr_texts)
+            pages_processed = len(page_blocks_list)
+            logger.info(
+                "Spatial OCR complete: %d pages, %d records extracted",
+                pages_processed,
+                len(all_records),
+            )
 
     # Resolve metadata from PDF header if not provided
     constituency_name, part_no, part_name = _extract_metadata_from_text(first_page_text)
@@ -1443,7 +1837,13 @@ def extract_from_pdf(
         if not r.get("constituency_name") and constituency_name:
             r["constituency_name"] = constituency_name
         if r.get("epic_number"):
-            r["epic_number"] = _normalize_epic(r["epic_number"], cfg)
+            normalized, prefix_fixed = _normalize_epic(r["epic_number"], cfg)
+            r["epic_number"] = normalized
+            if prefix_fixed:
+                # Prefix was OCR-corrected (e.g. WOD→WQD); digits may also have OCR errors
+                r.setdefault("_warnings", [])
+                if "epic_prefix_ocr_corrected" not in r["_warnings"]:
+                    r["_warnings"].append("epic_prefix_ocr_corrected")
         r.setdefault("serial_number", None)
 
     # Structural layer: validation, confidence scoring, duplicate detection

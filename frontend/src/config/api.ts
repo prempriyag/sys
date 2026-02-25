@@ -107,7 +107,12 @@ export const API_ENDPOINTS = {
   SIR_PDF_FILES: "/api/upload/pdf-files",
   SIR_PDF_FILE: "/api/upload/pdf-file",
   SIR_DEBUG_PDF: "/api/upload/debug-pdf",
+  SIR_CONVERT_PDF: "/api/upload/convert-scanned-pdf",
+  SIR_PARSE_ELECTORAL_PDF: "/api/upload/convert-scanned-pdf",
   SIR_ECI_DOWNLOAD: "/api/upload/eci-download",
+  SIR_ECI_STATES: "/api/upload/eci-states",
+  SIR_ECI_DISTRICTS: "/api/upload/eci-districts",
+  SIR_ECI_ASSEMBLY_CONSTITUENCIES: "/api/upload/eci-assembly-constituencies",
   // Production extractor v1 (auto-detect text vs scanned, validation)
   EXTRACTOR_V1_EXTRACT: "/api/v1/extract-voters",
   EXTRACTOR_V1_HEALTH: "/api/v1/extractor/health",

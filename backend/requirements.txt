@@ -1,5 +1,8 @@
 fastapi
+pydantic>=2.7
+pydantic-settings>=2.0
 uvicorn
+python-dotenv
 sqlalchemy
 psycopg2-binary
 geoalchemy2

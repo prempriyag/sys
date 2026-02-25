@@ -1,9 +1,14 @@
 """
 Configuration settings for the FastAPI application
 """
+from pathlib import Path
 from pydantic_settings import BaseSettings
 from pydantic import model_validator
 from typing import Optional
+
+# Load .env from backend directory so it's found regardless of current working directory
+_BACKEND_DIR = Path(__file__).resolve().parent.parent
+_ENV_PATH = _BACKEND_DIR / ".env"
 
 # Default BASE_URL (origin for SSO) and FRONTEND_URL per environment (override with env vars)
 # UAT/PROD: backend at {origin}/backend, frontend at {origin}
@@ -66,6 +71,9 @@ class Settings(BaseSettings):
     INS_NAME: str = "OSUCSC"
     STUDENT_LABEL: str = "OSUCSC"
 
+    # ECI electoral roll download: subprocess timeout (seconds). ECI portal can be slow; 600=10min, 900=15min if needed.
+    ECI_DOWNLOAD_TIMEOUT_SECONDS: int = 600
+
     @model_validator(mode="after")
     def set_default_urls_by_env(self):
         env = (self.ENVIRONMENT or "DEV").upper()
@@ -84,10 +92,9 @@ class Settings(BaseSettings):
         return self
     
     class Config:
-        env_file = ".env"
+        env_file = str(_ENV_PATH) if _ENV_PATH.exists() else ".env"
         env_file_encoding = "utf-8"
         case_sensitive = True
-        # Reload .env file on changes
         extra = "ignore"
 
 

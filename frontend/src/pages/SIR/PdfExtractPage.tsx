@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { extractPdfRoll, extractPdfByPath, listPdfFiles, getPdfBlobUrl, debugPdfRoll, downloadEciRoll } from '../../services/api';
+import { extractPdfRoll, extractPdfByPath, listPdfFiles, getPdfBlobUrl, debugPdfRoll } from '../../services/api';
 import PageContainer from '../../components/common/PageContainer';
 import PageMeta from '../../components/common/PageMeta';
 import ThemedLoader from '../../components/common/ThemedLoader';
@@ -85,7 +85,6 @@ const PdfExtractPage: React.FC = () => {
   const [metadata, setMetadata] = useState<ExtractMetadata | null>(null);
   const [rawPageTexts, setRawPageTexts] = useState<{ page: number; length: number; text: string }[]>([]);
   const [debugInfo, setDebugInfo] = useState<{ page_texts_full?: { page: number; length: number; text: string }[] } | null>(null);
-  const [eciLoading, setEciLoading] = useState(false);
   const [selectedFilename, setSelectedFilename] = useState<string>('');
   const [pdfFiles, setPdfFiles] = useState<string[]>([]);
   const [pdfFolder, setPdfFolder] = useState<string>('');
@@ -148,42 +147,6 @@ const PdfExtractPage: React.FC = () => {
   useEffect(() => {
     loadPdfList();
   }, [loadPdfList]);
-
-  const handleEciDownload = async () => {
-    setEciLoading(true);
-    try {
-      const blob = await downloadEciRoll({
-        state: 'Andhra Pradesh',
-        revyear: '2025',
-        district: 'Kurnool',
-        ac_name: 'Kurnool',
-      });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'eci_electoral_roll.pdf';
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (e: any) {
-      let msg = e.message || 'ECI download failed';
-      if (e.response?.data) {
-        const d = e.response.data;
-        if (typeof d === 'string') msg = d;
-        else if (d.detail) msg = typeof d.detail === 'string' ? d.detail : JSON.stringify(d.detail);
-        else if (d.message) msg = d.message;
-        else if (d instanceof Blob) {
-          try {
-            const t = await d.text();
-            const j = JSON.parse(t);
-            msg = j.detail || j.message || t;
-          } catch { /* ignore */ }
-        }
-      }
-      alerterror(typeof msg === 'string' ? msg : JSON.stringify(msg));
-    } finally {
-      setEciLoading(false);
-    }
-  };
 
   const handleSubmit = async () => {
     const useFolder = selectedFilename && !file;
@@ -304,29 +267,6 @@ const PdfExtractPage: React.FC = () => {
             </div>
           </div>
           <p className="mt-2 text-blue-800 dark:text-blue-200">Layout: 3 sections per row × 3 cards per section = 9 voters per row. Move PDF to backend/pdf folder to select from dropdown.</p>
-        </div>
-
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 max-w-4xl">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Download from ECI Portal</h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-            Automatically download electoral roll PDF from voters.eci.gov.in for Andhra Pradesh, Kurnool district.
-            Requires Playwright + Tesseract on the backend.
-          </p>
-          <button
-            type="button"
-            onClick={handleEciDownload}
-            disabled={eciLoading}
-            className="px-5 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-          >
-            {eciLoading ? (
-              <span className="flex items-center gap-2">
-                <ThemedLoader size={16} />
-                Downloading from ECI...
-              </span>
-            ) : (
-              'Download from ECI'
-            )}
-          </button>
         </div>
 
         <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 max-w-4xl">

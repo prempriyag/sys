@@ -83,21 +83,34 @@ export const debugPdfRoll = (formData: FormData) =>
         headers: { 'Content-Type': 'multipart/form-data' }
     });
 
-/** Download electoral roll PDF from ECI portal (automated: pre-fill, captcha OCR, select first row). Returns blob for PDF download. */
+/** ECI dropdown options: states (all), districts (by state), assembly constituencies (by state + district). */
+export const getEciStates = () =>
+  api.get<{ states: string[] }>(API_ENDPOINTS.SIR_ECI_STATES);
+export const getEciDistricts = (state: string) =>
+  api.get<{ districts: string[] }>(API_ENDPOINTS.SIR_ECI_DISTRICTS, { params: { state } });
+export const getEciAssemblyConstituencies = (state: string, district: string) =>
+  api.get<{ assembly_constituencies: string[] }>(API_ENDPOINTS.SIR_ECI_ASSEMBLY_CONSTITUENCIES, { params: { state, district } });
+
+/** Download electoral roll PDF from ECI portal (automated: pre-fill, captcha OCR or manual entry, select first row). Returns blob for PDF download. */
 export const downloadEciRoll = async (params: {
     state?: string;
     revyear?: string;
     district?: string;
     ac_name?: string;
+    language?: string;
+    manual_captcha?: boolean;
 }): Promise<Blob> => {
     const formData = new FormData();
-    formData.append('state', params.state ?? 'Andhra Pradesh');
-    formData.append('revyear', params.revyear ?? '2025');
-    formData.append('district', params.district ?? 'Kurnool');
-    formData.append('ac_name', params.ac_name ?? 'Kurnool');
+    formData.append('state', params.state ?? 'Tamil Nadu');
+    formData.append('revyear', params.revyear ?? '2026');
+    formData.append('district', params.district ?? 'Chennai');
+    formData.append('ac_name', params.ac_name ?? '11 - Dr.Radhakrishnan Nagar');
+    formData.append('language', params.language ?? 'English');
+    formData.append('manual_captcha', params.manual_captcha ? 'true' : 'false');
     const res = await api.post(API_ENDPOINTS.SIR_ECI_DOWNLOAD, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
         responseType: 'blob',
+        timeout: 600000, // 10 minutes — ECI download can take several minutes
     });
     return res.data;
 };

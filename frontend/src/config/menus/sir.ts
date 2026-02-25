@@ -39,6 +39,11 @@ export const sirMenu: MenuConfig = {
           path: "/upload/pdf-extract",
           icon: "file-text",
         },
+        {
+          name: "Download from ECI",
+          path: "/upload/eci-download",
+          icon: "download",
+        },
       ],
     },
     {

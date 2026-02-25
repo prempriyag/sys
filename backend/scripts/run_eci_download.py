@@ -17,11 +17,16 @@ if str(_backend) not in sys.path:
 def main():
     parser = argparse.ArgumentParser(description="ECI electoral roll download (standalone)")
     parser.add_argument("--output", "-o", required=True, help="Output PDF path")
-    parser.add_argument("--state", default="Andhra Pradesh", help="State name")
-    parser.add_argument("--revyear", default="2025", help="Revision year")
-    parser.add_argument("--district", default="Kurnool", help="District name")
-    parser.add_argument("--ac", default="Kurnool", dest="ac_name", help="Assembly Constituency name")
+    parser.add_argument("--state", default="Tamil Nadu", help="State name")
+    parser.add_argument("--revyear", default="2026", help="Revision year")
+    parser.add_argument("--district", default="Chennai", help="District")
+    parser.add_argument("--ac", default="11 - Dr.Radhakrishnan Nagar", dest="ac_name", help="Assembly Constituency name")
+    parser.add_argument("--language", default="English", help="Select Language (e.g. English, Tamil, Kannada)")
+    parser.add_argument("--manual-captcha", action="store_true", help="Type captcha manually in the browser (default).")
+    parser.add_argument("--no-manual-captcha", action="store_true", help="Use OCR for captcha (may fail on ECI).")
     args = parser.parse_args()
+    # Default = manual captcha; --no-manual-captcha switches to OCR.
+    manual_captcha = not bool(args.no_manual_captcha)
 
     from services.eci_downloader import download_eci_roll_sync
 
@@ -30,6 +35,8 @@ def main():
         revyear=args.revyear,
         district=args.district,
         ac_name=args.ac_name,
+        language=args.language,
+        manual_captcha=manual_captcha,
     )
     if error_msg:
         print(f"Error: {error_msg}", file=sys.stderr)

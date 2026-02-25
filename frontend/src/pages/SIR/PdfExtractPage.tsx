@@ -108,7 +108,7 @@ const PdfExtractPage: React.FC = () => {
   const [records, setRecords] = useState<ExtractedRecord[]>([]);
   const [metadata, setMetadata] = useState<ExtractMetadata | null>(null);
   const [rawPageTexts, setRawPageTexts] = useState<{ page: number; length: number; text: string }[]>([]);
-  const [debugInfo, setDebugInfo] = useState<{
+  const [debugInfo, setDebugInfo] = useState<{ page_texts_full?: { page: number; length: number; text: string }[] } | null>(null);
     first_page_text?: string;
     first_page_text_length?: number;
     table_count?: number;
@@ -352,29 +352,6 @@ const PdfExtractPage: React.FC = () => {
           </div>
           <p className="mt-2 text-blue-800 dark:text-blue-200">Layout: 3 cards per row × 10 rows = 30 voters per page. Move PDF to backend/pdf folder to select from dropdown.</p>
           <p className="mt-1 text-xs text-blue-700 dark:text-blue-300">See backend/docs/EXTRACTION_ENGINE_HOW_IT_WORKS.md for how the engine works and accuracy details.</p>
-        </div>
-
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 max-w-4xl">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Download from ECI Portal</h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-            Automatically download electoral roll PDF from voters.eci.gov.in for Andhra Pradesh, Kurnool district.
-            Requires Playwright + Tesseract on the backend.
-          </p>
-          <button
-            type="button"
-            onClick={handleEciDownload}
-            disabled={eciLoading}
-            className="px-5 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-          >
-            {eciLoading ? (
-              <span className="flex items-center gap-2">
-                <ThemedLoader size={16} />
-                Downloading from ECI...
-              </span>
-            ) : (
-              'Download from ECI'
-            )}
-          </button>
         </div>
 
         <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 max-w-4xl">

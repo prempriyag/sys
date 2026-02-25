@@ -148,23 +148,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setPermissions(userPermissions);
     setTwoWayPending(null);
 
-    // Redirect based on permissions
-    // For SIR System, we redirect everyone to the main dashboard
-    // Legacy redirects removed
-    navigate("/");
-
-    /* 
-    if (response.user.college_perm === 1) {
-      navigate("/college/dashboard");
-    } else if (response.user.hs_perm === 1) {
-      navigate("/school/dashboard");
-    } else if (response.user.ocr_perm === 1) {
-      navigate("/ocrverify/dashboard");
+    // Defer navigation so React commits auth state before ProtectedRoute runs.
+    // Otherwise ProtectedRoute can still see isAuthenticated=false and redirect to /login.
+    const go = () => navigate("/dashboard");
+    if (typeof requestAnimationFrame !== "undefined") {
+      requestAnimationFrame(() => go());
     } else {
-      // Default fallback
-      navigate("/");
+      setTimeout(go, 0);
     }
-    */
   };
 
   const login = async (email: string, password: string) => {

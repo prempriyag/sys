@@ -6,9 +6,14 @@ from typing import Optional as Opt
 import json
 from sqlalchemy.orm import Session
 from database.connection import get_db
+from config.settings import settings
 from models.sir.voter import VoterPre, VoterPost
 from models.sir.constituency import Constituency
 from models.sir.booth import Booth
+from models.sir.state import State
+from models.sir.district import District
+from models.sir.assembly_constituency import AssemblyConstituency
+from models.sir.eci_roll_selection import EciRollSelection
 from services.normalization import NormalizationService
 from services.electoral_roll_pdf_extractor import extract_from_pdf, debug_pdf, get_pdf_page_texts
 import pandas as pd
@@ -594,41 +599,196 @@ async def extract_pdf_only(
         raise HTTPException(status_code=500, detail=f"Error processing PDF: {str(e)}")
 
 
+def _parse_bool_form(val) -> bool:
+    if val is None:
+        return True
+    if isinstance(val, bool):
+        return val
+    return str(val).strip().lower() in ("1", "true", "yes", "on")
+
+
+# ------------------ ECI metadata (states / districts / AC) for dropdowns ------------------
+
+@router.get("/eci-states")
+def eci_states(db: Session = Depends(get_db)):
+    """Return all state names for the State dropdown (full list from ECI data)."""
+    from data.eci_states_districts import ECI_ALL_STATES
+    return {"states": ECI_ALL_STATES}
+
+
+@router.get("/eci-districts")
+def eci_districts(state: str = "", db: Session = Depends(get_db)):
+    """Return district names for the given state. Uses full static list when available (e.g. Tamil Nadu, Karnataka); else DB."""
+    from sqlalchemy import func
+    state = (state or "").strip()
+    if not state:
+        return {"districts": []}
+    from data.eci_states_districts import get_districts_for_state, STATE_DISTRICTS
+    # Prefer full list from static data if we have it for this state (so dropdown has all districts)
+    state_key = next((k for k in STATE_DISTRICTS if k.lower() == state.lower()), None)
+    if state_key is not None:
+        districts = get_districts_for_state(state_key)
+    else:
+        rows = (
+            db.query(District.name)
+            .join(State, District.state_id == State.id)
+            .filter(func.lower(State.name) == state.lower())
+            .order_by(District.name)
+            .all()
+        )
+        districts = [r[0] for r in rows if r[0]]
+    return {"districts": districts}
+
+
+@router.get("/eci-assembly-constituencies")
+def eci_assembly_constituencies(state: str = "", district: str = "", db: Session = Depends(get_db)):
+    """Return assembly constituency names for the given state and district. Merges static list + DB so no options are missing."""
+    from sqlalchemy import func
+    from data.eci_states_districts import get_assembly_constituencies
+    state = (state or "").strip()
+    district = (district or "").strip()
+    if not state or not district:
+        return {"assembly_constituencies": []}
+    # Static data (STATE_DISTRICT_AC) – full list for known state+district
+    acs_static = get_assembly_constituencies(state, district)
+    # DB: assembly_constituencies for this state+district (in case some were added or static is incomplete)
+    rows = (
+        db.query(AssemblyConstituency.name)
+        .join(District, AssemblyConstituency.district_id == District.id)
+        .join(State, District.state_id == State.id)
+        .filter(
+            func.lower(State.name) == state.lower(),
+            func.lower(District.name) == district.lower(),
+        )
+        .order_by(AssemblyConstituency.name)
+        .all()
+    )
+    acs_db = [r[0] for r in rows if r[0]]
+    # Merge: static first (preserve order), then any from DB not already in static
+    acs = list(acs_static)
+    seen = {(a or "").strip().lower() for a in acs_static}
+    for name in acs_db:
+        n = (name or "").strip()
+        if not n:
+            continue
+        key = n.lower()
+        if key not in seen:
+            seen.add(key)
+            acs.append(n)
+    return {"assembly_constituencies": acs}
+
+
+def _safe_folder_name(s: str) -> str:
+    """Sanitize string for use in download path (no path traversal or invalid chars)."""
+    if not s:
+        return "unknown"
+    s = str(s).strip().replace("\\", "_").replace("/", "_").replace(":", "_")
+    for c in '*?"<>|':
+        s = s.replace(c, "_")
+    return s[:200] or "unknown"
+
+
 @router.post("/eci-download")
 async def eci_download_roll(
-    state: str = Form("Andhra Pradesh"),
-    revyear: str = Form("2025"),
-    district: str = Form("Kurnool"),
-    ac_name: str = Form("Kurnool"),
+    db: Session = Depends(get_db),
+    state: str = Form("Tamil Nadu"),
+    revyear: str = Form("2026"),
+    district: str = Form("Chennai"),
+    ac_name: str = Form("11 - Dr.Radhakrishnan Nagar"),
+    language: str = Form("English"),
+    manual_captcha: str = Form("true"),
 ):
     """
-    Automate ECI electoral roll PDF download: pre-fill state, revyear, district, AC,
-    solve captcha via OCR, select first row, and return the PDF.
+    Automate ECI electoral roll PDF download: pre-fill state, revyear, district, AC, language.
+    Saves PDF under backend/download/<state>/<year>/<district>/<AC>/ and stores record in eci_roll_selections (pdf_path).
+    Default: manual captcha. Use manual_captcha=false for OCR.
     Requires: pip install playwright && playwright install chromium
-    Runs in a dedicated thread to avoid Windows event loop / subprocess conflicts.
     """
     try:
         import asyncio
+        from datetime import datetime
         from services.eci_downloader import download_eci_roll_via_subprocess
     except ImportError:
         raise HTTPException(
             status_code=501,
             detail="ECI downloader not available. Install: pip install playwright && playwright install chromium",
         )
-    loop = asyncio.get_event_loop()
-    pdf_bytes, error_msg = await loop.run_in_executor(
-        None,
-        lambda: download_eci_roll_via_subprocess(
-            state=state,
-            revyear=revyear,
-            district=district,
-            ac_name=ac_name,
-        ),
-    )
+    use_manual = _parse_bool_form(manual_captcha)
+    # In Python 3.12+, prefer the running loop inside async endpoints.
+    loop = asyncio.get_running_loop()
+    try:
+        pdf_bytes, error_msg = await loop.run_in_executor(
+            None,
+            lambda: download_eci_roll_via_subprocess(
+                state=state,
+                revyear=revyear,
+                district=district,
+                ac_name=ac_name,
+                language=(language or "English").strip(),
+                manual_captcha=use_manual,
+            ),
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=502,
+            detail=f"ECI download failed to start: {e!s}. Ensure Playwright is installed (pip install playwright && playwright install chromium) and the server has permission to launch the browser.",
+        )
     if error_msg:
-        raise HTTPException(status_code=502, detail=error_msg)
+        # Strip PyTorch/EasyOCR noise and old "continuing" lines from subprocess stderr
+        lines = [l for l in error_msg.splitlines() if l.strip()
+            and "Using CPU" not in l
+            and "pin_memory" not in l
+            and "dataloader" not in l.lower()
+            and "accelerator" not in l.lower()
+            and "super().__init__" not in l
+            and "may have failed, continuing" not in l]
+        detail = "\n".join(lines).strip() or error_msg.strip()
+        # Normalize generic "canceled" into a clear message (Playwright or client disconnect)
+        if detail.lower() in ("canceled", "error: canceled", "cancelled", "error: cancelled"):
+            detail = (
+                "Download was canceled or the connection was closed. "
+                "This can happen if the request took too long or the page was closed. "
+                "Please try again and wait for the download to complete (it may take 2–5 minutes)."
+            )
+        raise HTTPException(status_code=502, detail=detail)
     if not pdf_bytes:
         raise HTTPException(status_code=502, detail="No PDF was downloaded from ECI portal")
+
+    # Save PDF to persistent path and store pdf_path in eci_roll_selections
+    base_dir = Path(__file__).resolve().parent.parent.parent / "download"
+    folder = (
+        base_dir
+        / _safe_folder_name(state)
+        / _safe_folder_name(revyear)
+        / _safe_folder_name(district)
+        / _safe_folder_name(ac_name)
+    )
+    folder.mkdir(parents=True, exist_ok=True)
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    pdf_filename = f"eci_electoral_roll_{ts}.pdf"
+    pdf_file_path = folder / pdf_filename
+    try:
+        pdf_file_path.write_bytes(pdf_bytes)
+    except Exception as e:
+        logger.warning("Could not save ECI PDF to %s: %s", pdf_file_path, e)
+    else:
+        saved_path_str = str(pdf_file_path.resolve())
+        try:
+            row = EciRollSelection(
+                state=state.strip(),
+                year_of_revision=(revyear or "").strip(),
+                district=district.strip(),
+                assembly_constituency=ac_name.strip(),
+                language=(language or "English").strip(),
+                created_by=None,
+                pdf_path=saved_path_str,
+            )
+            db.add(row)
+            db.commit()
+        except Exception as e:
+            logger.warning("Could not insert eci_roll_selections row: %s", e)
+            db.rollback()
+
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",

@@ -42,7 +42,12 @@ export const sirMenu: MenuConfig = {
         {
           name: "Download from ECI",
           path: "/upload/eci-download",
-          icon: "download",
+          icon: "download", 
+        },
+        {
+          name: "OCR PDF Detector",
+          path: "/upload/ocr-pdf-detector",
+          icon: "file-text",
         },
       ],
     },

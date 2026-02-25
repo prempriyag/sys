@@ -1,0 +1,34 @@
+Document ID,SOP Section,Item,Status,Priority,Notes
+TN-VOTER-ANALYTICS-01,1. OBJECTIVE & SCOPE,Objective defined,Completed,P1,Identify, quantify, interpret electoral roll changes (SIR)
+TN-VOTER-ANALYTICS-01,1. OBJECTIVE & SCOPE,Scope In-Scope documented,Completed,P1,Pre/Post-SIR comparison, booth-level metrics, GIS, field validation sampling
+TN-VOTER-ANALYTICS-01,1. OBJECTIVE & SCOPE,Scope Out-of-Scope documented,Completed,P2,Legal filing prep (data support only); manual door-to-door (sampling only)
+TN-VOTER-ANALYTICS-01,2. ROLES & RESPONSIBILITIES,SIR Project Lead assigned,Pending,P2,Overall ownership, strategy alignment, final reporting
+TN-VOTER-ANALYTICS-01,2. ROLES & RESPONSIBILITIES,Roll Data Engineer assigned,Pending,P2,Data ingestion, cleaning, database management
+TN-VOTER-ANALYTICS-01,2. ROLES & RESPONSIBILITIES,Matching Analyst assigned,Pending,P2,Fuzzy matching algorithms, record classification
+TN-VOTER-ANALYTICS-01,2. ROLES & RESPONSIBILITIES,GIS Analyst assigned,Pending,P2,Spatial mapping, heatmap generation, boundary validation
+TN-VOTER-ANALYTICS-01,2. ROLES & RESPONSIBILITIES,Political Analyst assigned,Pending,P2,Interpretation into political insights (caste/community)
+TN-VOTER-ANALYTICS-01,2. ROLES & RESPONSIBILITIES,Field Validation Lead assigned,Pending,P2,Ground teams for physical verification of anomalies
+TN-VOTER-ANALYTICS-01,3. DATA ACQUISITION & STANDARDIZATION,Pre-SIR Electoral Roll source,Completed,P1,PDF/Text - upload & parse implemented
+TN-VOTER-ANALYTICS-01,3. DATA ACQUISITION & STANDARDIZATION,Post-SIR Electoral Roll source,Completed,P1,PDF/Text - upload & parse implemented
+TN-VOTER-ANALYTICS-01,3. DATA ACQUISITION & STANDARDIZATION,ECI Booth List & Constituency Maps source,Pending,P1,Required for booth validation and GIS boundary validation
+TN-VOTER-ANALYTICS-01,3. DATA ACQUISITION & STANDARDIZATION,Historical Turnout Data (Last 2 Elections) source,Pending,P1,Required for risk model (High Risk: deletions >5% AND turnout >70%)
+TN-VOTER-ANALYTICS-01,3. DATA ACQUISITION & STANDARDIZATION,Text Normalization implemented,Completed,P1,Uppercase; remove non-alphanumeric from address - NormalizationService
+TN-VOTER-ANALYTICS-01,3. DATA ACQUISITION & STANDARDIZATION,Language Handling (Tamil-English transliteration) implemented,Completed,P1,NormalizationService
+TN-VOTER-ANALYTICS-01,3. DATA ACQUISITION & STANDARDIZATION,Booth count validation vs ECI lists,Completed,P1,Booth creation/validation logic
+TN-VOTER-ANALYTICS-01,4. ANALYTICAL LOGIC,Exact Match (EPIC Primary Key),Completed,P1,MatchingEngine - EPIC match
+TN-VOTER-ANALYTICS-01,4. ANALYTICAL LOGIC,Fuzzy Match (Name + Relative + Door No >90%),Completed,P1,rapidfuzz in MatchingEngine
+TN-VOTER-ANALYTICS-01,4. ANALYTICAL LOGIC,Family Clustering (House Number),Completed,P1,analyze_families - household-level shifts & anomaly (>15)
+TN-VOTER-ANALYTICS-01,4. ANALYTICAL LOGIC,Classification UNCHANGED / ADDED / DELETED / MODIFIED / MIGRATED,Completed,P1,MatchResult model and MatchingEngine
+TN-VOTER-ANALYTICS-01,5. KEY PERFORMANCE INDICATORS,Net Roll Change %,Completed,P1,KPIEngine - (Additions - Deletions) / Total Voters
+TN-VOTER-ANALYTICS-01,5. KEY PERFORMANCE INDICATORS,Deletion Velocity,Completed,P1,KPIEngine vs district average concept
+TN-VOTER-ANALYTICS-01,5. KEY PERFORMANCE INDICATORS,Youth Intake (18-19 and 20-25 age bands),Completed,P1,KPIEngine youth_18_19_percent, youth_20_25_percent
+TN-VOTER-ANALYTICS-01,5. KEY PERFORMANCE INDICATORS,Gender Balance Shift (F/M ratio),Completed,P1,KPIEngine gender_shift_percent
+TN-VOTER-ANALYTICS-01,5. RISK SCORING MODEL,High Risk Deletion (>5% deletions AND turnout >70%),Completed,P1,KPIEngine risk_category HIGH_RISK
+TN-VOTER-ANALYTICS-01,5. RISK SCORING MODEL,High Opportunity Addition (>10% new voters favorable segments),Completed,P1,KPIEngine HIGH_OPPORTUNITY
+TN-VOTER-ANALYTICS-01,5. RISK SCORING MODEL,Anomaly Flag (>15 voters per household),Completed,P1,KPIEngine ANOMALY from analyze_families
+TN-VOTER-ANALYTICS-01,6. FIELD VALIDATION,Top 10 High Risk booths per constituency,Completed,P1,GET /api/sir/analytics/high-risk/{id}?limit=10
+TN-VOTER-ANALYTICS-01,6. FIELD VALIDATION,5% random sample of Deleted voters for verification,Completed,P1,GET /api/sir/analytics/validation-sample/{id}?sample_percent=5
+TN-VOTER-ANALYTICS-01,6. FIELD VALIDATION,New Additions in non-residential zones (industrial/warehouse),Pending,P2,Target list by zone type - requires zone/land-use data or tagging
+TN-VOTER-ANALYTICS-01,6. REPORTING DELIVERABLES,Executive Summary (Win/Loss estimation),Completed,P1,Dashboard aggregates / high-level impact
+TN-VOTER-ANALYTICS-01,6. REPORTING DELIVERABLES,Booth Action Plan (booths for legal/ground intervention),Completed,P1,High-risk booth list and analytics
+TN-VOTER-ANALYTICS-01,6. REPORTING DELIVERABLES,Spatial Heatmaps (deletion/addition clusters),Completed,P1,Risk Heatmap page and dashboard heatmap

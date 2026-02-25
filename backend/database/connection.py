@@ -1,23 +1,30 @@
 """
 Database connection and session management for PostgreSQL
 """
+import os
+from pathlib import Path
+import urllib.parse
+
+# Load .env from backend directory first so DB_PORT is in os.environ (avoids wrong cwd)
+try:
+    from dotenv import load_dotenv
+    load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+except ImportError:
+    pass
+
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from config.settings import settings
-import urllib.parse
 
 # Create connection string for PostgreSQL
 # Format: postgresql://user:password@host:port/database
-# Encode password to handle special characters
 encoded_password = urllib.parse.quote_plus(settings.DB_PASSWORD)
-# Support optional port in DB_HOST or use DB_PORT if provided
 db_host = settings.DB_HOST
-# Check if port is already in host or use DB_PORT
-if ':' not in db_host:
-    if hasattr(settings, 'DB_PORT') and settings.DB_PORT:
-        db_host = f"{db_host}:{settings.DB_PORT}"
-    # PostgreSQL default port is 5432, but we'll let psycopg2 handle it if not specified
+# Port: from env first (dotenv above), then settings, then default 5432
+db_port = (os.environ.get("DB_PORT") or getattr(settings, "DB_PORT", None) or "").strip() or "5432"
+if ":" not in db_host:
+    db_host = f"{db_host}:{db_port}"
 connection_string = (
     f"postgresql://{settings.DB_USER}:{encoded_password}"
     f"@{db_host}/{settings.DB_NAME}"

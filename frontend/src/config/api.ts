@@ -14,6 +14,7 @@ export const API_ENDPOINTS = {
   VERIFY: "/api/verify",
   VERIFY_RESEND: "/api/verify/resend",
   ME: "/api/me",
+  DB_INFO: "/api/db-info",
   FORGOT_PASSWORD: "/api/forgot-password",
   FORGOT_PASSWORD_RESET: "/api/forgot-password/reset",
   TRANSCRIPT_REPORTS: "/api/transcriptreports",
@@ -112,6 +113,9 @@ export const API_ENDPOINTS = {
   SIR_ECI_STATES: "/api/upload/eci-states",
   SIR_ECI_DISTRICTS: "/api/upload/eci-districts",
   SIR_ECI_ASSEMBLY_CONSTITUENCIES: "/api/upload/eci-assembly-constituencies",
+  // Production extractor v1 (auto-detect text vs scanned, validation)
+  EXTRACTOR_V1_EXTRACT: "/api/v1/extract-voters",
+  EXTRACTOR_V1_HEALTH: "/api/v1/extractor/health",
   SIR_MATCHING_RUN: "/api/matching/run",
   SIR_KPI_BOOTH: "/api/kpi/booth",
   SIR_KPI_CONSTITUENCY: "/api/kpi/constituency",

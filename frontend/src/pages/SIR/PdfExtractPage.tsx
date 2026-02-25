@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { extractPdfRoll, extractPdfByPath, listPdfFiles, getPdfBlobUrl, debugPdfRoll } from '../../services/api';
+import { extractPdfRoll, extractPdfByPath, listPdfFiles, getPdfBlobUrl, debugPdfRoll, downloadEciRoll, getDbInfo } from '../../services/api';
 import PageContainer from '../../components/common/PageContainer';
 import PageMeta from '../../components/common/PageMeta';
 import ThemedLoader from '../../components/common/ThemedLoader';
-import { alerterror } from '../../utils/toast';
-import PdfZoneEditor, { ZoneConfig } from '../../components/SIR/PdfZoneEditor';
+import { alerterror, alertsuccess } from '../../utils/toast';
+import { CopyIcon } from '../../icons';
 
 /** Extracted voter record (matches backend electoral_roll_pdf_extractor schema). */
 interface ExtractedRecord {
   epic_number: string | null;
+  serial_number?: string | null;
   name: string | null;
   relative_name: string | null;
   age: number | null;
@@ -18,6 +19,9 @@ interface ExtractedRecord {
   booth_number: string | null;
   constituency_name: string | null;
   page_number?: number;
+  confidence_score?: number;
+  is_duplicate?: boolean;
+  low_confidence?: boolean;
 }
 
 interface ExtractMetadata {
@@ -48,9 +52,29 @@ interface ExtractMetadata {
   net_electors_total?: string;
 }
 
-/** Extraction config for ABBYY-like coordinate tuning (3 sections × 3 cards = 9 per row). */
+/** Accuracy summary from extraction engine. */
+interface AccuracySummary {
+  completeness_percent?: number;
+  estimated_accuracy_range?: string;
+  field_coverage?: Record<string, number>;
+  extraction_mode?: string;
+  records_total?: number;
+  records_complete?: number;
+  epic_valid_pct?: number;
+  age_valid_pct?: number;
+  gender_valid_pct?: number;
+  duplicate_epic_count?: number;
+  low_confidence_count?: number;
+  multi_epic_warnings?: number;
+  possible_cross_card_merge_count?: number;
+  avg_confidence_score?: number;
+}
+
+/** Extraction config for ABBYY-like coordinate tuning (3 cards/row × 10 rows = 30 per page). */
 interface ExtractionConfig {
   cards_per_row?: number;
+  rows_per_page?: number;
+  row_gap?: number;
   header_top?: number;
   data_bottom?: number;
   margin_left?: number;
@@ -58,74 +82,53 @@ interface ExtractionConfig {
 }
 
 const DEFAULT_CONFIG: ExtractionConfig = {
-  cards_per_row: 9,
+  cards_per_row: 3,
+  rows_per_page: 10,
+  row_gap: 25,
   header_top: 120,
   data_bottom: 750,
   margin_left: 20,
   margin_right: 20,
 };
 
-function toZoneConfig(c: ExtractionConfig): ZoneConfig {
-  return {
-    cards_per_row: c.cards_per_row ?? 9,
-    header_top: c.header_top ?? 120,
-    data_bottom: c.data_bottom ?? 750,
-    margin_left: c.margin_left ?? 20,
-    margin_right: c.margin_right ?? 20,
-  };
-}
 
 const PdfExtractPage: React.FC = () => {
+  const copyToClipboard = (text: string | number | null | undefined) => {
+    const str = String(text ?? '').trim();
+    if (!str) return;
+    navigator.clipboard.writeText(str).then(() => {
+      alertsuccess('Copied to clipboard!');
+    }).catch(() => {});
+  };
+
   const [file, setFile] = useState<File | null>(null);
   const [constituencyName, setConstituencyName] = useState('');
   const [boothNumber, setBoothNumber] = useState('');
-  const [useOcr, setUseOcr] = useState(false);
   const [loading, setLoading] = useState(false);
   const [records, setRecords] = useState<ExtractedRecord[]>([]);
   const [metadata, setMetadata] = useState<ExtractMetadata | null>(null);
   const [rawPageTexts, setRawPageTexts] = useState<{ page: number; length: number; text: string }[]>([]);
   const [debugInfo, setDebugInfo] = useState<{ page_texts_full?: { page: number; length: number; text: string }[] } | null>(null);
+    first_page_text?: string;
+    first_page_text_length?: number;
+    table_count?: number;
+    table_count_text_strategy?: number;
+    table_preview?: Array<{ table_index: number; strategy?: string; row_count: number; first_3_rows: any[] }>;
+    page_texts_full?: { page: number; length: number; text: string }[];
+  } | null>(null);
+  const [dbInfo, setDbInfo] = useState<any | null>(null);
+  const [dbLoading, setDbLoading] = useState(false);
+  const [eciLoading, setEciLoading] = useState(false);
   const [selectedFilename, setSelectedFilename] = useState<string>('');
   const [pdfFiles, setPdfFiles] = useState<string[]>([]);
   const [pdfFolder, setPdfFolder] = useState<string>('');
   const [pdfListLoading, setPdfListLoading] = useState(true);
   const [pdfListError, setPdfListError] = useState<string | null>(null);
   const [extractionConfig, setExtractionConfig] = useState<ExtractionConfig>({ ...DEFAULT_CONFIG });
-  const [showConfig, setShowConfig] = useState(false);
-  const [previewPage, setPreviewPage] = useState(3);
+  const [accuracySummary, setAccuracySummary] = useState<AccuracySummary | null>(null);
+  /** Force OCR for data pages (recommended for 3×10 card layout — avoids wrong column alignment from text layer). */
+  const [forceOcr, setForceOcr] = useState(true);
 
-  const blobUrlRef = React.useRef<string | null>(null);
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (blobUrlRef.current) {
-      URL.revokeObjectURL(blobUrlRef.current);
-      blobUrlRef.current = null;
-    }
-    if (selectedFilename) {
-      let cancelled = false;
-      getPdfBlobUrl(selectedFilename).then((url) => {
-        if (!cancelled) {
-          blobUrlRef.current = url;
-          setPdfUrl(url);
-        }
-      }).catch(() => setPdfUrl(null));
-      return () => { cancelled = true; };
-    }
-    if (file) {
-      const url = URL.createObjectURL(file);
-      blobUrlRef.current = url;
-      setPdfUrl(url);
-    } else {
-      setPdfUrl(null);
-    }
-    return () => {
-      if (blobUrlRef.current) {
-        URL.revokeObjectURL(blobUrlRef.current);
-        blobUrlRef.current = null;
-      }
-    };
-  }, [selectedFilename, file]);
 
   const loadPdfList = useCallback(async () => {
     setPdfListLoading(true);
@@ -148,6 +151,58 @@ const PdfExtractPage: React.FC = () => {
     loadPdfList();
   }, [loadPdfList]);
 
+  const loadDbInfo = useCallback(async () => {
+    setDbLoading(true);
+    try {
+      const res = await getDbInfo();
+      setDbInfo(res.data);
+    } catch (e: any) {
+      setDbInfo(null);
+    } finally {
+      setDbLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadDbInfo();
+  }, [loadDbInfo]);
+
+  const handleEciDownload = async () => {
+    setEciLoading(true);
+    try {
+      const blob = await downloadEciRoll({
+        state: 'Andhra Pradesh',
+        revyear: '2025',
+        district: 'Kurnool',
+        ac_name: 'Kurnool',
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'eci_electoral_roll.pdf';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      let msg = e.message || 'ECI download failed';
+      if (e.response?.data) {
+        const d = e.response.data;
+        if (typeof d === 'string') msg = d;
+        else if (d.detail) msg = typeof d.detail === 'string' ? d.detail : JSON.stringify(d.detail);
+        else if (d.message) msg = d.message;
+        else if (d instanceof Blob) {
+          try {
+            const t = await d.text();
+            const j = JSON.parse(t);
+            msg = j.detail || j.message || t;
+          } catch { /* ignore */ }
+        }
+      }
+      alerterror(typeof msg === 'string' ? msg : JSON.stringify(msg));
+    } finally {
+      setEciLoading(false);
+    }
+  };
+
   const handleSubmit = async () => {
     const useFolder = selectedFilename && !file;
     if (!file && !selectedFilename) {
@@ -165,32 +220,35 @@ const PdfExtractPage: React.FC = () => {
     setMetadata(null);
     setRawPageTexts([]);
     setDebugInfo(null);
+    setAccuracySummary(null);
     try {
       if (useFolder) {
         const res = await extractPdfByPath({
           filename: selectedFilename,
           constituency_name: constituencyName.trim() || undefined,
           booth_number: boothNumber.trim() || undefined,
-          use_ocr: useOcr,
+          use_ocr: forceOcr,
           extraction_config: hasConfig ? cfg : undefined,
         });
-        const data = res.data as { records?: ExtractedRecord[]; metadata?: ExtractMetadata; raw_page_texts?: { page: number; length: number; text: string }[] };
+        const data = res.data as { records?: ExtractedRecord[]; metadata?: ExtractMetadata; raw_page_texts?: { page: number; length: number; text: string }[]; accuracy_summary?: AccuracySummary };
         setRecords(data.records ?? []);
         setMetadata(data.metadata ?? null);
         setRawPageTexts(data.raw_page_texts ?? []);
+        setAccuracySummary(data.accuracy_summary ?? null);
       } else {
         const formData = new FormData();
         formData.append('file', file!);
         if (constituencyName.trim()) formData.append('constituency_name', constituencyName.trim());
         if (boothNumber.trim()) formData.append('booth_number', boothNumber.trim());
-        formData.append('use_ocr', useOcr ? 'true' : 'false');
+        formData.append('use_ocr', forceOcr ? 'true' : 'false');
         if (hasConfig) formData.append('extraction_config_json', JSON.stringify(cfg));
 
         const res = await extractPdfRoll(formData);
-        const data = res.data as { records?: ExtractedRecord[]; metadata?: ExtractMetadata; raw_page_texts?: { page: number; length: number; text: string }[] };
+        const data = res.data as { records?: ExtractedRecord[]; metadata?: ExtractMetadata; raw_page_texts?: { page: number; length: number; text: string }[]; accuracy_summary?: AccuracySummary };
         setRecords(data.records ?? []);
         setMetadata(data.metadata ?? null);
         setRawPageTexts(data.raw_page_texts ?? []);
+        setAccuracySummary(data.accuracy_summary ?? null);
       }
     } catch (e: any) {
       const msg = e.response?.data?.detail || e.message || 'Extraction failed';
@@ -210,7 +268,7 @@ const PdfExtractPage: React.FC = () => {
     setDebugInfo(null);
     try {
       const res = await debugPdfRoll(formData);
-      setDebugInfo(res.data as { page_texts_full?: { page: number; length: number; text: string }[] });
+      setDebugInfo(res.data as any);
     } catch (e: any) {
       alerterror(e.response?.data?.detail || e.message || 'Debug failed');
     }
@@ -225,6 +283,32 @@ const PdfExtractPage: React.FC = () => {
         description="Upload an ECI-style electoral roll PDF and preview extracted voter data"
       />
       <div className="space-y-6">
+        {/* DB info */}
+        <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow border border-gray-200 dark:border-gray-700 max-w-4xl">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold text-gray-900 dark:text-white">DB Detail</h2>
+              {dbInfo?.database ? (
+                <p className="text-xs text-gray-600 dark:text-gray-300 mt-1">
+                  {dbInfo.status} | {dbInfo.database.driver} | {dbInfo.database.user}@{dbInfo.database.host}/{dbInfo.database.name}{" "}
+                  {dbInfo.database.version ? `| ${dbInfo.database.version}` : ""}
+                </p>
+              ) : (
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  DB info not available
+                </p>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={loadDbInfo}
+              disabled={dbLoading}
+              className="text-sm px-3 py-1.5 rounded border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50"
+            >
+              {dbLoading ? 'Loading...' : 'Refresh DB Info'}
+            </button>
+          </div>
+        </div>
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Extract PDF Roll</h1>
           <p className="text-gray-500 dark:text-gray-400 mt-1">
@@ -233,8 +317,8 @@ const PdfExtractPage: React.FC = () => {
         </div>
 
         <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 text-sm text-blue-900 dark:text-blue-100">
-          <p className="font-semibold mb-2">Supported format: Tamil Nadu ECI electoral roll (e.g. ELECTORAL ROLL 2026 S22)</p>
-          <p className="mb-2">Data extracted — easy reference:</p>
+          <p className="font-semibold mb-2">OCR-style extraction — same format as OCR module for easy verification</p>
+          <p className="mb-2">Supported: Tamil Nadu ECI electoral roll (e.g. ELECTORAL ROLL 2026 S22). Data extracted:</p>
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <p className="font-medium mb-1">From first page (cover)</p>
@@ -266,7 +350,8 @@ const PdfExtractPage: React.FC = () => {
               </ul>
             </div>
           </div>
-          <p className="mt-2 text-blue-800 dark:text-blue-200">Layout: 3 sections per row × 3 cards per section = 9 voters per row. Move PDF to backend/pdf folder to select from dropdown.</p>
+          <p className="mt-2 text-blue-800 dark:text-blue-200">Layout: 3 cards per row × 10 rows = 30 voters per page. Move PDF to backend/pdf folder to select from dropdown.</p>
+          <p className="mt-1 text-xs text-blue-700 dark:text-blue-300">See backend/docs/EXTRACTION_ENGINE_HOW_IT_WORKS.md for how the engine works and accuracy details.</p>
         </div>
 
         <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 max-w-4xl">
@@ -354,85 +439,22 @@ const PdfExtractPage: React.FC = () => {
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                 />
               </div>
-              <div className="flex items-center gap-2">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                OCR runs automatically for scanned/image-only PDFs (no text layer).
+              </p>
+              <label className="flex items-start gap-3 cursor-pointer">
                 <input
                   type="checkbox"
-                  id="use-ocr"
-                  checked={useOcr}
-                  onChange={(e) => setUseOcr(e.target.checked)}
-                  className="rounded border-gray-300 dark:border-gray-600"
+                  checked={forceOcr}
+                  onChange={(e) => setForceOcr(e.target.checked)}
+                  className="mt-1 rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500"
                 />
-                <label htmlFor="use-ocr" className="text-sm text-gray-700 dark:text-gray-300">
-                  Use OCR (for scanned/image-only PDFs — slower, requires Tesseract/PyMuPDF)
-                </label>
-              </div>
+                <span className="text-sm text-gray-700 dark:text-gray-300">
+                  <strong>Force OCR for extraction</strong> — recommended for 3×10 card layout. Uses per-card OCR so Name, Relative, Age, Gender align correctly. If unchecked, the PDF text layer is used (can produce wrong columns).
+                </span>
+              </label>
             </div>
 
-            <div className="border-t border-gray-200 dark:border-gray-600 pt-4">
-              <button
-                type="button"
-                onClick={() => setShowConfig(!showConfig)}
-                className="text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
-              >
-                {showConfig ? '▼' : '▶'} Extraction format (ABBYY-like coordinates)
-              </button>
-              {showConfig && (
-                <div className="mt-3 grid grid-cols-2 sm:grid-cols-5 gap-3 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
-                  <div>
-                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-0.5">Cards/row</label>
-                    <input
-                      type="number"
-                      min={3}
-                      max={12}
-                      value={extractionConfig.cards_per_row ?? ''}
-                      onChange={(e) => setExtractionConfig((c) => ({ ...c, cards_per_row: e.target.value ? parseInt(e.target.value, 10) : undefined }))}
-                      placeholder="9"
-                      className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-0.5">Header top (y)</label>
-                    <input
-                      type="number"
-                      value={extractionConfig.header_top ?? ''}
-                      onChange={(e) => setExtractionConfig((c) => ({ ...c, header_top: e.target.value ? parseFloat(e.target.value) : undefined }))}
-                      placeholder="120"
-                      className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-0.5">Data bottom (y)</label>
-                    <input
-                      type="number"
-                      value={extractionConfig.data_bottom ?? ''}
-                      onChange={(e) => setExtractionConfig((c) => ({ ...c, data_bottom: e.target.value ? parseFloat(e.target.value) : undefined }))}
-                      placeholder="750"
-                      className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-0.5">Margin left</label>
-                    <input
-                      type="number"
-                      value={extractionConfig.margin_left ?? ''}
-                      onChange={(e) => setExtractionConfig((c) => ({ ...c, margin_left: e.target.value ? parseFloat(e.target.value) : undefined }))}
-                      placeholder="20"
-                      className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-0.5">Margin right</label>
-                    <input
-                      type="number"
-                      value={extractionConfig.margin_right ?? ''}
-                      onChange={(e) => setExtractionConfig((c) => ({ ...c, margin_right: e.target.value ? parseFloat(e.target.value) : undefined }))}
-                      placeholder="20"
-                      className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800"
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
 
             <button
               type="button"
@@ -452,101 +474,64 @@ const PdfExtractPage: React.FC = () => {
           </div>
         </div>
 
-        {/* ABBYY-style: PDF + zones (left) | Extracted data (right) */}
-        {pdfUrl && (
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow border border-gray-200 dark:border-gray-700 overflow-hidden">
-              <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Document — extraction zones</h3>
-                <div className="flex items-center gap-2">
-                  <label className="text-xs text-gray-500 dark:text-gray-400">Page</label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={previewPage}
-                    onChange={(e) => setPreviewPage(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                    className="w-14 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800"
-                  />
-                </div>
-              </div>
-              <div className="p-4">
-                <PdfZoneEditor
-                  pdfUrl={pdfUrl}
-                  config={toZoneConfig(extractionConfig)}
-                  onConfigChange={(c) => setExtractionConfig((prev) => ({ ...prev, ...c }))}
-                  page={previewPage}
-                  editable={true}
-                />
-              </div>
-            </div>
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col">
-              <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Extracted data</h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Click Submit above to extract. Records appear here.
-                </p>
-              </div>
-              <div className="flex-1 overflow-auto p-4 min-h-[300px]">
-                {records.length === 0 && !loading && (
-                  <p className="text-gray-500 dark:text-gray-400 text-sm text-center py-8">
-                    No records yet. Adjust zones if needed, then click Submit.
-                  </p>
-                )}
-                {records.length > 0 && (
-                  <div className="overflow-x-auto max-h-[60vh]">
-                    <table className="min-w-full text-sm">
-                      <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0">
-                        <tr>
-                          <th className="px-2 py-1.5 text-left font-medium text-gray-700 dark:text-gray-200">Page</th>
-                          <th className="px-2 py-1.5 text-left font-medium text-gray-700 dark:text-gray-200">EPIC</th>
-                          <th className="px-2 py-1.5 text-left font-medium text-gray-700 dark:text-gray-200">Name</th>
-                          <th className="px-2 py-1.5 text-left font-medium text-gray-700 dark:text-gray-200">Relative</th>
-                          <th className="px-2 py-1.5 text-left font-medium text-gray-700 dark:text-gray-200">Age</th>
-                          <th className="px-2 py-1.5 text-left font-medium text-gray-700 dark:text-gray-200">Gender</th>
-                          <th className="px-2 py-1.5 text-left font-medium text-gray-700 dark:text-gray-200">House</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
-                        {records.slice(0, 100).map((r, idx) => (
-                          <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                            <td className="px-2 py-1.5 text-gray-900 dark:text-white">{r.page_number ?? '—'}</td>
-                            <td className="px-2 py-1.5 text-gray-900 dark:text-white">{r.epic_number ?? '—'}</td>
-                            <td className="px-2 py-1.5 text-gray-900 dark:text-white">{r.name ?? '—'}</td>
-                            <td className="px-2 py-1.5 text-gray-600 dark:text-gray-300">{r.relative_name ?? '—'}</td>
-                            <td className="px-2 py-1.5">{r.age ?? '—'}</td>
-                            <td className="px-2 py-1.5">{r.gender ?? '—'}</td>
-                            <td className="px-2 py-1.5">{r.house_no ?? '—'}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                    {records.length > 100 && (
-                      <p className="text-xs text-gray-500 dark:text-gray-400 py-2">Showing first 100 of {records.length}</p>
-                    )}
-                  </div>
-                )}
-                {loading && (
-                  <div className="flex items-center justify-center py-12">
-                    <ThemedLoader size={24} />
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
 
-        {/* Extracted data below (full view) */}
+        {/* Extracted data below - OCR module style layout */}
         {(metadata !== null || records.length > 0 || rawPageTexts.length > 0 || (debugInfo?.page_texts_full?.length ?? 0) > 0) && (
           <div className="space-y-4">
-            {/* 1. Entire raw extracted text (show first so user sees what was read from PDF) */}
+            {/* PDF table detail (pdfplumber table extraction preview) */}
+            {file && (
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow border border-gray-200 dark:border-gray-700 overflow-hidden">
+                <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">0. PDF table detail</h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      Shows what pdfplumber detects as tables on the first page (helps diagnose layout issues).
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleDebug}
+                    className="text-sm px-3 py-1.5 rounded border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                    title="Calls /api/upload/debug-pdf"
+                  >
+                    Load table preview
+                  </button>
+                </div>
+                <div className="p-4 text-sm">
+                  <div className="text-gray-700 dark:text-gray-300">
+                    tables: {String(debugInfo?.table_count ?? 0)} | tables (text strategy): {String(debugInfo?.table_count_text_strategy ?? 0)}
+                  </div>
+                  {debugInfo?.table_preview?.length ? (
+                    <div className="mt-3 space-y-2">
+                      {debugInfo.table_preview.slice(0, 2).map((t) => (
+                        <div key={t.table_index} className="rounded border border-gray-200 dark:border-gray-700 p-2">
+                          <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">
+                            table {t.table_index} {t.strategy ? `(${t.strategy})` : ""} | rows: {t.row_count}
+                          </div>
+                          <pre className="text-xs whitespace-pre-wrap break-words font-mono bg-gray-50 dark:bg-gray-900 p-2 rounded">
+                            {JSON.stringify(t.first_3_rows, null, 2)}
+                          </pre>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="mt-2 text-gray-500 dark:text-gray-400 text-xs">
+                      No table preview loaded yet (click “Load table preview”).
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* 1. Raw OCR / extracted text — what was read from the PDF */}
             {pageTextsToShow.length > 0 && (
               <div className="bg-white dark:bg-gray-800 rounded-xl shadow border border-gray-200 dark:border-gray-700 overflow-hidden">
                 <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                    1. Raw extracted text (entire) — what was read from the PDF
+                    1. Raw OCR / extracted text — what was read from the PDF
                   </h3>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    Full text per page. Used for parsing constituency, Part No., and voter cards.
+                    Full text per page. Used to parse voter cards. Scanned PDFs (no text layer) trigger OCR automatically.
                   </p>
                 </div>
                 <div className="p-4 space-y-4 max-h-[70vh] overflow-y-auto">
@@ -556,7 +541,7 @@ const PdfExtractPage: React.FC = () => {
                         Page {p.page} — {p.length} characters
                       </div>
                       <pre className="p-4 text-xs whitespace-pre-wrap break-words font-mono bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200 min-h-[80px]">
-                        {p.text || '(empty — image-only PDF: OCR runs automatically; if still empty, enable "Use OCR" above and install: pip install pymupdf pytesseract + Tesseract from https://github.com/UB-Mannheim/tesseract/wiki)'}
+                        {p.text || '(empty — scanned PDF; OCR runs automatically. If still empty, install: pip install pymupdf pytesseract + Tesseract from https://github.com/UB-Mannheim/tesseract/wiki)'}
                       </pre>
                     </div>
                   ))}
@@ -564,10 +549,78 @@ const PdfExtractPage: React.FC = () => {
               </div>
             )}
 
-            {/* 2. Metadata */}
+            {/* 2. Accuracy summary — how extraction performed */}
+            {accuracySummary && records.length > 0 && (
+              <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow border border-gray-200 dark:border-gray-700">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Extraction accuracy</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+                  <div>
+                    <span className="text-gray-500 dark:text-gray-400">Mode</span>
+                    <p className="font-medium text-gray-900 dark:text-white">{accuracySummary.extraction_mode === 'ocr' ? 'OCR (scanned)' : 'Text (digital)'}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500 dark:text-gray-400">Completeness</span>
+                    <p className="font-medium text-gray-900 dark:text-white">{accuracySummary.completeness_percent ?? 0}%</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500 dark:text-gray-400">Est. accuracy</span>
+                    <p className="font-medium text-gray-900 dark:text-white">{accuracySummary.estimated_accuracy_range ?? '—'}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500 dark:text-gray-400">Records</span>
+                    <p className="font-medium text-gray-900 dark:text-white">{accuracySummary.records_complete ?? 0} / {accuracySummary.records_total ?? 0} complete</p>
+                  </div>
+                </div>
+                {(accuracySummary.epic_valid_pct != null || accuracySummary.avg_confidence_score != null || (accuracySummary.duplicate_epic_count ?? 0) > 0 || (accuracySummary.low_confidence_count ?? 0) > 0) && (
+                  <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Structural metrics</p>
+                    <div className="flex flex-wrap gap-2">
+                      {accuracySummary.epic_valid_pct != null && (
+                        <span className="text-xs px-2 py-1 rounded bg-gray-100 dark:bg-gray-700">EPIC valid: {accuracySummary.epic_valid_pct}%</span>
+                      )}
+                      {accuracySummary.age_valid_pct != null && (
+                        <span className="text-xs px-2 py-1 rounded bg-gray-100 dark:bg-gray-700">Age valid: {accuracySummary.age_valid_pct}%</span>
+                      )}
+                      {accuracySummary.gender_valid_pct != null && (
+                        <span className="text-xs px-2 py-1 rounded bg-gray-100 dark:bg-gray-700">Gender valid: {accuracySummary.gender_valid_pct}%</span>
+                      )}
+                      {accuracySummary.avg_confidence_score != null && (
+                        <span className="text-xs px-2 py-1 rounded bg-gray-100 dark:bg-gray-700">Avg confidence: {accuracySummary.avg_confidence_score}%</span>
+                      )}
+                      {(accuracySummary.duplicate_epic_count ?? 0) > 0 && (
+                        <span className="text-xs px-2 py-1 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200">Duplicates: {accuracySummary.duplicate_epic_count}</span>
+                      )}
+                      {(accuracySummary.low_confidence_count ?? 0) > 0 && (
+                        <span className="text-xs px-2 py-1 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200">Low confidence: {accuracySummary.low_confidence_count}</span>
+                      )}
+                      {(accuracySummary.possible_cross_card_merge_count ?? 0) > 0 && (
+                        <span className="text-xs px-2 py-1 rounded bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200">Possible merge: {accuracySummary.possible_cross_card_merge_count}</span>
+                      )}
+                    </div>
+                  </div>
+                )}
+                {accuracySummary.field_coverage && Object.keys(accuracySummary.field_coverage).length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Field coverage (% of records with value)</p>
+                    <div className="flex flex-wrap gap-2">
+                      {Object.entries(accuracySummary.field_coverage).map(([k, v]) => (
+                        <span key={k} className="text-xs px-2 py-1 rounded bg-gray-100 dark:bg-gray-700">
+                          {k.replace(/_/g, ' ')}: {v}%
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                  Text PDF: typically 90–98% accurate. Scanned PDF: 75–90%. If Name/Relative/House columns show wrong data (e.g. labels or numbers in Name), enable <strong>Force OCR for extraction</strong> above and re-run.
+                </p>
+              </div>
+            )}
+
+            {/* 3. Document metadata (constituency, booth, revision, etc.) */}
             {metadata && (
               <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow border border-gray-200 dark:border-gray-700">
-                <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">2. Extraction metadata</h3>
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Document metadata</h3>
                 <dl className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
                   {metadata.constituency_name != null && (
                     <>
@@ -700,7 +753,7 @@ const PdfExtractPage: React.FC = () => {
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow border border-gray-200 dark:border-gray-700 overflow-hidden">
               <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  3. Extracted records ({records.length})
+                  Extracted voter records ({records.length}) — click copy icon to copy
                 </h3>
               </div>
               {records.length === 0 ? (
@@ -740,14 +793,35 @@ const PdfExtractPage: React.FC = () => {
                     <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
                       {records.map((r, idx) => (
                         <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                          <td className="px-3 py-2 text-gray-900 dark:text-white">{r.page_number ?? '—'}</td>
-                          <td className="px-3 py-2 text-gray-900 dark:text-white">{r.epic_number ?? '—'}</td>
-                          <td className="px-3 py-2 text-gray-900 dark:text-white">{r.name ?? '—'}</td>
+                          <td className="px-3 py-2">{r.page_number ?? '—'}</td>
+                          <td className="px-3 py-2">
+                            <span className="inline-flex items-center gap-1">
+                              {r.epic_number ?? '—'}
+                              {(r.epic_number ?? '').trim() && (
+                                <button type="button" onClick={() => copyToClipboard(r.epic_number)} className="text-gray-400 hover:text-indigo-600" title="Copy"><CopyIcon className="w-3.5 h-3.5" /></button>
+                              )}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2">
+                            <span className="inline-flex items-center gap-1">
+                              {r.name ?? '—'}
+                              {(r.name ?? '').trim() && (
+                                <button type="button" onClick={() => copyToClipboard(r.name)} className="text-gray-400 hover:text-indigo-600" title="Copy"><CopyIcon className="w-3.5 h-3.5" /></button>
+                              )}
+                            </span>
+                          </td>
                           <td className="px-3 py-2 text-gray-600 dark:text-gray-300">{r.relative_name ?? '—'}</td>
                           <td className="px-3 py-2">{r.age ?? '—'}</td>
                           <td className="px-3 py-2">{r.gender ?? '—'}</td>
                           <td className="px-3 py-2">{r.house_no ?? '—'}</td>
-                          <td className="px-3 py-2 max-w-[200px] truncate text-gray-600 dark:text-gray-300" title={r.address ?? ''}>{r.address ?? '—'}</td>
+                          <td className="px-3 py-2 max-w-[200px] truncate text-gray-600 dark:text-gray-300" title={r.address ?? ''}>
+                            <span className="inline-flex items-center gap-1">
+                              {r.address ?? '—'}
+                              {(r.address ?? '').trim() && (
+                                <button type="button" onClick={() => copyToClipboard(r.address)} className="text-gray-400 hover:text-indigo-600 flex-shrink-0" title="Copy"><CopyIcon className="w-3.5 h-3.5" /></button>
+                              )}
+                            </span>
+                          </td>
                           <td className="px-3 py-2 text-gray-600 dark:text-gray-300">{r.booth_number ?? '—'}</td>
                           <td className="px-3 py-2 text-gray-600 dark:text-gray-300">{r.constituency_name ?? '—'}</td>
                         </tr>

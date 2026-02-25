@@ -16,8 +16,8 @@ class ExtractionConfig:
     sample_pages_for_detection: int = 5
     image_area_ratio_threshold: float = 0.7  # If >70% of page is images, treat as scanned
 
-    # OCR settings (tuned for speed: lower DPI, no preprocess by default)
-    ocr_dpi: int = 200
+    # OCR settings: 300 DPI minimum for production electoral extraction (ChatGPT recommendation)
+    ocr_dpi: int = 300
     ocr_max_pages: int = 1000
     ocr_preprocess: bool = False  # OpenCV preprocessing improves quality but slows extraction
 
@@ -42,7 +42,7 @@ class ExtractionConfig:
         return cls(
             min_text_chars_per_page=int(os.getenv("EXTRACT_MIN_TEXT_CHARS", "50")),
             sample_pages_for_detection=int(os.getenv("EXTRACT_SAMPLE_PAGES", "5")),
-            ocr_dpi=int(os.getenv("EXTRACT_OCR_DPI", "200")),
+            ocr_dpi=int(os.getenv("EXTRACT_OCR_DPI", "300")),
             ocr_max_pages=int(os.getenv("EXTRACT_OCR_MAX_PAGES", "1000")),
             ocr_preprocess=os.getenv("EXTRACT_OCR_PREPROCESS", "false").lower() in ("true", "1", "yes"),
             max_file_size_mb=int(os.getenv("EXTRACT_MAX_FILE_MB", "100")),

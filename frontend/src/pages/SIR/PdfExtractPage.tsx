@@ -1,7 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-
-import { extractPdfRoll, extractPdfByPath, listPdfFiles, debugPdfRoll, downloadEciRoll } from '../../services/api';
-
+import { extractPdfRoll, extractPdfByPath, listPdfFiles, getPdfBlobUrl, debugPdfRoll, downloadEciRoll, getDbInfo } from '../../services/api';
 import PageContainer from '../../components/common/PageContainer';
 import PageMeta from '../../components/common/PageMeta';
 import ThemedLoader from '../../components/common/ThemedLoader';
@@ -128,6 +126,8 @@ const PdfExtractPage: React.FC = () => {
   const [pdfListError, setPdfListError] = useState<string | null>(null);
   const [extractionConfig, setExtractionConfig] = useState<ExtractionConfig>({ ...DEFAULT_CONFIG });
   const [accuracySummary, setAccuracySummary] = useState<AccuracySummary | null>(null);
+  /** Force OCR for data pages (recommended for 3×10 card layout — avoids wrong column alignment from text layer). */
+  const [forceOcr, setForceOcr] = useState(true);
 
 
   const loadPdfList = useCallback(async () => {
@@ -227,7 +227,7 @@ const PdfExtractPage: React.FC = () => {
           filename: selectedFilename,
           constituency_name: constituencyName.trim() || undefined,
           booth_number: boothNumber.trim() || undefined,
-          use_ocr: false,
+          use_ocr: forceOcr,
           extraction_config: hasConfig ? cfg : undefined,
         });
         const data = res.data as { records?: ExtractedRecord[]; metadata?: ExtractMetadata; raw_page_texts?: { page: number; length: number; text: string }[]; accuracy_summary?: AccuracySummary };
@@ -240,7 +240,7 @@ const PdfExtractPage: React.FC = () => {
         formData.append('file', file!);
         if (constituencyName.trim()) formData.append('constituency_name', constituencyName.trim());
         if (boothNumber.trim()) formData.append('booth_number', boothNumber.trim());
-        formData.append('use_ocr', 'false'); // OCR runs automatically when PDF has no text layer
+        formData.append('use_ocr', forceOcr ? 'true' : 'false');
         if (hasConfig) formData.append('extraction_config_json', JSON.stringify(cfg));
 
         const res = await extractPdfRoll(formData);
@@ -465,6 +465,17 @@ const PdfExtractPage: React.FC = () => {
               <p className="text-xs text-gray-500 dark:text-gray-400">
                 OCR runs automatically for scanned/image-only PDFs (no text layer).
               </p>
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={forceOcr}
+                  onChange={(e) => setForceOcr(e.target.checked)}
+                  className="mt-1 rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500"
+                />
+                <span className="text-sm text-gray-700 dark:text-gray-300">
+                  <strong>Force OCR for extraction</strong> — recommended for 3×10 card layout. Uses per-card OCR so Name, Relative, Age, Gender align correctly. If unchecked, the PDF text layer is used (can produce wrong columns).
+                </span>
+              </label>
             </div>
 
 
@@ -624,7 +635,7 @@ const PdfExtractPage: React.FC = () => {
                   </div>
                 )}
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                  Text PDF: typically 90–98% accurate. Scanned PDF: 75–90%. Adjust extraction format or enable OCR if needed.
+                  Text PDF: typically 90–98% accurate. Scanned PDF: 75–90%. If Name/Relative/House columns show wrong data (e.g. labels or numbers in Name), enable <strong>Force OCR for extraction</strong> above and re-run.
                 </p>
               </div>
             )}

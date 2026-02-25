@@ -1,0 +1,24 @@
+Section,Item,Status,Notes
+OBJECTIVE & SCOPE,Objective defined,Completed,To identify, quantify, and interpret electoral roll changes caused by SIR
+OBJECTIVE & SCOPE,Scope defined,Completed,In-Scope: Comparative analysis, booth-level metrics, spatial mapping, field validation sampling. Out-of-Scope: Legal filing, manual verification
+ROLES & RESPONSIBILITIES,SIR Project Lead assigned,Pending,Overall ownership, strategy alignment, final reporting
+ROLES & RESPONSIBILITIES,Roll Data Engineer assigned,Pending,Data ingestion, cleaning, database management
+ROLES & RESPONSIBILITIES,Matching Analyst assigned,Pending,Execution of fuzzy matching algorithms, record classification
+ROLES & RESPONSIBILITIES,GIS Analyst assigned,Pending,Spatial mapping, heatmap generation, boundary validation
+ROLES & RESPONSIBILITIES,Political Analyst assigned,Pending,Interpretation of data trends into political insights
+ROLES & RESPONSIBILITIES,Field Validation Lead assigned,Pending,Management of ground teams for physical verification
+DATA ACQUISITION & STANDARDIZATION,Electoral Roll (Pre-SIR Draft) source identified,Completed,PDF/Text format - upload endpoint implemented
+DATA ACQUISITION & STANDARDIZATION,Electoral Roll (Post-SIR Final) source identified,Completed,PDF/Text format - upload endpoint implemented
+DATA ACQUISITION & STANDARDIZATION,ECI Booth List & Constituency Maps source identified,Pending,
+DATA ACQUISITION & STANDARDIZATION,Historical Turnout Data source identified,Pending,Last 2 Elections
+DATA ACQUISITION & STANDARDIZATION,Text Normalization implemented,Completed,Convert to Uppercase, remove non-alphanumeric from addresses - NormalizationService
+DATA ACQUISITION & STANDARDIZATION,Language Handling implemented,Completed,Tamil-to-English transliteration - NormalizationService
+DATA ACQUISITION & STANDARDIZATION,Validation implemented,Completed,Verify booth counts match ECI lists - booth creation logic
+ANALYTICAL LOGIC,Exact Match logic implemented,Completed,EPIC Number matching - MatchingEngine
+ANALYTICAL LOGIC,Fuzzy Match logic implemented,Completed,Name + Relative Name + Door No, threshold >90% - rapidfuzz
+ANALYTICAL LOGIC,Family Clustering implemented,Completed,Grouping by House Number - analyze_families method
+ANALYTICAL LOGIC,Classification Tags implemented,Completed,UNCHANGED, ADDED, DELETED, MODIFIED, MIGRATED - MatchResult model
+KEY PERFORMANCE INDICATORS,Booth-Level Metrics implemented,Completed,Net Roll Change, Deletion Velocity, Youth Intake, Gender Balance Shift - KPIEngine
+KEY PERFORMANCE INDICATORS,Risk Scoring Model implemented,Completed,High Risk, High Opportunity, Anomaly Flag - KPIEngine
+FIELD VALIDATION & REPORTING,Sampling Methodology implemented,Completed,Top 10 High Risk booths, 5% Deleted voters, New Additions in non-residential zones - analytics endpoints
+FIELD VALIDATION & REPORTING,Reporting Deliverables implemented,Completed,Executive Summary, Booth Action Plan, Spatial Heatmaps - dashboard aggregates

@@ -14,6 +14,7 @@ export const API_ENDPOINTS = {
   VERIFY: "/api/verify",
   VERIFY_RESEND: "/api/verify/resend",
   ME: "/api/me",
+  DB_INFO: "/api/db-info",
   FORGOT_PASSWORD: "/api/forgot-password",
   FORGOT_PASSWORD_RESET: "/api/forgot-password/reset",
   TRANSCRIPT_REPORTS: "/api/transcriptreports",

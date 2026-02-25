@@ -41,12 +41,32 @@ SUMMARY PAGE (last):
 --------------------------------------------------------------------------------
 """
 import re
+import json
 import logging
+import os
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple
 
 logger = logging.getLogger(__name__)
+
+
+def _get_debug_config() -> Optional[Dict[str, Any]]:
+    """
+    Optional diagnostic logging for one page and one card.
+    Set EXTRACT_DEBUG=1, EXTRACT_DEBUG_PAGE=3, EXTRACT_DEBUG_CARD=0 (defaults).
+    Outputs: debug/full_page_ocr_*.json, epic_detection_*.json, card_01.png, card_01_ocr.txt,
+             parsed_record.json, expected_record.json (template).
+    """
+    if os.getenv("EXTRACT_DEBUG", "").strip().lower() not in ("1", "true", "yes"):
+        return None
+    try:
+        page = int(os.getenv("EXTRACT_DEBUG_PAGE", "3"))
+        card = int(os.getenv("EXTRACT_DEBUG_CARD", "0"))
+    except ValueError:
+        return None
+    debug_dir = Path(os.getenv("EXTRACT_DEBUG_DIR", "debug"))
+    return {"debug_page": page, "debug_card_index": card, "debug_dir": debug_dir}
 
 
 def _preprocess_image_for_ocr(img) -> "Any":
@@ -66,6 +86,34 @@ def _preprocess_image_for_ocr(img) -> "Any":
             return img
     blur = cv2.GaussianBlur(gray, (5, 5), 0)
     _, thresh = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    return Image.fromarray(thresh)
+
+
+def _preprocess_card_for_ocr(img) -> "Any":
+    """
+    Stronger preprocessing for per-card OCR: grayscale, adaptive threshold, mild dilation.
+    Use before image_to_string(crop) to improve EPIC/name accuracy on small crops.
+    """
+    try:
+        import cv2
+        import numpy as np
+        from PIL import Image
+    except ImportError:
+        return img
+    if hasattr(img, "size"):
+        arr = np.array(img)
+        gray = cv2.cvtColor(arr, cv2.COLOR_RGB2GRAY) if len(arr.shape) == 3 else arr
+    else:
+        gray = cv2.imread(str(img), cv2.IMREAD_GRAYSCALE)
+        if gray is None:
+            return img
+    # Adaptive threshold (better than Otsu for uneven lighting on small card)
+    thresh = cv2.adaptiveThreshold(
+        gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2
+    )
+    # Mild dilation to strengthen character strokes
+    kernel = np.ones((2, 2), np.uint8)
+    thresh = cv2.dilate(thresh, kernel)
     return Image.fromarray(thresh)
 
 
@@ -163,24 +211,249 @@ def _cluster_words_into_lines(col_words: List[dict]) -> List[List[dict]]:
     return lines
 
 
-# Tolerant EPIC anchor: matches WQD2616720, WOD2614042, WQd2705291, WQD2/24243
-# Allows 1-2 letter OCR noise in prefix, slash in numeric part, lowercase letters.
-_RE_EPIC_ANCHOR = re.compile(
-    r"^[A-Za-z]{2,4}[0-9][A-Za-z0-9/]{4,}$",
-)
-# Stricter validation used after normalisation
+# ----- EPIC: two-level handling -----
+# 1) ANCHOR (segmentation): very tolerant — do NOT use strict validation for segmentation.
+#    Match EPIC-like tokens (alphanumeric + slash); filter by ≥5 digits + ≥2 letters.
+_RE_EPIC_ANCHOR_LOOSE = re.compile(r"^[A-Za-z0-9/]{5,14}$", re.IGNORECASE)
+# 2) VALIDATION (final data only): strict, after normalisation.
 _RE_EPIC_STRICT = re.compile(r"^[A-Z]{3}[0-9]{6,7}(/[0-9]+)?$", re.IGNORECASE)
+# Minimum EPICs on a data page to accept segmentation; below this we log failure and do not fallback.
+EPIC_MIN_FOR_DATA_PAGE = 25
 
 
 def _looks_like_epic(text: str) -> bool:
-    """Return True if the text looks like an EPIC (tolerant of OCR noise)."""
+    """
+    EPIC anchor for segmentation only. Tolerant of OCR noise (WQd, WOD, WQp2/24243, WQD259783Q).
+    Must contain ≥5 digits and ≥2 letters; no strict format. Strict validation is applied later.
+    """
     t = text.strip()
-    # Must start with 2-4 letters then digits
-    if not _RE_EPIC_ANCHOR.match(t):
+    if not t or len(t) < 5 or len(t) > 14:
         return False
-    # Must contain at least 6 digits total
+    if not _RE_EPIC_ANCHOR_LOOSE.match(t):
+        return False
     digit_count = sum(1 for c in t if c.isdigit())
-    return digit_count >= 6
+    letter_count = sum(1 for c in t if c.isalpha())
+    return digit_count >= 5 and letter_count >= 2
+
+
+# PSM 6 = uniform block of text (best for small card crops). OEM 3 = default LSTM.
+TESSERACT_CARD_CONFIG = "--psm 6 --oem 3 -l eng"
+# EPIC-first segmentation constants (TN ECI S22 format: 10 rows × 3 columns = 30 cards)
+EPICS_PER_PAGE_EXPECTED = 30
+ROWS_PER_PAGE = 10
+
+
+def _ocr_page_epic_first(
+    img,
+    num_cols: int = 3,
+    conf_threshold: int = 30,
+    expected_epics: int = EPICS_PER_PAGE_EXPECTED,
+    page_number: Optional[int] = None,
+    debug_config: Optional[Dict[str, Any]] = None,
+) -> Tuple[List[List[str]], Optional[str], Optional[Dict[str, Any]]]:
+    """
+    EPIC-first deterministic segmentation for TN ECI electoral rolls.
+
+    Pipeline:
+      1. image_to_data on full page → per-word bounding boxes
+      2. Find all words matching EPIC anchor (tolerant) → EPIC positions
+      3. Sort EPICs by Y, cluster into rows
+      4. If EPIC count < EPIC_MIN_FOR_DATA_PAGE → return failure (no fallback)
+      5. Compute card bounding boxes, crop each card
+      6. Preprocess crop, OCR per card with --psm 6 --oem 3 -l eng
+      7. Return card blocks + segmentation metrics
+
+    Returns: (card_blocks, segmentation_error or None, metrics or None)
+    """
+    try:
+        import pytesseract
+        from pytesseract import Output
+        from PIL import Image
+    except ImportError:
+        return [], "pytesseract or PIL not available", None
+
+    pil_img = _img_to_pil(img)
+    w_page, h_page = pil_img.size
+
+    try:
+        data = pytesseract.image_to_data(pil_img, output_type=Output.DICT)
+    except Exception as e:
+        logger.warning("image_to_data failed in EPIC-first: %s", e)
+        return [], str(e), None
+
+    # ----- DEBUG: 1) Raw full-page OCR output (word, x, y, width, height, confidence) -----
+    if debug_config and page_number == debug_config.get("debug_page"):
+        debug_dir = debug_config["debug_dir"]
+        debug_dir.mkdir(parents=True, exist_ok=True)
+        raw_words = []
+        for i in range(len(data["text"])):
+            try:
+                conf = int(data["conf"][i])
+            except (ValueError, TypeError):
+                conf = -1
+            raw_words.append({
+                "word": str(data["text"][i]),
+                "x": int(data["left"][i]),
+                "y": int(data["top"][i]),
+                "width": int(data["width"][i]),
+                "height": int(data["height"][i]),
+                "confidence": conf,
+            })
+        out_path = debug_dir / ("full_page_ocr_%d.json" % page_number)
+        with open(out_path, "w", encoding="utf-8") as f:
+            json.dump(raw_words, f, indent=2, ensure_ascii=False)
+        logger.info("DEBUG: wrote %s", out_path)
+
+    # Step 1: collect all words with bboxes (low conf to catch EPICs)
+    words: List[dict] = []
+    for i in range(len(data["text"])):
+        try:
+            conf = int(data["conf"][i])
+        except (ValueError, TypeError):
+            conf = -1
+        text = str(data["text"][i]).strip()
+        if conf >= conf_threshold and text:
+            words.append({
+                "text": text,
+                "x": int(data["left"][i]),
+                "y": int(data["top"][i]),
+                "w": int(data["width"][i]),
+                "h": int(data["height"][i]),
+            })
+
+    # Step 2: find EPIC positions
+    epics: List[dict] = []
+    for w in words:
+        if _looks_like_epic(w["text"]):
+            epics.append({
+                "text": w["text"],
+                "x": w["x"],
+                "y": w["y"],
+                "w": w["w"],
+                "h": w["h"],
+            })
+
+    if not epics:
+        return [], "no EPICs detected", None
+
+    # Step 3: sort by Y, cluster into rows
+    epics_sorted = sorted(epics, key=lambda e: (e["y"], e["x"]))
+    rows: List[List[dict]] = []
+    current_row: List[dict] = [epics_sorted[0]]
+    median_h = sorted(e["h"] for e in epics)[len(epics) // 2] if epics else 20
+    y_threshold = max(15, median_h * 1.5)
+
+    for e in epics_sorted[1:]:
+        prev_y = current_row[-1]["y"]
+        if e["y"] - prev_y <= y_threshold:
+            current_row.append(e)
+        else:
+            rows.append(current_row)
+            current_row = [e]
+    if current_row:
+        rows.append(current_row)
+
+    # ----- DEBUG: 2) EPIC detection result (candidates, X/Y, per-row count, total) -----
+    if debug_config and page_number == debug_config.get("debug_page"):
+        debug_dir = debug_config["debug_dir"]
+        debug_dir.mkdir(parents=True, exist_ok=True)
+        epic_payload = {
+            "epic_candidates": [{"text": e["text"], "x": e["x"], "y": e["y"]} for e in epics_sorted],
+            "epics_per_row": [len(r) for r in rows],
+            "total_epic_count": sum(len(r) for r in rows),
+        }
+        out_path = debug_dir / ("epic_detection_%d.json" % page_number)
+        with open(out_path, "w", encoding="utf-8") as f:
+            json.dump(epic_payload, f, indent=2, ensure_ascii=False)
+        logger.info("DEBUG: wrote %s", out_path)
+
+    # Step 4: integrity check — each row should have num_cols EPICs
+    bad_rows = [i for i, r in enumerate(rows) if len(r) != num_cols]
+    if bad_rows:
+        logger.warning(
+            "EPIC-first segmentation: rows %s have != %d EPICs (got %s); page may have layout anomalies",
+            bad_rows[:5], num_cols, [len(r) for r in rows],
+        )
+    total_epics = sum(len(r) for r in rows)
+    if total_epics != expected_epics:
+        logger.warning(
+            "EPIC-first segmentation failure: expected %d EPICs per page, got %d",
+            expected_epics, total_epics,
+        )
+    # Do not return blocks if EPIC count too low — force caller to treat as segmentation failure (no fallback).
+    if total_epics < EPIC_MIN_FOR_DATA_PAGE:
+        metrics = {
+            "epic_count": total_epics,
+            "rows_detected": len(rows),
+            "cards_extracted": 0,
+            "segmentation_failure": True,
+        }
+        return [], "segmentation_failure: EPIC count %d < %d" % (total_epics, EPIC_MIN_FOR_DATA_PAGE), metrics
+
+    # Step 5: compute card bounding boxes from EPIC positions (resilient to column drift)
+    margin_left = 15
+    margin_right = 15
+    top_margin = 35  # space above EPIC for serial
+    bottom_margin = 20
+    card_blocks: List[List[str]] = []
+
+    for row_idx, row_epics in enumerate(rows):
+        row_epics_sorted_x = sorted(row_epics, key=lambda e: e["x"])
+        row_y_min = min(e["y"] for e in row_epics) - top_margin
+        row_y_max = max(e["y"] + e["h"] for e in row_epics)
+        row_height = row_y_max - row_y_min
+        card_height = int(row_height + bottom_margin)
+        if row_idx + 1 < len(rows):
+            next_row_y = min(e["y"] for e in rows[row_idx + 1])
+            card_height = min(card_height, next_row_y - row_y_min - 5)
+
+        # Column boundaries from EPIC positions (midpoints between adjacent EPICs)
+        col_bounds: List[Tuple[int, int]] = []
+        for col_idx, epic_info in enumerate(row_epics_sorted_x):
+            ex, ew = epic_info["x"], epic_info["w"]
+            prev_right = (row_epics_sorted_x[col_idx - 1]["x"] + row_epics_sorted_x[col_idx - 1]["w"]) if col_idx > 0 else 0
+            next_left = row_epics_sorted_x[col_idx + 1]["x"] if col_idx + 1 < len(row_epics_sorted_x) else w_page
+            x_min = margin_left if col_idx == 0 else (prev_right + ex) // 2
+            x_max = (ex + ew + next_left) // 2 if col_idx < len(row_epics_sorted_x) - 1 else w_page - margin_right
+            col_bounds.append((max(0, x_min), min(w_page, x_max)))
+
+        for col_idx, epic_info in enumerate(row_epics_sorted_x):
+            x_min, x_max = col_bounds[col_idx] if col_idx < len(col_bounds) else (
+                max(0, col_idx * (w_page // num_cols)), min(w_page, (col_idx + 1) * (w_page // num_cols))
+            )
+            y_min = max(0, row_y_min)
+            y_max = min(h_page, row_y_min + card_height)
+
+            try:
+                crop = pil_img.crop((x_min, y_min, x_max, y_max))
+                crop = _preprocess_card_for_ocr(crop)
+                crop_text = pytesseract.image_to_string(crop, config=TESSERACT_CARD_CONFIG)
+                lines = [ln.strip() for ln in crop_text.splitlines() if ln.strip()]
+                # ----- DEBUG: 3) Cropped card image; 4) Raw OCR text from that crop -----
+                card_linear_index = row_idx * num_cols + col_idx
+                if debug_config and page_number == debug_config.get("debug_page") and card_linear_index == debug_config.get("debug_card_index", 0):
+                    debug_dir = debug_config["debug_dir"]
+                    debug_dir.mkdir(parents=True, exist_ok=True)
+                    crop.save(debug_dir / "card_01.png")
+                    ocr_path = debug_dir / "card_01_ocr.txt"
+                    with open(ocr_path, "w", encoding="utf-8") as f:
+                        f.write(crop_text)
+                    logger.info("DEBUG: wrote %s and %s", debug_dir / "card_01.png", ocr_path)
+                if lines:
+                    card_blocks.append(lines)
+                else:
+                    card_blocks.append([epic_info["text"]])  # fallback: EPIC only
+            except Exception as e:
+                logger.debug("Crop OCR failed for card (%d,%d): %s", row_idx, col_idx, e)
+                card_blocks.append([epic_info["text"]])
+
+    metrics = {
+        "epic_count": total_epics,
+        "rows_detected": len(rows),
+        "cards_extracted": len(card_blocks),
+        "segmentation_failure": False,
+    }
+    return card_blocks, None, metrics
 
 
 def _ocr_page_spatial(img, num_cols: int = 3, conf_threshold: int = 40) -> List[List[str]]:
@@ -282,7 +555,7 @@ def _ocr_page_spatial(img, num_cols: int = 3, conf_threshold: int = 40) -> List[
 def _render_pdf_images(
     pdf_path: Path,
     max_pages: int = 1000,
-    dpi: int = 200,
+    dpi: int = 300,
 ) -> List["Any"]:
     """
     Render PDF pages to PIL Images.
@@ -324,7 +597,7 @@ def _render_pdf_images(
 def _extract_text_via_ocr(
     pdf_path: Path,
     max_pages: Optional[int] = 1000,
-    dpi: int = 200,
+    dpi: int = 300,
     preprocess: bool = False,
     num_cols: int = 3,
 ) -> List[str]:
@@ -417,7 +690,7 @@ def _extract_text_via_ocr(
 def _extract_blocks_via_ocr(
     pdf_path: Path,
     max_pages: int = 1000,
-    dpi: int = 200,
+    dpi: int = 300,
     preprocess: bool = False,
     num_cols: int = 3,
 ) -> List[List[List[str]]]:
@@ -439,26 +712,53 @@ def _extract_blocks_via_ocr(
     if preprocess:
         images = [_preprocess_image_for_ocr(img) for img in images]
 
+    debug_config = _get_debug_config()
+
     # Try Tesseract spatial path
     try:
         import pytesseract
         from pytesseract import Output  # noqa: F401
 
-        def _spatial_page(img) -> List[List[str]]:
+        def _spatial_page(img, page_idx: int = 0) -> List[List[str]]:
+            # Data pages (page 2+): always use EPIC-first; never fallback to full-page split.
+            if page_idx >= 2:
+                blocks, seg_err, seg_metrics = _ocr_page_epic_first(
+                    img, num_cols=num_cols,
+                    page_number=page_idx + 1, debug_config=debug_config,
+                )
+                if blocks:
+                    return blocks
+                logger.warning(
+                    "Data page %d: EPIC-first segmentation failed (%s). Not falling back to full-page OCR.",
+                    page_idx + 1, seg_err or "unknown",
+                )
+                if seg_metrics:
+                    logger.info(
+                        "Segmentation metrics: epic_count=%s rows_detected=%s cards_extracted=%s",
+                        seg_metrics.get("epic_count"), seg_metrics.get("rows_detected"),
+                        seg_metrics.get("cards_extracted"),
+                    )
+                return []
+            # Cover/summary pages (0, 1): use spatial or full-page as before
+            blocks, seg_err, _ = _ocr_page_epic_first(
+                img, num_cols=num_cols,
+                page_number=page_idx + 1, debug_config=debug_config,
+            )
+            if blocks:
+                return blocks
             blocks = _ocr_page_spatial(img, num_cols=num_cols)
             if blocks:
                 return blocks
-            # Fallback: plain string → treat whole page as one block
             text = pytesseract.image_to_string(img)
             lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
             return [lines] if lines else []
 
         max_workers = min(4, len(images))
         if max_workers <= 1:
-            result = [_spatial_page(img) for img in images]
+            result = [_spatial_page(img, i) for i, img in enumerate(images)]
         else:
             with ThreadPoolExecutor(max_workers=max_workers) as ex:
-                result = list(ex.map(_spatial_page, images))
+                result = list(ex.map(lambda args: _spatial_page(args[1], args[0]), enumerate(images)))
         logger.info(
             "Spatial OCR: %d pages, total %d card blocks",
             len(result),
@@ -680,19 +980,225 @@ RE_GENDER_FEMALE_FUZZY = re.compile(r"^(?:farna\s*8?|fema\s*e|foma?\s*0?|female|
 # Reject dates as house_no: 09-May, Oct-99, 12-Jan
 RE_DATE_LIKE = re.compile(r"^(?:\d{1,2}[-/](?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*[-/]\d{2,4})\s*$", re.IGNORECASE)
 
+# ----- OCR normalization: fix common label typos before keyword-based parsing -----
+# TN rolls: Cender/Gendar/Gerder → Gender; Housa/Houae → House; Falher → Father
+OCR_NORMALIZATION_MAP = [
+    (r"\bCender\b", "Gender"),
+    (r"\bGendar\b", "Gender"),
+    (r"\bGerder\b", "Gender"),
+    (r"\bGonder\b", "Gender"),
+    (r"\bGenocr\b", "Gender"),
+    (r"\bGendcr\b", "Gender"),
+    (r"\bCendor\b", "Gender"),
+    (r"\bHousa\b", "House"),
+    (r"\bHouae\b", "House"),
+    (r"\bHcu3e\b", "House"),
+    (r"\bFouse\b", "House"),
+    (r"\bHouso\b", "House"),
+    (r"\bHou8e\b", "House"),
+    (r"\bHouga\b", "House"),
+    (r"\bNumbar\b", "Number"),
+    (r"\bNumoor\b", "Number"),
+    (r"\bNumper\b", "Number"),
+    (r"\bFalher\b", "Father"),
+    (r"\bFalner\b", "Father"),
+    (r"\bFatnar\b", "Father"),
+    (r"\bFether\b", "Father"),
+    (r"\bFatner\b", "Father"),
+    (r"\bFalhar\b", "Father"),
+    (r"\bNaine\b", "Name"),
+    (r"\bNamie\b", "Name"),
+    (r"\bNamo\b", "Name"),
+    (r"\bNamc\b", "Name"),
+    (r"\bNarne\b", "Name"),
+    (r"\bNarie\b", "Name"),
+    (r"\bHusoand\b", "Husband"),
+]
+# Compile for speed
+_OCR_NORM_REGEXES = [(re.compile(p, re.IGNORECASE), r) for p, r in OCR_NORMALIZATION_MAP]
+
+
+def _normalize_ocr_card_lines(lines: List[str]) -> List[str]:
+    """
+    Apply OCR typo normalization to each line so keyword anchors (Gender, House, Father Name)
+    match despite OCR noise. Returns new list of lines; does not mutate input.
+    """
+    out: List[str] = []
+    for ln in lines:
+        s = ln.strip()
+        if not s:
+            continue
+        for pat, repl in _OCR_NORM_REGEXES:
+            s = pat.sub(repl, s)
+        # Collapse multiple spaces
+        s = re.sub(r"\s+", " ", s).strip()
+        out.append(s)
+    return out
+
+
+# Footer lines that must not be included in card content (e.g. last card on page)
+CARD_FOOTER_KEYWORDS = (
+    "age as on",
+    "date of publication",
+    "total pages",
+    "page ",
+    "signature of",
+    "summary of electors",
+)
+
+
+def _strip_footer_from_card_block(lines: List[str]) -> List[str]:
+    """Remove lines that are clearly page footer, not card content."""
+    return [
+        ln for ln in lines
+        if ln.strip() and not any(k in ln.lower() for k in CARD_FOOTER_KEYWORDS)
+    ]
+
+
+# Keyword-anchor regexes (TN rolls: order varies; use anchors, not line index)
+RE_EPIC_ANYWHERE_STRICT = re.compile(r"\b[A-Z]{3}[0-9]{6,7}\b", re.IGNORECASE)
+RE_AGE_ANCHOR = re.compile(r"Age\s*[:;]?\s*(\d{1,3})", re.IGNORECASE)
+RE_AGE_FALLBACK_GENDER = re.compile(r"\b(\d{2})\s*(Male|Female)\b", re.IGNORECASE)
+RE_RELATIVE_ANCHOR = re.compile(r"(Father|Husband|Mother)\s*Name\s*[:;]?\s*(.*)", re.IGNORECASE)
+RE_HOUSE_ANCHOR = re.compile(r"House\s*Number\s*[:;]?\s*([0-9A-Za-z\/\-]+)", re.IGNORECASE)
+RE_HOUSE_FALLBACK = re.compile(r"\b([0-9]+[A-Za-z]*[/\-][0-9A-Za-z\/\-]+)\b")
+# Name with prefix on same line (after normalization)
+RE_NAME_ANCHOR = re.compile(r"^Name\s*[:;]?\s*(.+)$", re.IGNORECASE)
+
+
+def _parse_card_keyword_anchored(block: List[str], rec: Dict[str, Any]) -> None:
+    """
+    Extract fields using keyword anchors and patterns only. No line-position assumptions.
+    Use after OCR normalization and footer stripping. Fills only missing fields.
+    """
+    if not block:
+        return
+    full_text = " ".join(block)
+    lines = [ln.strip() for ln in block if ln.strip()]
+
+    # 1) EPIC: find anywhere in block (do not assume first line)
+    if not rec.get("epic_number"):
+        for ln in lines:
+            m = RE_RECORD_START.match(ln)
+            if m:
+                if rec.get("serial_number") is None:
+                    rec["serial_number"] = m.group(1)
+                if _looks_like_epic(m.group(2)):
+                    rec["epic_number"] = m.group(2)
+                    break
+            if _looks_like_epic(ln):
+                rec["epic_number"] = ln
+                break
+        if not rec.get("epic_number"):
+            m = RE_EPIC_ANYWHERE_STRICT.search(full_text)
+            if m:
+                rec["epic_number"] = m.group(0)
+
+    # 2) Relative: (Father|Husband|Mother) Name : value
+    if not rec.get("relative_name"):
+        for ln in lines:
+            m = RE_RELATIVE_ANCHOR.search(ln)
+            if m:
+                val = (m.group(2) or "").strip().rstrip("-").rstrip('"').strip()
+                if val and len(val) >= 2 and val.lower() not in ("name", "nama", "narie", "nartie"):
+                    rec["relative_name"] = val
+                    break
+
+    # 3) House Number: "House Number : 9/5" or first numeric/slash pattern
+    if not rec.get("house_no"):
+        for ln in lines:
+            m = RE_HOUSE_ANCHOR.search(ln)
+            if m:
+                val = (m.group(1) or "").strip()
+                if val and not _is_date_like(val) and not RE_EPIC.match(val):
+                    rec["house_no"] = _normalize_house_no(val)
+                    break
+        if not rec.get("house_no"):
+            for ln in lines:
+                m = RE_HOUSE_FALLBACK.search(ln)
+                if m:
+                    val = m.group(1).strip()
+                    if not _is_date_like(val) and not RE_EPIC.match(val) and len(val) <= 20:
+                        rec["house_no"] = _normalize_house_no(val)
+                        break
+
+    # 4) Age: "Age : 24" or "24 Male" / "24 Female"
+    if rec.get("age") is None:
+        for ln in lines:
+            m = RE_AGE_ANCHOR.search(ln)
+            if m:
+                try:
+                    a = int(m.group(1))
+                    if 18 <= a <= 120:
+                        rec["age"] = a
+                        break
+                except ValueError:
+                    pass
+        if rec.get("age") is None:
+            m = RE_AGE_FALLBACK_GENDER.search(full_text)
+            if m:
+                try:
+                    a = int(m.group(1))
+                    if 18 <= a <= 120:
+                        rec["age"] = a
+                except ValueError:
+                    pass
+
+    # 5) Gender: search for Male/Female on any line (independent of Age)
+    # Do not assign "O" during parsing — only M/F; leave unknown for validation/default.
+    if not rec.get("gender"):
+        for ln in lines:
+            g = _normalize_gender(ln)
+            if g and g in ("M", "F"):
+                rec["gender"] = g
+                break
+
+    # 6) Name: "Name : value" on same line, or first non-keyword line after EPIC
+    if rec.get("name") is None:
+        for ln in lines:
+            m = RE_NAME_ANCHOR.match(ln)
+            if m:
+                val = (m.group(1) or "").strip().rstrip("-").strip()
+                if val and val.lower() not in ("name", "nama", "narie"):
+                    rec["name"] = val
+                    break
+        if rec.get("name") is None:
+            skip_starts = ("father", "husband", "mother", "house", "age", "gender", "photo", "available", "name:")
+            for ln in lines:
+                if RE_EPIC.match(ln) or _looks_like_epic(ln):
+                    continue
+                low = ln.lower().strip()
+                if any(low.startswith(s) for s in skip_starts) or low in ("male", "female"):
+                    continue
+                if ln.isdigit() or _is_date_like(ln) or RE_HOUSE_FALLBACK.match(ln):
+                    continue
+                if len(ln) > 1 and ":" not in ln.split()[0] if ln.split() else True:
+                    rec["name"] = ln.rstrip("-").strip()
+                    break
+
 
 def _normalize_house_no(s: str) -> str:
-    """Fix common OCR errors in house numbers: C→0, O→0 (8/1C00→8/100)."""
+    """Fix common OCR errors in house numbers: &→8, Q→0, O→0, C→0, I→1 (e.g. 8/100, &/10Q→8/100)."""
     if not s or len(s) > 80:
         return s
     s = s.strip()
-    # In digit/slash context, C and O are often misread as 0
+    # Only in digit/slash context: replace common OCR misreads.
     out = []
     for i, c in enumerate(s):
-        prev_ok = (out and out[-1] in "0123456789/") or (i > 0 and s[i - 1] in "0123456789/")
-        next_ok = i + 1 < len(s) and s[i + 1] in "0123456789/"
-        if c.upper() in ("C", "O") and (prev_ok or next_ok):
-            out.append("0")
+        prev_numeric = (out and out[-1] in "0123456789/") or (i > 0 and s[i - 1] in "0123456789/")
+        next_numeric = i + 1 < len(s) and s[i + 1] in "0123456789/"
+        in_numeric_zone = prev_numeric or next_numeric
+        if in_numeric_zone:
+            if c == "&":
+                out.append("8")
+            elif c.upper() == "Q":
+                out.append("0")
+            elif c.upper() in ("C", "O"):
+                out.append("0")
+            elif c.upper() == "I" and (prev_numeric or next_numeric):
+                out.append("1")
+            else:
+                out.append(c)
         else:
             out.append(c)
     return "".join(out)
@@ -790,14 +1296,19 @@ def _normalize_epic(epic: str, config: Optional[Dict[str, Any]] = None) -> Tuple
 
 def _normalize_gender(text: str) -> Optional[str]:
     """
-    Normalize OCR-noisy gender values to 'M' or 'F'.
-    Handles: Male/Female, Ma e/Fema e, Mala/Ferala, Famale/Femalo, MA 4/Farna 8, etc.
-    Returns 'M', 'F', or None if unrecognisable.
+    Normalize OCR-noisy gender values to 'M', 'F', or 'O' (Third gender).
+    Handles: Male/Female/Third, Ma e/Fema e, Mala/Ferala, Famale/Femalo, etc.
+    Returns 'M', 'F', 'O', or None if unrecognisable.
     """
     if not text:
         return None
     t = text.strip().lower().replace(" ", "").replace(".", "")
-    # Female first (longer match, avoids "fema" matching "ma")
+    # Third gender first (ECI TN format)
+    third_tokens = ("third", "thirdgender", "other", "o", "transgender", "tg")
+    for tok in third_tokens:
+        if t == tok or t.startswith(tok) or tok in t:
+            return "O"
+    # Female (longer match, avoids "fema" matching "ma")
     female_tokens = ("female", "fema", "femalo", "famale", "ferala", "farnale",
                      "fema0", "fema8", "fema@", "femal")
     male_tokens = ("male", "mala", "ma0", "ma8", "ma4", "mae", "mal")
@@ -859,20 +1370,36 @@ def _validate_and_score_records(records: List[Dict[str, Any]]) -> Tuple[List[Dic
         age_valid = age is not None and AGE_MIN <= age <= AGE_MAX
         if age_valid:
             stats["age_valid_count"] += 1
-        elif age is not None and (age < AGE_MIN or age > AGE_MAX):
+        elif age is None or age == "":
+            warnings.append("age_missing")
+        elif age < AGE_MIN or age > AGE_MAX:
             warnings.append("age_out_of_range")
 
         gender = (r.get("gender") or "").strip().upper()
-        gender_valid = gender in VALID_GENDERS or gender in ("M", "F")
+        gender_valid = gender in VALID_GENDERS or gender in ("M", "F", "O")
         if gender_valid and gender:
             stats["gender_valid_count"] += 1
-        if gender and gender not in VALID_GENDERS and gender not in ("M", "F"):
+        if gender and gender not in VALID_GENDERS and gender not in ("M", "F", "O"):
             warnings.append("gender_invalid")
 
         house_no = (r.get("house_no") or "").strip()
         if house_no and len(house_no) > HOUSE_NO_MAX_LEN:
             warnings.append("house_no_too_long")
             r["house_no"] = house_no[:HOUSE_NO_MAX_LEN]
+
+        # Validation status: Valid | Missing Age | EPIC Invalid | Gender Invalid | Needs Review
+        if epic_valid and age_valid and gender_valid:
+            r["validation_status"] = "Valid"
+        elif not epic_valid and epic:
+            r["validation_status"] = "EPIC Invalid"
+        elif not age_valid and (age is None or age == ""):
+            r["validation_status"] = "Missing Age"
+        elif not gender_valid and gender:
+            r["validation_status"] = "Gender Invalid"
+        elif not epic_valid or not age_valid or not gender_valid:
+            r["validation_status"] = "Needs Review"
+        else:
+            r["validation_status"] = "Valid"
 
         if "multiple_epics_in_card" in warnings:
             stats["multi_epic_warnings"] += 1
@@ -918,7 +1445,7 @@ def _merge_ocr_config(extraction_config: Optional[Dict[str, Any]] = None) -> Dic
             "ocr_preprocess": ecfg.ocr_preprocess,
         }
     except Exception:
-        base = {"ocr_dpi": 200, "ocr_max_pages": 1000, "ocr_preprocess": False}
+        base = {"ocr_dpi": 300, "ocr_max_pages": 1000, "ocr_preprocess": False}
     return {**base, **(extraction_config or {})}
 
 
@@ -1030,26 +1557,102 @@ def _extract_cards_by_position(
     return records
 
 
+def _apply_positional_card_parsing(block: List[str], rec: Dict[str, Any]) -> None:
+    """
+    Positional extraction: Line 0 = EPIC/serial, 1 = Name, 2 = Father, 3 = House, 4+ = Age/Gender.
+    Only sets fields when the line content matches expected type; does not overwrite with garbage.
+    """
+    if not block:
+        return
+    lines = [ln.strip() for ln in block if ln.strip()]
+    # Line 0: EPIC or "serial EPIC"
+    if lines:
+        m = RE_RECORD_START.match(lines[0])
+        if m:
+            rec["serial_number"] = rec.get("serial_number") or m.group(1)
+            if _looks_like_epic(m.group(2)):
+                rec["epic_number"] = rec.get("epic_number") or m.group(2)
+        elif _looks_like_epic(lines[0]):
+            rec["epic_number"] = rec.get("epic_number") or lines[0]
+    # Line 1: Name (if not a label line)
+    if len(lines) > 1 and not re.match(r"^(?:name|nama|father|house|age|sex|gender)", lines[1], re.I):
+        if not RE_EPIC.match(lines[1]) and len(lines[1]) > 1 and not lines[1].isdigit():
+            rec["name"] = rec.get("name") or lines[1].rstrip("-").strip()
+    # Line 2: Father/relative (if not a label)
+    if len(lines) > 2 and not re.match(r"^(?:father|husband|mother|house|age)", lines[2], re.I):
+        if not RE_EPIC.match(lines[2]) and len(lines[2]) > 1:
+            rec["relative_name"] = rec.get("relative_name") or lines[2].rstrip("-").strip() or ""
+    # Line 3: House (digits/slash) or next line that looks like house
+    for idx in (3, 4):
+        if len(lines) > idx and re.search(r"[\d/]", lines[idx]) and not _is_date_like(lines[idx]):
+            if not RE_EPIC.match(lines[idx]) and len(lines[idx]) <= 20:
+                rec["house_no"] = rec.get("house_no") or _normalize_house_no(lines[idx]) or ""
+                break
+    # Age/Gender: look for "digits" and "Male/Female" in remaining lines
+    for idx in range(min(4, len(lines)), len(lines)):
+        ln = lines[idx]
+        m_age = RE_AGE_GENDER_LINE_FUZZY.search(ln) or RE_AGE_FUZZY.search(ln)
+        if m_age:
+            try:
+                a = int(m_age.group(1))
+                if 18 <= a <= 120:
+                    rec["age"] = rec.get("age") or a
+            except (ValueError, TypeError):
+                pass
+            if m_age.lastindex and m_age.lastindex >= 2 and m_age.group(2):
+                g = _normalize_gender(m_age.group(2))
+                if g:
+                    rec["gender"] = rec.get("gender") or g
+        if RE_AGE.match(ln.split()[-1] if ln.split() else ""):
+            try:
+                a = int(re.sub(r"\D", "", ln))
+                if 18 <= a <= 120:
+                    rec["age"] = rec.get("age") or a
+            except ValueError:
+                pass
+        g = _normalize_gender(ln)
+        if g:
+            rec["gender"] = rec.get("gender") or g
+
+
 def _parse_one_card_block(
     block: List[str],
     rec: Dict[str, Any],
 ) -> None:
     """
     Fill one voter record from a list of lines (one card).
-    Extracts serial_number, uses OCR-tolerant patterns for labels/values.
+    Uses keyword-anchor extraction only (no line-position assumptions).
+    Optional label-based loop fills remaining gaps.
     """
+    # Normalize OCR typos (Cender→Gender, Falher→Father, etc.) and strip footer
+    normalized = _normalize_ocr_card_lines(block)
+    lines = _strip_footer_from_card_block(normalized)
+    if not lines:
+        return
+
+    # Keyword-anchor extraction first (no positional assumptions)
+    _parse_card_keyword_anchored(lines, rec)
+
+    if os.getenv("EXTRACT_DEBUG", "").strip().lower() in ("1", "true", "yes"):
+        logger.debug(
+            "Parsed card (before gap-fill): epic=%s name=%s relative=%s age=%s gender=%s house_no=%s",
+            rec.get("epic_number"), rec.get("name"), rec.get("relative_name"),
+            rec.get("age"), rec.get("gender"), rec.get("house_no"),
+        )
+
+    # Serial number from first line if "serial EPIC" or standalone digit
     i = 0
-    # Serial number: "1 WQD2616720" or standalone "1","2",... at card start
-    if block:
-        m = RE_RECORD_START.match(block[0])
+    if lines:
+        m = RE_RECORD_START.match(lines[0])
         if m:
-            rec["serial_number"] = m.group(1)
+            rec["serial_number"] = rec.get("serial_number") or m.group(1)
             i = 1
-        elif re.match(r"^\d{1,4}$", block[0].strip()) and len(block) > 1:
-            rec["serial_number"] = block[0].strip()
+        elif re.match(r"^\d{1,4}$", lines[0]) and len(lines) > 1:
+            rec["serial_number"] = rec.get("serial_number") or lines[0]
             i = 1
-    while i < len(block):
-        bl = block[i].strip()
+    # Label-based gap-fill (next-line values, fuzzy labels)
+    while i < len(lines):
+        bl = lines[i].strip()
         if not bl or bl.lower() in ("photo", "available", "pnoio", "ptoto", "pnoto", "avallable", "availabl", "availablc", "avallablo"):
             i += 1
             continue
@@ -1059,8 +1662,8 @@ def _parse_one_card_block(
             val = (m_name.group(1) or "").strip().rstrip("-")
             if val and val.lower() not in ("name", "naine", "namie", "nama", "namo", "namc"):
                 rec["name"] = val
-            elif i + 1 < len(block):
-                next_val = block[i + 1].strip()
+            elif i + 1 < len(lines):
+                next_val = lines[i + 1].strip()
                 if next_val and not RE_EPIC.match(next_val) and next_val.lower() not in ("name", "father", "house", "age", "gender", "photo", "available"):
                     rec["name"] = next_val.rstrip("-").strip()
                     i += 1
@@ -1075,8 +1678,8 @@ def _parse_one_card_block(
             label_like = re.sub(r"[\s\"]+", "", val).lower() in ("name", "naine", "namie", "nama", "namo", "namc", "narne", "narie") or len(val) < 3
             if val and not label_like:
                 rec["relative_name"] = val
-            elif i + 1 < len(block):
-                rec["relative_name"] = block[i + 1].strip().rstrip("-").rstrip('"').strip()
+            elif i + 1 < len(lines):
+                rec["relative_name"] = lines[i + 1].strip().rstrip("-").rstrip('"').strip()
                 i += 1
             i += 1
             continue
@@ -1084,8 +1687,8 @@ def _parse_one_card_block(
             val = (m_h.group(1) or "").strip().rstrip("-")
             if val:
                 rec["relative_name"] = val
-            elif i + 1 < len(block):
-                rec["relative_name"] = block[i + 1].strip().rstrip("-").strip()
+            elif i + 1 < len(lines):
+                rec["relative_name"] = lines[i + 1].strip().rstrip("-").strip()
                 i += 1
             i += 1
             continue
@@ -1093,8 +1696,8 @@ def _parse_one_card_block(
             val = (m_m.group(1) or "").strip().rstrip("-")
             if val:
                 rec["relative_name"] = val
-            elif i + 1 < len(block):
-                rec["relative_name"] = block[i + 1].strip().rstrip("-").strip()
+            elif i + 1 < len(lines):
+                rec["relative_name"] = lines[i + 1].strip().rstrip("-").strip()
                 i += 1
             i += 1
             continue
@@ -1106,16 +1709,16 @@ def _parse_one_card_block(
             sensible = val and not _is_date_like(val) and (re.search(r"[\d/]", val) or len(val) > 3)
             if sensible and not RE_EPIC.match(val):
                 rec["house_no"] = _normalize_house_no(val)
-            elif i + 1 < len(block):
-                val2 = block[i + 1].strip()
+            elif i + 1 < len(lines):
+                val2 = lines[i + 1].strip()
                 if val2 and not _is_date_like(val2) and not RE_EPIC.match(val2):
                     rec["house_no"] = _normalize_house_no(val2)
                     i += 1
             i += 1
             continue
         # Standalone age label "Ago"/"Aga"/"Age" with value on next line (e.g. "32 Genocr", then "Mole")
-        if bl.lower() in ("ago", "aga", "age") and i + 1 < len(block):
-            next_ln = block[i + 1].strip()
+        if bl.lower() in ("ago", "aga", "age") and i + 1 < len(lines):
+            next_ln = lines[i + 1].strip()
             m_next = RE_AGE_LEADING.match(next_ln) or RE_AGE_FUZZY.search(next_ln) or (RE_AGE.match(next_ln) and next_ln)
             if m_next:
                 try:
@@ -1124,10 +1727,10 @@ def _parse_one_card_block(
                         rec["age"] = a
                 except (ValueError, AttributeError, TypeError):
                     pass
-                if i + 2 < len(block):
-                    g_line = block[i + 2].strip()
+                if i + 2 < len(lines):
+                    g_line = lines[i + 2].strip()
                     g_norm = _normalize_gender(g_line)
-                    if g_norm:
+                    if g_norm and g_norm in ("M", "F"):
                         rec["gender"] = g_norm
                         i += 1
                 i += 1
@@ -1151,12 +1754,12 @@ def _parse_one_card_block(
             g_val = m_age_line.group(2) if m_age_line.lastindex and m_age_line.lastindex >= 2 else None
             if g_val:
                 g_norm = _normalize_gender(g_val)
-                if g_norm:
+                if g_norm and g_norm in ("M", "F"):
                     rec["gender"] = g_norm
-            elif i + 1 < len(block):
-                g_line = block[i + 1].strip()
+            elif i + 1 < len(lines):
+                g_line = lines[i + 1].strip()
                 g_norm = _normalize_gender(g_line)
-                if g_norm:
+                if g_norm and g_norm in ("M", "F"):
                     rec["gender"] = g_norm
                     i += 1
             i += 1
@@ -1172,8 +1775,9 @@ def _parse_one_card_block(
             i += 1
             continue
         # Standalone gender line — use _normalize_gender for all OCR variants
+        # Only set M/F during parsing; never assign O (validation/default only).
         g_norm = _normalize_gender(bl)
-        if g_norm and not rec.get("gender"):
+        if g_norm and g_norm in ("M", "F") and not rec.get("gender"):
             rec["gender"] = g_norm
             i += 1
             continue
@@ -1299,11 +1903,34 @@ def _parse_voter_cards_from_blocks(
     except ImportError:
         count_structural_anomalies = lambda b: []  # noqa: E731
 
+    # ----- DEBUG: Log raw card blocks BEFORE parsing (segmentation verification) -----
+    if os.getenv("EXTRACT_DEBUG", "").strip().lower() in ("1", "true", "yes"):
+        debug_page = None
+        try:
+            debug_page = int(os.getenv("EXTRACT_DEBUG_PAGE", "0"))
+        except ValueError:
+            pass
+        if debug_page == 0 or page_number == debug_page:
+            logger.info(
+                "Page %d: total card blocks = %d (expected 30 for TN 3×10 grid)",
+                page_number, len(blocks),
+            )
+            for block_idx, block in enumerate(blocks):
+                epics_in_block = [ln for ln in block if _looks_like_epic((ln or "").strip())]
+                logger.info(
+                    "---- CARD BLOCK START (page=%d block=%d/%d, EPICs in block=%d) ----",
+                    page_number, block_idx + 1, len(blocks), len(epics_in_block),
+                )
+                for line in block:
+                    logger.info("%s", line)
+                logger.info("---- CARD BLOCK END ----")
+
     records: List[Dict[str, Any]] = []
     for block in blocks:
         if not block:
             continue
-        epics_in = [ln for ln in block if RE_EPIC.match(ln.strip())]
+        # Use tolerant anchor for blocks from EPIC-first (OCR-noisy EPICs like WQd2597805, WOD2614642)
+        epics_in = [ln for ln in block if _looks_like_epic(ln.strip())]
         epic = epics_in[0] if epics_in else None
         if not epic:
             continue
@@ -1756,11 +2383,17 @@ def extract_from_pdf(
                     rec["page_number"] = page_no
             pages_processed += 1
 
-    # If no text was extracted from any page (image-only PDF), run spatial OCR automatically
+    # If no text was extracted from any page (image-only PDF), run OCR automatically.
+    # When use_ocr is True, always run OCR for extraction so we get per-card segmentation
+    # (EPIC-first) instead of row-major text layer, which produces wrong field alignment.
     all_text_empty = all((not (p.get("text") or "").strip()) for p in raw_page_texts)
-    run_ocr = (not all_records and all_text_empty) or (
+    run_ocr = use_ocr or (not all_records and all_text_empty) or (
         not all_records and use_ocr and (not first_page_text or not first_page_text.strip())
     )
+    if run_ocr and use_ocr and all_records:
+        # Force OCR path: discard text-layer records so we replace with OCR (per-card) results.
+        all_records = []
+    segmentation_metrics_ocr: Optional[Dict[str, Any]] = None
     if run_ocr:
         cfg = _merge_ocr_config(extraction_config)
         ecfg = extraction_config or {}
@@ -1769,7 +2402,7 @@ def extract_from_pdf(
         page_blocks_list = _extract_blocks_via_ocr(
             pdf_path,
             max_pages=cfg.get("ocr_max_pages", 1000),
-            dpi=cfg.get("ocr_dpi", 200),
+            dpi=cfg.get("ocr_dpi", 300),
             preprocess=cfg.get("ocr_preprocess", False),
             num_cols=num_cols,
         )
@@ -1817,6 +2450,12 @@ def extract_from_pdf(
                 pages_processed,
                 len(all_records),
             )
+            total_cards = sum(len(p) for p in page_blocks_list)
+            segmentation_metrics_ocr = {
+                "total_cards_extracted": total_cards,
+                "pages_with_blocks": sum(1 for p in page_blocks_list if p),
+                "pages_processed": pages_processed,
+            }
 
     # Resolve metadata from PDF header if not provided
     constituency_name, part_no, part_name = _extract_metadata_from_text(first_page_text)
@@ -1849,6 +2488,41 @@ def extract_from_pdf(
     # Structural layer: validation, confidence scoring, duplicate detection
     all_records, validation_stats = _validate_and_score_records(all_records)
 
+    # ----- DEBUG: 5) Parsed record (wrong output); 6) Expected record template (manual) -----
+    debug_cfg = _get_debug_config()
+    if debug_cfg:
+        debug_dir = debug_cfg["debug_dir"]
+        debug_dir.mkdir(parents=True, exist_ok=True)
+        page_records = [r for r in all_records if r.get("page_number") == debug_cfg["debug_page"]]
+        idx = debug_cfg["debug_card_index"]
+        if idx < len(page_records):
+            rec = page_records[idx]
+            parsed_out = {
+                "epic": rec.get("epic_number"),
+                "name": rec.get("name"),
+                "father_name": rec.get("relative_name"),
+                "house_no": rec.get("house_no"),
+                "age": rec.get("age"),
+                "gender": rec.get("gender"),
+                "page_number": rec.get("page_number"),
+                "validation_status": rec.get("validation_status"),
+                "confidence_score": rec.get("confidence_score"),
+            }
+            with open(debug_dir / "parsed_record.json", "w", encoding="utf-8") as f:
+                json.dump(parsed_out, f, indent=2, ensure_ascii=False)
+            expected_template = {
+                "epic": "",
+                "name": "",
+                "father_name": "",
+                "house_no": "",
+                "age": None,
+                "gender": "",
+                "_comment": "Fill in correct values for comparison",
+            }
+            with open(debug_dir / "expected_record.json", "w", encoding="utf-8") as f:
+                json.dump(expected_template, f, indent=2, ensure_ascii=False)
+            logger.info("DEBUG: wrote parsed_record.json and expected_record.json to %s", debug_dir)
+
     meta = {
         "constituency_name": constituency_name or "",
         "booth_number": part_no or "",
@@ -1858,6 +2532,8 @@ def extract_from_pdf(
     }
     meta.update(_extract_extended_metadata(first_page_text))
     meta["validation_stats"] = validation_stats
+    if segmentation_metrics_ocr:
+        meta["segmentation_metrics"] = segmentation_metrics_ocr
     return {
         "records": all_records,
         "metadata": meta,

@@ -11,6 +11,7 @@ Supports:
 """
 import re
 import logging
+import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -18,6 +19,32 @@ logger = logging.getLogger(__name__)
 
 # EPIC patterns: [A-Z]{3}[0-9]{7} or [A-Z]{3}[0-9]{6}
 RE_EPIC = re.compile(r"[A-Z]{3}[0-9]{6,7}")
+
+_TESSERACT_HELP = (
+    "Tesseract OCR is not installed or not in PATH. "
+    "Install Tesseract and either add it to PATH, or set TESSERACT_CMD to the full path "
+    r"(example: C:\Program Files\Tesseract-OCR\tesseract.exe)."
+)
+
+
+def _configure_tesseract_cmd() -> None:
+    cmd = (os.getenv("TESSERACT_CMD") or "").strip()
+    if not cmd:
+        return
+    try:
+        import pytesseract
+        pytesseract.pytesseract.tesseract_cmd = cmd
+    except Exception:
+        return
+
+
+def _require_tesseract() -> None:
+    _configure_tesseract_cmd()
+    try:
+        import pytesseract
+        pytesseract.get_tesseract_version()
+    except Exception as e:
+        raise RuntimeError(_TESSERACT_HELP) from e
 
 
 def _preprocess_image_for_ocr(img) -> "Image":
@@ -129,13 +156,18 @@ def _extract_text_via_ocr_with_preprocessing(
     if preprocess:
         images = [_preprocess_image_for_ocr(img) for img in images]
 
+    allow_easyocr = os.getenv("ALLOW_EASYOCR_FALLBACK", "").strip().lower() in ("1", "true", "yes")
     try:
         import pytesseract
+        if not allow_easyocr:
+            _require_tesseract()
         return [pytesseract.image_to_string(img, lang="eng") for img in images]
     except Exception as e:
         err_msg = str(e).lower()
         if "tesseract" not in err_msg and "path" not in err_msg:
             logger.warning("Tesseract OCR failed: %s", e)
+        if not allow_easyocr:
+            raise RuntimeError(_TESSERACT_HELP) from e
         try:
             import easyocr
             import numpy as np

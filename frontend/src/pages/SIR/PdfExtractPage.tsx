@@ -108,7 +108,7 @@ const PdfExtractPage: React.FC = () => {
   const [records, setRecords] = useState<ExtractedRecord[]>([]);
   const [metadata, setMetadata] = useState<ExtractMetadata | null>(null);
   const [rawPageTexts, setRawPageTexts] = useState<{ page: number; length: number; text: string }[]>([]);
-  const [debugInfo, setDebugInfo] = useState<{ page_texts_full?: { page: number; length: number; text: string }[] } | null>(null);
+  const [debugInfo, setDebugInfo] = useState<{
     first_page_text?: string;
     first_page_text_length?: number;
     table_count?: number;

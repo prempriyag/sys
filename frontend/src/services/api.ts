@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { AxiosRequestConfig } from 'axios';
 import { API_BASE_URL, API_ENDPOINTS, getAuthToken } from '../config/api';
 
 const api = axios.create({
@@ -39,6 +39,81 @@ export const uploadPostSirPdf = (formData: FormData) =>
     api.post(API_ENDPOINTS.SIR_UPLOAD_POST_PDF, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
     });
+
+/** Bulk Electoral Roll: folder_path (server path) or multiple PDF files. Returns total_found, inserted, duplicates_skipped, invalid_epic_count, invalid_epics. */
+export const bulkElectoralRoll = (formData: FormData, config?: AxiosRequestConfig) =>
+    api.post(API_ENDPOINTS.SIR_BULK_ELECTORAL_ROLL, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 600000,
+        ...(config || {}),
+    });
+
+export type BulkProgress = { current: number; total: number; pdf_name: string; records_so_far: number };
+export type BulkResult = {
+    total_found?: number;
+    inserted?: number;
+    duplicates_skipped?: number;
+    invalid_epic_count?: number;
+    invalid_epics?: string[];
+    pdf_count?: number;
+    moved_count?: number;
+    extracted_folder?: string;
+    message?: string;
+};
+
+/** Bulk with progress: POST to stream endpoint, call onProgress for each event, resolve with result on 'done'. */
+export async function bulkElectoralRollWithProgress(
+    formData: FormData,
+    onProgress: (p: BulkProgress) => void,
+): Promise<BulkResult> {
+    const token = getAuthToken();
+    const url = `${API_BASE_URL}${API_ENDPOINTS.SIR_BULK_ELECTORAL_ROLL_STREAM}`;
+    const res = await fetch(url, {
+        method: 'POST',
+        body: formData,
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        signal: AbortSignal.timeout(600000),
+    });
+    if (!res.ok) {
+        const t = await res.text();
+        throw new Error(t || res.statusText);
+    }
+    const reader = res.body?.getReader();
+    if (!reader) throw new Error('No response body');
+    const dec = new TextDecoder();
+    let buffer = '';
+    let result: BulkResult = {};
+    while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += dec.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+        for (const line of lines) {
+            if (line.startsWith('data: ')) {
+                try {
+                    const data = JSON.parse(line.slice(6));
+                    if (data.type === 'progress') {
+                        onProgress({
+                            current: data.current,
+                            total: data.total,
+                            pdf_name: data.pdf_name ?? '',
+                            records_so_far: data.records_so_far ?? 0,
+                        });
+                    } else if (data.type === 'done' && data.result) {
+                        result = data.result;
+                    } else if (data.type === 'error') {
+                        throw new Error(data.detail ?? 'Stream error');
+                    }
+                } catch (e) {
+                    if (e instanceof SyntaxError) continue;
+                    throw e;
+                }
+            }
+        }
+    }
+    return result;
+}
 
 /** Extract electoral roll from PDF only (no DB save). Returns { records, metadata } for preview. */
 export const extractPdfRoll = (formData: FormData) =>
@@ -83,6 +158,7 @@ export const debugPdfRoll = (formData: FormData) =>
         headers: { 'Content-Type': 'multipart/form-data' }
     });
 
+
 /** ECI dropdown options: states (all), districts (by state), assembly constituencies (by state + district). */
 export const getEciStates = () =>
   api.get<{ states: string[] }>(API_ENDPOINTS.SIR_ECI_STATES);
@@ -91,11 +167,36 @@ export const getEciDistricts = (state: string) =>
 export const getEciAssemblyConstituencies = (state: string, district: string) =>
   api.get<{ assembly_constituencies: string[] }>(API_ENDPOINTS.SIR_ECI_ASSEMBLY_CONSTITUENCIES, { params: { state, district } });
 
-/** Production v1: Extract voters (auto-detect text vs scanned). Returns { data, metadata, extraction_mode, errors, warnings }. */
-export const extractVotersV1 = (formData: FormData) =>
+/** Production v1: Extract voters (auto-detect text vs scanned). Returns { data, metadata, extraction_mode, errors, warnings }. Use max_pages in form to limit OCR and avoid timeout. */
+export const extractVotersV1 = (formData: FormData, config?: AxiosRequestConfig) =>
     api.post(API_ENDPOINTS.EXTRACTOR_V1_EXTRACT, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 15 * 60 * 1000,
+        ...(config || {}),
     });
+
+/** Docling-based extraction (layout-aware). Returns { total_extracted, is_scanned, data }. Optional max_pages limits PDF pages (default 15) to avoid OOM. */
+export const extractWithDocling = (
+    formData: FormData,
+    config?: AxiosRequestConfig,
+    params?: { max_pages?: number },
+) => {
+    const url = params?.max_pages != null
+        ? `${API_ENDPOINTS.SIR_DOCLING_UPLOAD}?max_pages=${params.max_pages}`
+        : API_ENDPOINTS.SIR_DOCLING_UPLOAD;
+    return api.post(url, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 30 * 60 * 1000,
+        ...(config || {}),
+    });
+};
+
+/** Production v1: Upload extracted OCR records to sys DB (table ocr_voter_uploads). */
+export const uploadOcrRecords = (payload: {
+  records: Array<Record<string, any>>;
+  constituency_name?: string;
+  booth_number?: string;
+}) => api.post(API_ENDPOINTS.EXTRACTOR_V1_OCR_UPLOAD, payload);
 
 /** Production v1: Extractor health (OCR engines, OpenCV, PyMuPDF availability). */
 export const extractorHealth = () => api.get(API_ENDPOINTS.EXTRACTOR_V1_HEALTH);
@@ -103,7 +204,7 @@ export const extractorHealth = () => api.get(API_ENDPOINTS.EXTRACTOR_V1_HEALTH);
 /** Database connection info (no password). */
 export const getDbInfo = () => api.get(API_ENDPOINTS.DB_INFO);
 
-/** Download electoral roll PDF from ECI portal (automated: pre-fill, captcha OCR, select first row). Returns blob for PDF download. */
+/** Download electoral roll PDF from ECI portal. Returns { blob, recordSaved } so UI can show if DB record was saved. */
 export const downloadEciRoll = async (params: {
     state?: string;
     revyear?: string;
@@ -111,7 +212,7 @@ export const downloadEciRoll = async (params: {
     ac_name?: string;
     language?: string;
     manual_captcha?: boolean;
-}): Promise<Blob> => {
+}): Promise<{ blob: Blob; recordSaved: boolean }> => {
     const formData = new FormData();
     formData.append('state', params.state ?? 'Tamil Nadu');
     formData.append('revyear', params.revyear ?? '2026');
@@ -124,7 +225,8 @@ export const downloadEciRoll = async (params: {
         responseType: 'blob',
         timeout: 600000, // 10 minutes — ECI download can take several minutes
     });
-    return res.data;
+    const recordSaved = (res.headers['x-eci-record-saved'] ?? '').toLowerCase() === 'true';
+    return { blob: res.data, recordSaved };
 };
 
 export const runMatching = (constituencyId: number) => 

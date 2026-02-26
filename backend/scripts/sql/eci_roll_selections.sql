@@ -29,5 +29,8 @@ CREATE INDEX IF NOT EXISTS ix_eci_roll_selections_created_by ON eci_roll_selecti
 -- ALTER TABLE eci_roll_selections ADD COLUMN IF NOT EXISTS created_by VARCHAR(255);
 
 -- Add pdf_path (run only when the table exists but does not have pdf_path yet):
-ALTER TABLE eci_roll_selections
-ADD COLUMN pdf_path VARCHAR(1000);
+ALTER TABLE eci_roll_selections ADD COLUMN IF NOT EXISTS pdf_path VARCHAR(1000);
+
+-- Optional: prevent duplicate rows for same state/year/district/AC (run once):
+-- ALTER TABLE eci_roll_selections
+-- ADD CONSTRAINT unique_roll UNIQUE (state, year_of_revision, district, assembly_constituency);

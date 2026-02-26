@@ -1,9 +1,10 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import PageContainer from "../../components/common/PageContainer";
 import PageMeta from "../../components/common/PageMeta";
 import ThemedLoader from "../../components/common/ThemedLoader";
 import { alerterror, alertsuccess } from "../../utils/toast";
-import { debugPdfRoll, extractVotersV1, extractorHealth, getDbInfo } from "../../services/api";
+import { debugPdfRoll, extractVotersV1, extractorHealth, getDbInfo, uploadOcrRecords } from "../../services/api";
+import { API_BASE_URL } from "../../config/api";
 
 type ExtractedRecord = Record<string, any> & {
   epic_number?: string | null;
@@ -106,15 +107,20 @@ function toCsv(records: ExtractedRecord[]): string {
 const OcrPdfDetector: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
+  const [errorText, setErrorText] = useState<string>("");
+  const [elapsedSec, setElapsedSec] = useState(0);
+  const abortRef = useRef<AbortController | null>(null);
   const [health, setHealth] = useState<Record<string, any> | null>(null);
   const [healthLoading, setHealthLoading] = useState(false);
   const [dbInfo, setDbInfo] = useState<DbInfo | null>(null);
   const [dbLoading, setDbLoading] = useState(false);
   const [pdfDebug, setPdfDebug] = useState<PdfDebugInfo | null>(null);
   const [pdfDebugLoading, setPdfDebugLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   const [constituencyName, setConstituencyName] = useState("");
   const [boothNumber, setBoothNumber] = useState("");
+  const [maxPages, setMaxPages] = useState(20);
   const [forceOcr, setForceOcr] = useState(false);
   const [usePreprocessing, setUsePreprocessing] = useState(true);
 
@@ -123,6 +129,15 @@ const OcrPdfDetector: React.FC = () => {
 
   const [result, setResult] = useState<ExtractResponse | null>(null);
   const [records, setRecords] = useState<ExtractedRecord[]>([]);
+
+  useEffect(() => {
+    if (!loading) {
+      setElapsedSec(0);
+      return;
+    }
+    const id = window.setInterval(() => setElapsedSec((s) => s + 1), 1000);
+    return () => window.clearInterval(id);
+  }, [loading]);
 
   const fetchHealth = async () => {
     setHealthLoading(true);
@@ -190,30 +205,96 @@ const OcrPdfDetector: React.FC = () => {
       return;
     }
     setLoading(true);
+    setErrorText("");
     setResult(null);
     setRecords([]);
     setPdfDebug(null);
+    abortRef.current?.abort();
+    abortRef.current = new AbortController();
     try {
       const formData = new FormData();
       formData.append("file", file);
       if (constituencyName.trim()) formData.append("constituency_name", constituencyName.trim());
       if (boothNumber.trim()) formData.append("booth_number", boothNumber.trim());
+      if (maxPages > 0) formData.append("max_pages", String(maxPages));
       formData.append("force_ocr", forceOcr ? "true" : "false");
       formData.append("use_preprocessing", usePreprocessing ? "true" : "false");
 
-      const res = await extractVotersV1(formData);
+      const res = await extractVotersV1(formData, { signal: abortRef.current.signal });
       const data = res.data as ExtractResponse;
+      const list = Array.isArray(data.data) ? data.data : Array.isArray((data as any).records) ? (data as any).records : [];
       setResult(data);
-      setRecords(Array.isArray(data.data) ? data.data : []);
-      alertsuccess(`Extracted ${data.total_records ?? (data.data?.length ?? 0)} records`);
+      setRecords(list);
+      alertsuccess(`Extracted ${data.total_records ?? list.length} records. You can Download CSV or Upload to database.`);
     } catch (e: any) {
-      const msg =
-        e?.response?.data?.detail ||
-        e?.message ||
-        "Extraction failed.";
-      alerterror(typeof msg === "string" ? msg : JSON.stringify(msg));
+      const isAbort =
+        e?.name === "CanceledError" ||
+        e?.code === "ERR_CANCELED" ||
+        e?.message?.toLowerCase?.().includes("canceled") ||
+        abortRef.current?.signal?.aborted;
+      const msg = isAbort
+        ? "Request cancelled."
+        : (e?.response?.data?.detail || e?.message || "Extraction failed.");
+      const printable = typeof msg === "string" ? msg : JSON.stringify(msg);
+      setErrorText(printable);
+      alerterror(printable);
     } finally {
       setLoading(false);
+      abortRef.current = null;
+    }
+  };
+
+  const onCancel = () => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setLoading(false);
+    setErrorText("Request cancelled.");
+  };
+
+  const onUploadToDb = async () => {
+    if (!records.length) {
+      alerterror("No records to upload. Extract from a PDF first.");
+      return;
+    }
+    setUploading(true);
+    try {
+      const res = await uploadOcrRecords({
+        records: records.map((r) => ({
+          epic_number: r.epic_number ?? null,
+          name: r.name ?? null,
+          relative_name: r.relative_name ?? null,
+          relation_type: r.relation_type ?? null,
+          age: r.age != null ? Number(r.age) : null,
+          gender: r.gender ?? null,
+          house_no: r.house_no ?? null,
+          address: r.address ?? null,
+          booth_number: r.booth_number ?? null,
+          constituency_name: r.constituency_name ?? null,
+          page_number: r.page_number != null ? Number(r.page_number) : null,
+          card_index: r.card_index != null ? Number(r.card_index) : null,
+          section_name: r.section_name ?? null,
+          source_block: r.source_block ?? null,
+          confidence: r.confidence != null ? Number(r.confidence) : null,
+          epic_confidence: r.epic_confidence != null ? Number(r.epic_confidence) : null,
+          quality_flag: r.quality_flag ?? null,
+        })),
+        constituency_name: constituencyName.trim() || undefined,
+        booth_number: boothNumber.trim() || undefined,
+      });
+      const data = res.data as { inserted?: number; total_sent?: number; errors?: string[] };
+      const inserted = data.inserted ?? 0;
+      const errs = data.errors ?? [];
+      if (errs.length) {
+        alerterror(`Uploaded ${inserted} of ${data.total_sent ?? records.length}. Some rows had errors.`);
+      } else {
+        alertsuccess(`Uploaded ${inserted} records to database (ocr_voter_uploads).`);
+      }
+    } catch (e: any) {
+      const detail = e?.response?.data?.detail;
+      const msg = detail ?? e?.message ?? "Upload failed. Check backend is running and DB is connected.";
+      alerterror(typeof msg === "string" ? msg : JSON.stringify(msg));
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -230,6 +311,9 @@ const OcrPdfDetector: React.FC = () => {
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white">OCR PDF Detector</h2>
             <p className="text-sm text-gray-600 dark:text-gray-400">
               Upload a voter-roll PDF, run card-level OCR extraction, review low-confidence rows, export clean JSON/CSV.
+            </p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              Backend: <span className="font-mono">{API_BASE_URL}</span>
             </p>
           </div>
           <button
@@ -301,6 +385,18 @@ const OcrPdfDetector: React.FC = () => {
                 placeholder="Part No"
               />
             </div>
+            <div>
+              <label className="block text-sm mb-1">Max pages (OCR)</label>
+              <input
+                type="number"
+                min={1}
+                max={500}
+                value={maxPages}
+                onChange={(e) => setMaxPages(Math.max(1, Math.min(500, parseInt(e.target.value, 10) || 20)))}
+                className="w-20 h-10 px-2 rounded border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950"
+                title="Limit PDF pages to process; lower = faster, avoids timeout"
+              />
+            </div>
             <div className="flex items-center gap-2">
               <input
                 id="forceOcr"
@@ -326,11 +422,28 @@ const OcrPdfDetector: React.FC = () => {
             >
               {loading ? "Processing..." : "Upload & Extract"}
             </button>
+            {loading ? (
+              <button
+                onClick={onCancel}
+                className="h-10 px-4 rounded border border-gray-200 dark:border-gray-800"
+                type="button"
+              >
+                Cancel
+              </button>
+            ) : null}
           </div>
 
           {loading ? (
             <div className="mt-3">
               <ThemedLoader />
+              <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                Running… {elapsedSec}s elapsed. If timeout (15 min): lower &quot;Max pages (OCR)&quot; and try again. First EasyOCR load can take minutes.
+              </div>
+            </div>
+          ) : null}
+          {!loading && errorText ? (
+            <div className="mt-3 text-sm text-red-700 dark:text-red-300">
+              {errorText}
             </div>
           ) : null}
         </div>
@@ -358,6 +471,7 @@ const OcrPdfDetector: React.FC = () => {
                 />
                 <label htmlFor="showLowOnly">Show only low confidence</label>
               </div>
+              <span className="text-xs text-gray-500 dark:text-gray-400">CSV / JSON / Upload use all {records.length} records.</span>
               <div className="flex items-center gap-2">
                 <label className="text-sm">Threshold</label>
                 <input
@@ -372,15 +486,25 @@ const OcrPdfDetector: React.FC = () => {
               </div>
               <button
                 className="h-9 px-3 rounded border border-gray-200 dark:border-gray-800"
-                onClick={() => downloadBlob("extracted_records.json", "application/json", JSON.stringify(filteredRecords, null, 2))}
+                onClick={() => downloadBlob("extracted_records.json", "application/json", JSON.stringify(records, null, 2))}
+                title="Export all extracted records as JSON"
               >
                 Download JSON
               </button>
               <button
                 className="h-9 px-3 rounded border border-gray-200 dark:border-gray-800"
-                onClick={() => downloadBlob("extracted_records.csv", "text/csv", toCsv(filteredRecords))}
+                onClick={() => downloadBlob("extracted_records.csv", "text/csv", toCsv(records))}
+                title="Export all extracted records as CSV"
               >
                 Download CSV
+              </button>
+              <button
+                className="h-9 px-3 rounded bg-green-600 text-white border-0 disabled:opacity-60"
+                onClick={onUploadToDb}
+                disabled={uploading || !records.length}
+                title="Save extracted records to sys database (ocr_voter_uploads)"
+              >
+                {uploading ? "Uploading..." : "Upload to database"}
               </button>
               <button
                 className="h-9 px-3 rounded border border-gray-200 dark:border-gray-800 disabled:opacity-60"

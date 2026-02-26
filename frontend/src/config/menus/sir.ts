@@ -49,6 +49,11 @@ export const sirMenu: MenuConfig = {
           path: "/upload/ocr-pdf-detector",
           icon: "file-text",
         },
+        {
+          name: "Bulk Electoral Roll",
+          path: "/upload/bulk-electoral-roll",
+          icon: "file-text",
+        },
       ],
     },
     {

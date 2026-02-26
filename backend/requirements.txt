@@ -16,11 +16,15 @@ requests
 aiofiles
 pdfplumber
 pymupdf
+pdfminer.six
 Pillow
 pytesseract
 numpy
 opencv-python-headless
 easyocr
 playwright
-opencv-python-headless
+opencv-python
+
 pdf2image
+docling
+scipy

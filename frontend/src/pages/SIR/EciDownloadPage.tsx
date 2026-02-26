@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import PageContainer from '../../components/common/PageContainer';
 import PageMeta from '../../components/common/PageMeta';
 import ThemedLoader from '../../components/common/ThemedLoader';
-import { alerterror } from '../../utils/toast';
+import { alerterror, alertsuccess } from '../../utils/toast';
 import {
   downloadEciRoll,
   getEciStates,
@@ -185,7 +185,7 @@ const EciDownloadPage: React.FC = () => {
     }
     setEciLoading(true);
     try {
-      const blob = await downloadEciRoll({
+      const { blob, recordSaved } = await downloadEciRoll({
         state: stateName.trim(),
         revyear: revyear.trim(),
         district: effectiveDistrict,
@@ -199,6 +199,11 @@ const EciDownloadPage: React.FC = () => {
       a.download = 'eci_electoral_roll.pdf';
       a.click();
       URL.revokeObjectURL(url);
+      if (recordSaved) {
+        alertsuccess('PDF downloaded. Record saved to database (eci_roll_selections).');
+      } else {
+        alerterror('PDF downloaded but record could not be saved to database. Check backend logs.');
+      }
     } catch (e: any) {
       let msg = e?.message || 'ECI download failed';
       if (e?.response?.data) {

@@ -1,11 +1,11 @@
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Form, Body
-from fastapi.responses import Response
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
 from pathlib import Path
-from typing import Optional as Opt
+from typing import List, Optional as Opt
 import json
 from sqlalchemy.orm import Session
-from database.connection import get_db
+from database.connection import get_db, SessionLocal
 from config.settings import settings
 from models.sir.voter import VoterPre, VoterPost
 from models.sir.constituency import Constituency
@@ -14,6 +14,7 @@ from models.sir.state import State
 from models.sir.district import District
 from models.sir.assembly_constituency import AssemblyConstituency
 from models.sir.eci_roll_selection import EciRollSelection
+from models.sir.bulk_voter_import import BulkVoterImport
 from services.normalization import NormalizationService
 from services.electoral_roll_pdf_extractor import extract_from_pdf, debug_pdf, get_pdf_page_texts
 import pandas as pd
@@ -21,6 +22,9 @@ import io
 import tempfile
 import os
 import logging
+import queue
+import threading
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -651,19 +655,23 @@ def eci_assembly_constituencies(state: str = "", district: str = "", db: Session
         return {"assembly_constituencies": []}
     # Static data (STATE_DISTRICT_AC) – full list for known state+district
     acs_static = get_assembly_constituencies(state, district)
-    # DB: assembly_constituencies for this state+district (in case some were added or static is incomplete)
-    rows = (
-        db.query(AssemblyConstituency.name)
-        .join(District, AssemblyConstituency.district_id == District.id)
-        .join(State, District.state_id == State.id)
-        .filter(
-            func.lower(State.name) == state.lower(),
-            func.lower(District.name) == district.lower(),
+    acs_db: list = []
+    try:
+        # DB: assembly_constituencies for this state+district (in case some were added or static is incomplete)
+        rows = (
+            db.query(AssemblyConstituency.name)
+            .join(District, AssemblyConstituency.district_id == District.id)
+            .join(State, District.state_id == State.id)
+            .filter(
+                func.lower(State.name) == state.lower(),
+                func.lower(District.name) == district.lower(),
+            )
+            .order_by(AssemblyConstituency.name)
+            .all()
         )
-        .order_by(AssemblyConstituency.name)
-        .all()
-    )
-    acs_db = [r[0] for r in rows if r[0]]
+        acs_db = [r[0] for r in rows if r[0]]
+    except Exception as e:
+        logger.warning("eci-assembly-constituencies: DB lookup failed for state=%r district=%r: %s", state, district, e)
     # Merge: static first (preserve order), then any from DB not already in static
     acs = list(acs_static)
     seen = {(a or "").strip().lower() for a in acs_static}
@@ -686,6 +694,269 @@ def _safe_folder_name(s: str) -> str:
     for c in '*?"<>|':
         s = s.replace(c, "_")
     return s[:200] or "unknown"
+
+
+@router.get("/eci-roll-selections")
+def list_eci_roll_selections(db: Session = Depends(get_db), limit: int = 20):
+    """List recent eci_roll_selections rows (to verify table and that download save works)."""
+    rows = (
+        db.query(EciRollSelection)
+        .order_by(EciRollSelection.id.desc())
+        .limit(max(1, min(limit, 100)))
+        .all()
+    )
+    return {
+        "count": len(rows),
+        "rows": [
+            {
+                "id": r.id,
+                "state": r.state,
+                "year_of_revision": r.year_of_revision,
+                "district": r.district,
+                "assembly_constituency": r.assembly_constituency,
+                "language": r.language,
+                "pdf_path": r.pdf_path,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            }
+            for r in rows
+        ],
+    }
+
+
+@router.get("/bulk-electoral-roll-count")
+def bulk_electoral_roll_count(db: Session = Depends(get_db)):
+    """Return row count in voter_data so you can verify data is stored (PostgreSQL)."""
+    try:
+        count = db.query(BulkVoterImport).count()
+        return {"count": count, "table": "bulk_voter_import"}
+    except Exception as e:
+        err = str(e).lower()
+        if "does not exist" in err or "relation" in err:
+            raise HTTPException(
+                status_code=503,
+                detail="Table voter_data missing. Run: python create_sir_tables.py or alembic upgrade head",
+            ) from e
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post("/bulk-electoral-roll")
+async def bulk_electoral_roll(
+    db: Session = Depends(get_db),
+    folder_path: Opt[str] = Form(None),
+    files: Opt[List[UploadFile]] = File(None),
+    constituency_name: Opt[str] = Form(None),
+    year: Opt[str] = Form(None),
+    state: Opt[str] = Form(None),
+    district: Opt[str] = Form(None),
+):
+    """
+    Bulk Electoral Roll: folder path (production) or file uploads.
+    - **Folder path**: Uses pdf_folder_extractor — extract_from_pdf (all pages), box_id per PDF, insert then move. Target: extracted/state/year/district/constituency/.
+    - **Files**: Uses bulk_electoral_roll_engine — text/OCR, insert then move.
+    """
+    from database.connection import SessionLocal
+    from services.bulk_electoral_roll_engine import run_bulk
+
+    extracted_base = os.environ.get("EXTRACTED_FOLDER", "").strip()
+    if not extracted_base:
+        backend_dir = Path(__file__).resolve().parent.parent.parent
+        extracted_base = str(backend_dir / "extracted")
+
+    # Production path: server folder (e.g. download/Tamil_Nadu/2026/Erode/83_-_Gobichettipalayam)
+    if folder_path and folder_path.strip() and (not files or len(files) == 0):
+        folder = Path(folder_path.strip())
+        if not folder.is_dir():
+            raise HTTPException(status_code=400, detail="folder_path is not a valid directory")
+        try:
+            from services.pdf_folder_extractor import process_folder
+            result = process_folder(
+                folder_path.strip(),
+                db,
+                extracted_base,
+                constituency_name=constituency_name,
+                state=state,
+                year=year,
+                district=district,
+                use_ocr=False,
+            )
+        except Exception as e:
+            logger.exception("process_folder failed: %s", e)
+            raise HTTPException(status_code=500, detail=str(e))
+        return result
+
+    pdf_paths: List[str] = []
+    temp_dir = None
+
+    if files and len(files) > 0:
+        import tempfile
+        temp_dir = tempfile.mkdtemp(prefix="bulk_roll_")
+        for f in files:
+            if f.filename and f.filename.lower().endswith(".pdf"):
+                path = Path(temp_dir) / (f.filename or "upload.pdf")
+                content = await f.read()
+                path.write_bytes(content)
+                pdf_paths.append(str(path))
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail="Provide folder_path (server path) or upload PDF files",
+        )
+
+    if not pdf_paths:
+        if temp_dir:
+            try:
+                import shutil
+                shutil.rmtree(temp_dir, ignore_errors=True)
+            except Exception:
+                pass
+        return {
+            "total_found": 0,
+            "inserted": 0,
+            "duplicates_skipped": 0,
+            "invalid_epic_count": 0,
+            "invalid_epics": [],
+            "message": "No PDF files found.",
+        }
+
+    try:
+        result = run_bulk(
+            pdf_paths,
+            SessionLocal,
+            max_workers=1,
+            batch_size=5000,
+            constituency_name=constituency_name,
+            year=year,
+            extracted_base=extracted_base,
+            state=state,
+            district=district,
+        )
+    except Exception as e:
+        logger.exception("bulk-electoral-roll failed: %s", e)
+        if temp_dir:
+            try:
+                import shutil
+                shutil.rmtree(temp_dir, ignore_errors=True)
+            except Exception:
+                pass
+        err_msg = str(e).strip()
+        if "voter_data" in err_msg and ("does not exist" in err_msg or "relation" in err_msg.lower()):
+            err_msg = "Table voter_data missing. Run: python create_sir_tables.py or alembic upgrade head"
+        elif "bulk_voter_import" in err_msg and ("does not exist" in err_msg or "relation" in err_msg.lower()):
+            err_msg = "Table voter_data missing (run migration to rename). Run: cd backend && alembic upgrade head"
+        elif "year" in err_msg and ("column" in err_msg.lower() and "does not exist" in err_msg.lower()):
+            err_msg = "Column 'year' missing on voter_data. Run: cd backend && alembic upgrade head"
+        raise HTTPException(status_code=500, detail=err_msg)
+
+    if temp_dir:
+        try:
+            import shutil
+            shutil.rmtree(temp_dir, ignore_errors=True)
+        except Exception:
+            pass
+
+    return result
+
+
+@router.post("/bulk-electoral-roll-stream")
+async def bulk_electoral_roll_stream(
+    folder_path: Opt[str] = Form(None),
+    files: Opt[List[UploadFile]] = File(None),
+    constituency_name: Opt[str] = Form(None),
+    year: Opt[str] = Form(None),
+    state: Opt[str] = Form(None),
+    district: Opt[str] = Form(None),
+):
+    """
+    Same as bulk-electoral-roll but returns Server-Sent Events: progress (current, total, pdf_name, records_so_far)
+    then a final 'done' event with the result. Use for progress bar and live count.
+    """
+    from database.connection import SessionLocal
+    from services.bulk_electoral_roll_engine import run_bulk
+
+    pdf_paths: List[str] = []
+    temp_dir = None
+
+    if files and len(files) > 0:
+        temp_dir = tempfile.mkdtemp(prefix="bulk_roll_")
+        for f in files:
+            if f.filename and f.filename.lower().endswith(".pdf"):
+                path = Path(temp_dir) / (f.filename or "upload.pdf")
+                content = await f.read()
+                path.write_bytes(content)
+                pdf_paths.append(str(path))
+    elif folder_path and folder_path.strip():
+        folder = Path(folder_path.strip())
+        if not folder.is_dir():
+            raise HTTPException(status_code=400, detail="folder_path is not a valid directory")
+        pdf_paths = [str(p) for p in folder.glob("*.pdf")]
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail="Provide either folder_path or upload multiple PDF files",
+        )
+
+    if not pdf_paths:
+        if temp_dir:
+            try:
+                import shutil
+                shutil.rmtree(temp_dir, ignore_errors=True)
+            except Exception:
+                pass
+        return {"total_found": 0, "inserted": 0, "pdf_count": 0, "message": "No PDF files found."}
+
+    extracted_base = os.environ.get("EXTRACTED_FOLDER", "").strip()
+    if not extracted_base:
+        backend_dir = Path(__file__).resolve().parent.parent.parent
+        extracted_base = str(backend_dir / "extracted")
+    progress_queue: queue.Queue = queue.Queue()
+
+    def run_with_progress():
+        def on_progress(current: int, total: int, pdf_name: str, records_so_far: int):
+            progress_queue.put({"type": "progress", "current": current, "total": total, "pdf_name": pdf_name, "records_so_far": records_so_far})
+        try:
+            result = run_bulk(
+                pdf_paths,
+                SessionLocal,
+                max_workers=1,
+                batch_size=5000,
+                constituency_name=constituency_name,
+                year=year,
+                extracted_base=extracted_base,
+                state=state,
+                district=district,
+                progress_callback=on_progress,
+            )
+            progress_queue.put({"type": "done", "result": result})
+        except Exception as e:
+            logger.exception("bulk-electoral-roll-stream failed: %s", e)
+            progress_queue.put({"type": "error", "detail": str(e)})
+
+    thread = threading.Thread(target=run_with_progress)
+    thread.start()
+
+    async def event_stream():
+        while True:
+            try:
+                item = await asyncio.get_event_loop().run_in_executor(None, lambda: progress_queue.get(timeout=1))
+            except queue.Empty:
+                yield ": keepalive\n\n"
+                continue
+            yield f"data: {json.dumps(item)}\n\n"
+            if item.get("type") in ("done", "error"):
+                break
+        thread.join(timeout=2)
+        if temp_dir:
+            try:
+                import shutil
+                shutil.rmtree(temp_dir, ignore_errors=True)
+            except Exception:
+                pass
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.post("/eci-download")
@@ -754,7 +1025,7 @@ async def eci_download_roll(
     if not pdf_bytes:
         raise HTTPException(status_code=502, detail="No PDF was downloaded from ECI portal")
 
-    # Save PDF to persistent path and store pdf_path in eci_roll_selections
+    # Save PDF to persistent path and store record in eci_roll_selections
     base_dir = Path(__file__).resolve().parent.parent.parent / "download"
     folder = (
         base_dir
@@ -764,35 +1035,70 @@ async def eci_download_roll(
         / _safe_folder_name(ac_name)
     )
     folder.mkdir(parents=True, exist_ok=True)
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    pdf_filename = f"eci_electoral_roll_{ts}.pdf"
+    pdf_filename = "downloaded.pdf"
     pdf_file_path = folder / pdf_filename
+    pdf_file_path.write_bytes(pdf_bytes)
+    saved_path_str = str(pdf_file_path.resolve())
+
+    # ---- On every download: save PDF details in DB (check existing → update, else insert) ----
+    state_s = state.strip()
+    year_s = revyear.strip()
+    district_s = district.strip()
+    ac_s = ac_name.strip()
+    language_s = (language or "").strip() or "English"
+
+    record_saved = False
+    selection_id = None
+    save_db = SessionLocal()
     try:
-        pdf_file_path.write_bytes(pdf_bytes)
-    except Exception as e:
-        logger.warning("Could not save ECI PDF to %s: %s", pdf_file_path, e)
-    else:
-        saved_path_str = str(pdf_file_path.resolve())
-        try:
-            row = EciRollSelection(
-                state=state.strip(),
-                year_of_revision=(revyear or "").strip(),
-                district=district.strip(),
-                assembly_constituency=ac_name.strip(),
-                language=(language or "English").strip(),
-                created_by=None,
-                pdf_path=saved_path_str,
+        existing = (
+            save_db.query(EciRollSelection)
+            .filter(
+                EciRollSelection.state == state_s,
+                EciRollSelection.year_of_revision == year_s,
+                EciRollSelection.district == district_s,
+                EciRollSelection.assembly_constituency == ac_s,
             )
-            db.add(row)
-            db.commit()
-        except Exception as e:
-            logger.warning("Could not insert eci_roll_selections row: %s", e)
-            db.rollback()
+            .first()
+        )
+        if existing:
+            existing.pdf_path = saved_path_str
+            existing.language = language_s
+            save_db.commit()
+            record_saved = True
+            selection_id = existing.id
+            logger.info("ECI updated eci_roll_selections id=%s pdf_path=%s", existing.id, saved_path_str)
+        else:
+            new_row = EciRollSelection(
+                state=state_s,
+                year_of_revision=year_s,
+                district=district_s,
+                assembly_constituency=ac_s,
+                language=language_s,
+                pdf_path=saved_path_str,
+                created_by="system",
+            )
+            save_db.add(new_row)
+            save_db.commit()
+            save_db.refresh(new_row)
+            record_saved = True
+            selection_id = new_row.id
+            logger.info("ECI inserted eci_roll_selections id=%s pdf_path=%s", new_row.id, saved_path_str)
+    except Exception as e:
+        logger.exception("Could not save eci_roll_selections: %s", e)
+        save_db.rollback()
+    finally:
+        save_db.close()
 
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
-        headers={"Content-Disposition": "attachment; filename=eci_electoral_roll.pdf"},
+        headers={
+            "Content-Disposition": "attachment; filename=eci_electoral_roll.pdf",
+            "X-ECI-Record-Saved": "true" if record_saved else "false",
+            "X-ECI-Selection-Id": str(selection_id or ""),
+            "Access-Control-Expose-Headers": "X-ECI-Record-Saved, X-ECI-Selection-Id, Content-Disposition",
+        },
     )
 
 

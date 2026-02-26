@@ -59,6 +59,7 @@ export type BulkResult = {
     moved_count?: number;
     extracted_folder?: string;
     message?: string;
+    errors?: string[];
 };
 
 /** Bulk with progress: POST to stream endpoint, call onProgress for each event, resolve with result on 'done'. */

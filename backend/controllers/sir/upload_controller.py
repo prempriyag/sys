@@ -728,7 +728,7 @@ def bulk_electoral_roll_count(db: Session = Depends(get_db)):
     """Return row count in voter_data so you can verify data is stored (PostgreSQL)."""
     try:
         count = db.query(BulkVoterImport).count()
-        return {"count": count, "table": "bulk_voter_import"}
+        return {"count": count, "table": "voter_data"}
     except Exception as e:
         err = str(e).lower()
         if "does not exist" in err or "relation" in err:
@@ -777,11 +777,22 @@ async def bulk_electoral_roll(
                 state=state,
                 year=year,
                 district=district,
-                use_ocr=False,
+                use_ocr=True,
             )
         except Exception as e:
             logger.exception("process_folder failed: %s", e)
-            raise HTTPException(status_code=500, detail=str(e))
+            err_msg = str(e).strip()
+            if "pdf_name" in err_msg or "box_id" in err_msg or "does not exist" in err_msg.lower():
+                err_msg = (
+                    "Table voter_data is missing columns. Run: cd backend && alembic upgrade head "
+                    "or run scripts/sql/add_voter_data_pdf_box_columns.sql in PostgreSQL. Original: "
+                ) + err_msg
+            raise HTTPException(status_code=500, detail=err_msg)
+        if result.get("errors") and result.get("total_inserted", 0) == 0:
+            detail = "; ".join(result["errors"][:5])
+            if "pdf_name" in detail or "box_id" in detail or "does not exist" in detail.lower():
+                detail = "Table voter_data missing columns. Run: cd backend && alembic upgrade head (or run scripts/sql/add_voter_data_pdf_box_columns.sql). " + detail
+            raise HTTPException(status_code=500, detail=detail)
         return result
 
     pdf_paths: List[str] = []
@@ -823,7 +834,7 @@ async def bulk_electoral_roll(
             pdf_paths,
             SessionLocal,
             max_workers=1,
-            batch_size=5000,
+            batch_size=500,
             constituency_name=constituency_name,
             year=year,
             extracted_base=extracted_base,
@@ -839,7 +850,9 @@ async def bulk_electoral_roll(
             except Exception:
                 pass
         err_msg = str(e).strip()
-        if "voter_data" in err_msg and ("does not exist" in err_msg or "relation" in err_msg.lower()):
+        if "pdf_name" in err_msg or "box_id" in err_msg or "uq_voter_data_pdf_box" in err_msg:
+            err_msg = "Table voter_data needs new columns. Run: cd backend && alembic upgrade head (or run scripts/sql/add_voter_data_pdf_box_columns.sql). " + err_msg
+        elif "voter_data" in err_msg and ("does not exist" in err_msg or "relation" in err_msg.lower()):
             err_msg = "Table voter_data missing. Run: python create_sir_tables.py or alembic upgrade head"
         elif "bulk_voter_import" in err_msg and ("does not exist" in err_msg or "relation" in err_msg.lower()):
             err_msg = "Table voter_data missing (run migration to rename). Run: cd backend && alembic upgrade head"
@@ -869,12 +882,15 @@ async def bulk_electoral_roll_stream(
     """
     Same as bulk-electoral-roll but returns Server-Sent Events: progress (current, total, pdf_name, records_so_far)
     then a final 'done' event with the result. Use for progress bar and live count.
+    - folder_path only: production flow (process_folder → extract_from_pdf, insert, move) with progress.
+    - files: run_bulk (text/OCR) with progress.
     """
     from database.connection import SessionLocal
     from services.bulk_electoral_roll_engine import run_bulk
 
     pdf_paths: List[str] = []
     temp_dir = None
+    use_folder_flow = False  # True = process_folder (production), False = run_bulk
 
     if files and len(files) > 0:
         temp_dir = tempfile.mkdtemp(prefix="bulk_roll_")
@@ -888,7 +904,8 @@ async def bulk_electoral_roll_stream(
         folder = Path(folder_path.strip())
         if not folder.is_dir():
             raise HTTPException(status_code=400, detail="folder_path is not a valid directory")
-        pdf_paths = [str(p) for p in folder.glob("*.pdf")]
+        pdf_paths = [str(p) for p in sorted(folder.glob("*.pdf"))]
+        use_folder_flow = True
     else:
         raise HTTPException(
             status_code=400,
@@ -914,19 +931,38 @@ async def bulk_electoral_roll_stream(
         def on_progress(current: int, total: int, pdf_name: str, records_so_far: int):
             progress_queue.put({"type": "progress", "current": current, "total": total, "pdf_name": pdf_name, "records_so_far": records_so_far})
         try:
-            result = run_bulk(
-                pdf_paths,
-                SessionLocal,
-                max_workers=1,
-                batch_size=5000,
-                constituency_name=constituency_name,
-                year=year,
-                extracted_base=extracted_base,
-                state=state,
-                district=district,
-                progress_callback=on_progress,
-            )
-            progress_queue.put({"type": "done", "result": result})
+            if use_folder_flow:
+                from services.pdf_folder_extractor import process_folder
+                db = SessionLocal()
+                try:
+                    result = process_folder(
+                        folder_path.strip(),
+                        db,
+                        extracted_base,
+                        constituency_name=constituency_name,
+                        state=state,
+                        year=year,
+                        district=district,
+                        use_ocr=True,
+                        progress_callback=on_progress,
+                    )
+                    progress_queue.put({"type": "done", "result": result})
+                finally:
+                    db.close()
+            else:
+                result = run_bulk(
+                    pdf_paths,
+                    SessionLocal,
+                    max_workers=1,
+                    batch_size=500,
+                    constituency_name=constituency_name,
+                    year=year,
+                    extracted_base=extracted_base,
+                    state=state,
+                    district=district,
+                    progress_callback=on_progress,
+                )
+                progress_queue.put({"type": "done", "result": result})
         except Exception as e:
             logger.exception("bulk-electoral-roll-stream failed: %s", e)
             progress_queue.put({"type": "error", "detail": str(e)})

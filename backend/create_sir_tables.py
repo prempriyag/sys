@@ -16,6 +16,8 @@ from models.sir.voter import VoterPre, VoterPost
 from models.sir.kpi import BoothKPI
 from models.sir.match_result import MatchResult
 from models.sir.field_validation import FieldValidationResult
+from models.sir.ocr_voter_upload import OcrVoterUpload
+from models.sir.bulk_voter_import import BulkVoterImport
 
 def enable_postgis():
     """Enable PostGIS extension if available (optional; SIR tables work without it)."""
@@ -50,6 +52,8 @@ def create_tables():
         BoothKPI.__table__,
         MatchResult.__table__,
         FieldValidationResult.__table__,
+        OcrVoterUpload.__table__,
+        BulkVoterImport.__table__,
     ])
     print("SIR tables created successfully!")
 

@@ -402,14 +402,88 @@ def process_one_pdf(pdf_path: str) -> Tuple[List[Dict[str, Any]], List[str], int
     return records, invalid_epics, total
 
 
+# PostgreSQL (and psycopg2) limit ~32,767 bind parameters per statement. With ~17 columns per row, use batch_size <= 1500.
+SAFE_BATCH_SIZE = 50
+
+
+def _record_to_row(r: Dict[str, Any], source_pdf: str, box_id: int) -> Dict[str, Any]:
+    """Build one voter_data row dict from a record (shared by bulk and one-by-one insert)."""
+    epic = (r.get("epic_number") or "").strip() or None
+    conf = r.get("confidence")
+    if conf is not None:
+        try:
+            conf = float(conf)
+        except (TypeError, ValueError):
+            conf = None
+    return {
+        "pdf_name": source_pdf[:255],
+        "page_number": r.get("page_number"),
+        "box_id": box_id,
+        "epic_number": epic,
+        "name": (r.get("name") or "")[:255] if r.get("name") else None,
+        "relative_name": (r.get("relative_name") or "")[:255] if r.get("relative_name") else None,
+        "relation_type": (r.get("relation_type") or r.get("relation") or "")[:20] or None,
+        "age": r.get("age"),
+        "gender": (r.get("gender") or "")[:10] or None,
+        "house_no": (r.get("house_no") or "")[:200] or None,
+        "address": r.get("address"),
+        "constituency_name": (r.get("constituency_name") or "")[:200] or None,
+        "year": (r.get("year") or "")[:20] or None,
+        "booth_number": (r.get("booth_number") or "")[:50] or None,
+        "source_pdf": source_pdf[:500],
+        "confidence_score": conf,
+        "confidence": r.get("confidence"),
+    }
+
+
+def insert_records_one_by_one(
+    db_session_factory,
+    records: List[Dict[str, Any]],
+) -> Tuple[int, int]:
+    """
+    Insert each record (one box) with an immediate commit. Same as folder flow: read one box, insert, commit, next.
+    Uses ON CONFLICT (pdf_name, box_id) DO NOTHING. Returns (total_inserted, 0).
+    """
+    from sqlalchemy.dialects.postgresql import insert
+    from models.sir.bulk_voter_import import BulkVoterImport
+
+    if not records:
+        return 0, 0
+    db = db_session_factory()
+    pdf_counter: Dict[str, int] = {}
+    total_inserted = 0
+    try:
+        for r in records:
+            source_pdf = (r.get("source_pdf") or "").strip() or "upload"
+            pdf_counter[source_pdf] = pdf_counter.get(source_pdf, 0) + 1
+            box_id = pdf_counter[source_pdf]
+            one_row = _record_to_row(r, source_pdf, box_id)
+            stmt = insert(BulkVoterImport).values(one_row).on_conflict_do_nothing(
+                index_elements=["pdf_name", "box_id"]
+            )
+            res = db.execute(stmt)
+            db.commit()
+            total_inserted += res.rowcount if res.rowcount is not None and res.rowcount >= 0 else 1
+    except Exception as e:
+        db.rollback()
+        logger.exception("DB INSERT FAILED (one-by-one): %s", e)
+        raise
+    finally:
+        db.close()
+    if total_inserted:
+        logger.info("Committed %d boxes to voter_data (one box = one insert).", total_inserted)
+    return total_inserted, 0
+
+
 def bulk_insert_on_conflict_nothing(
     db_session_factory,
     records: List[Dict[str, Any]],
-    batch_size: int = 5000,
+    batch_size: int = SAFE_BATCH_SIZE,
 ) -> Tuple[int, int]:
     """
     Bulk insert with ON CONFLICT (pdf_name, box_id) DO NOTHING when both set; else insert.
     Assigns pdf_name from source_pdf and box_id per-source_pdf so constraint is satisfied.
+    batch_size is capped to avoid PostgreSQL 32k parameter limit (rows * columns < 32767).
     """
     from sqlalchemy.dialects.postgresql import insert
     from models.sir.bulk_voter_import import BulkVoterImport
@@ -419,37 +493,20 @@ def bulk_insert_on_conflict_nothing(
     total_inserted = 0
     total_attempted = 0
     db = db_session_factory()
-    # Assign box_id per source_pdf so (pdf_name, box_id) is unique
     pdf_counter: Dict[str, int] = {}
     values_list: List[Dict[str, Any]] = []
     for r in records:
-        epic = (r.get("epic_number") or "").strip()
-        if not epic:
-            continue
         source_pdf = (r.get("source_pdf") or "").strip() or "upload"
         pdf_counter[source_pdf] = pdf_counter.get(source_pdf, 0) + 1
         box_id = pdf_counter[source_pdf]
-        values_list.append({
-            "pdf_name": source_pdf[:255],
-            "page_number": r.get("page_number"),
-            "box_id": box_id,
-            "epic_number": epic,
-            "name": r.get("name"),
-            "relative_name": r.get("relative_name"),
-            "age": r.get("age"),
-            "gender": r.get("gender"),
-            "house_no": r.get("house_no"),
-            "address": r.get("address"),
-            "constituency_name": r.get("constituency_name"),
-            "year": r.get("year"),
-            "booth_number": r.get("booth_number"),
-            "source_pdf": source_pdf[:500],
-            "confidence_score": float(r.get("confidence")) if r.get("confidence") is not None else None,
-            "confidence": r.get("confidence"),
-        })
+        values_list.append(_record_to_row(r, source_pdf, box_id))
+    if values_list:
+        logger.info("Bulk insert: inserting %d records into voter_data (pdf_name + box_id).", len(values_list))
+    # Cap batch to stay under PostgreSQL bind parameter limit (~32767)
+    effective_batch = min(batch_size, 50)
     try:
-        for i in range(0, len(values_list), batch_size):
-            batch = values_list[i : i + batch_size]
+        for i in range(0, len(values_list), effective_batch):
+            batch = values_list[i : i + effective_batch]
             if not batch:
                 continue
             total_attempted += len(batch)
@@ -458,9 +515,12 @@ def bulk_insert_on_conflict_nothing(
             )
             res = db.execute(stmt)
             db.commit()
-            total_inserted += res.rowcount if res.rowcount is not None and res.rowcount >= 0 else len(batch)
+            inserted_this_batch = res.rowcount if res.rowcount is not None and res.rowcount >= 0 else len(batch)
+            total_inserted += inserted_this_batch
+            logger.info("Committed %d rows to voter_data", inserted_this_batch)
     except Exception as e:
         db.rollback()
+        logger.exception("DB INSERT FAILED (bulk): %s", e)
         raise
     finally:
         db.close()
@@ -507,8 +567,8 @@ def _move_pdf_to_extracted(
 def run_bulk(
     pdf_paths: List[str],
     db_session_factory,
-    max_workers: Optional[int] = None,
-    batch_size: int = 5000,
+    max_workers: Optional[int] = 1,
+    batch_size: Optional[int] = None,
     constituency_name: Optional[str] = None,
     year: Optional[str] = None,
     extracted_base: Optional[str] = None,
@@ -517,17 +577,15 @@ def run_bulk(
     progress_callback: Optional[Callable[[int, int, str, int], None]] = None,
 ) -> Dict[str, Any]:
     """
-    Process PDFs one by one (or in parallel if max_workers>1), extract voter data, insert into DB.
+    Process PDFs one by one: for each PDF, extract boxes → insert one box → commit → next box → then move PDF.
+    No batching: one box = one insert = one commit (safe resume if crash).
     Optional constituency_name and year are stored on every inserted row.
     If extracted_base is set, each PDF is moved after processing to:
       extracted_base/<state>/<year>/<district>/<constituency_name>/<filename>
-    (same folder structure as ECI download).
+    max_workers is fixed at 1 (per-PDF processing only). batch_size is ignored (one-by-one insert).
     Returns: total_found, inserted, duplicates_skipped, invalid_epic_count, invalid_epics, pdf_count, moved_count, extracted_folder.
     """
-    from concurrent.futures import ThreadPoolExecutor, as_completed
-
     total_found = 0
-    all_records: List[Dict[str, Any]] = []
     all_invalid_epics: List[str] = []
     seen_epic: set = set()
     moved_count = 0
@@ -539,79 +597,47 @@ def run_bulk(
     total_inserted = 0
     total_duplicates_skipped = 0
 
-    # Process one by one: extract -> insert this PDF's data -> then move this PDF to extracted
-    if base_path is not None or (max_workers is not None and max_workers == 1):
-        for current_index, pdf_path in enumerate(pdf_paths, start=1):
-            try:
-                if progress_callback:
-                    progress_callback(current_index - 1, total_pdfs, Path(pdf_path).name, total_inserted)
-                records, invalid_epics, count = process_one_pdf(pdf_path)
-                total_found += count
-                all_invalid_epics.extend(invalid_epics)
-                # Apply constituency/year to this PDF's records
-                if constituency_name is not None or year is not None:
-                    for r in records:
-                        if constituency_name is not None:
-                            r["constituency_name"] = constituency_name.strip() or None
-                        if year is not None:
-                            r["year"] = str(year).strip() or None
-                # Dedupe within run: only insert records we haven't seen (by EPIC)
-                batch = []
+    # Strictly per-PDF: extract → insert one-by-one (one box → one commit) → then move PDF
+    for current_index, pdf_path in enumerate(pdf_paths, start=1):
+        try:
+            if progress_callback:
+                progress_callback(current_index - 1, total_pdfs, Path(pdf_path).name, total_inserted)
+            records, invalid_epics, count = process_one_pdf(pdf_path)
+            total_found += count
+            all_invalid_epics.extend(invalid_epics)
+            # Apply constituency/year to this PDF's records
+            if constituency_name is not None or year is not None:
                 for r in records:
-                    epic = (r.get("epic_number") or "").strip()
-                    if epic and epic not in seen_epic:
+                    if constituency_name is not None:
+                        r["constituency_name"] = constituency_name.strip() or None
+                    if year is not None:
+                        r["year"] = str(year).strip() or None
+            # Dedupe by EPIC when present; include all records (with or without EPIC)
+            batch = []
+            for r in records:
+                epic = (r.get("epic_number") or "").strip()
+                if epic:
+                    if epic not in seen_epic:
                         seen_epic.add(epic)
                         batch.append(r)
-                # Insert this PDF's records first
-                inserted, dup = bulk_insert_on_conflict_nothing(
-                    db_session_factory, batch, batch_size=batch_size
-                )
-                total_inserted += inserted
-                total_duplicates_skipped += dup
-                # Only then move this PDF to extracted folder
-                if base_path is not None:
-                    if _move_pdf_to_extracted(
-                        pdf_path, base_path, state, year, district, constituency_name
-                    ):
-                        moved_count += 1
-                if progress_callback:
-                    progress_callback(current_index, total_pdfs, Path(pdf_path).name, total_inserted)
-            except Exception as e:
-                logger.exception("process_one_pdf failed for %s: %s", pdf_path, e)
-                if progress_callback:
-                    progress_callback(current_index, total_pdfs, Path(pdf_path).name, total_inserted)
-    else:
-        workers = max_workers or min(4, len(pdf_paths))
-        with ThreadPoolExecutor(max_workers=workers) as executor:
-            futures = {executor.submit(process_one_pdf, p): p for p in pdf_paths}
-            for fut in as_completed(futures):
-                try:
-                    records, invalid_epics, count = fut.result()
-                    total_found += count
-                    all_invalid_epics.extend(invalid_epics)
-                    for r in records:
-                        epic = (r.get("epic_number") or "").strip()
-                        if epic and epic not in seen_epic:
-                            seen_epic.add(epic)
-                            all_records.append(r)
-                except Exception as e:
-                    logger.exception("process_one_pdf failed: %s", e)
-        if constituency_name is not None or year is not None:
-            for r in all_records:
-                if constituency_name is not None:
-                    r["constituency_name"] = constituency_name.strip() or None
-                if year is not None:
-                    r["year"] = str(year).strip() or None
-        total_inserted, total_duplicates_skipped = bulk_insert_on_conflict_nothing(
-            db_session_factory, all_records, batch_size=batch_size
-        )
-        if base_path is not None:
-            for pdf_path in pdf_paths:
-                if Path(pdf_path).exists():
-                    if _move_pdf_to_extracted(
-                        pdf_path, base_path, state, year, district, constituency_name
-                    ):
-                        moved_count += 1
+                else:
+                    batch.append(r)
+            # One box → one insert → one commit (no batching)
+            inserted, dup = insert_records_one_by_one(db_session_factory, batch)
+            total_inserted += inserted
+            total_duplicates_skipped += dup
+            # Only then move this PDF to extracted folder
+            if base_path is not None:
+                if _move_pdf_to_extracted(
+                    pdf_path, base_path, state, year, district, constituency_name
+                ):
+                    moved_count += 1
+            if progress_callback:
+                progress_callback(current_index, total_pdfs, Path(pdf_path).name, total_inserted)
+        except Exception as e:
+            logger.exception("process_one_pdf failed for %s: %s", pdf_path, e)
+            if progress_callback:
+                progress_callback(current_index, total_pdfs, Path(pdf_path).name, total_inserted)
 
     for ep in all_invalid_epics:
         logger.warning("Invalid EPIC (not stored): %s", ep)

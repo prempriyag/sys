@@ -91,7 +91,6 @@ export const getEciDistricts = (state: string) =>
 export const getEciAssemblyConstituencies = (state: string, district: string) =>
   api.get<{ assembly_constituencies: string[] }>(API_ENDPOINTS.SIR_ECI_ASSEMBLY_CONSTITUENCIES, { params: { state, district } });
 
-/** Download electoral roll PDF from ECI portal (automated: pre-fill, captcha OCR or manual entry, select first row). Returns blob for PDF download. */
 /** Production v1: Extract voters (auto-detect text vs scanned). Returns { data, metadata, extraction_mode, errors, warnings }. */
 export const extractVotersV1 = (formData: FormData) =>
     api.post(API_ENDPOINTS.EXTRACTOR_V1_EXTRACT, formData, {

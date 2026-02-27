@@ -24,7 +24,6 @@ opencv-python-headless
 easyocr
 playwright
 opencv-python
-
 pdf2image
 docling
 scipy

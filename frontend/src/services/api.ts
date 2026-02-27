@@ -62,6 +62,47 @@ export type BulkResult = {
     errors?: string[];
 };
 
+export type VoterDataItem = {
+    id: number;
+    pdf_name?: string | null;
+    page_number?: number | null;
+    box_id?: number | null;
+    epic_number?: string | null;
+    name?: string | null;
+    relative_name?: string | null;
+    relation_type?: string | null;
+    age?: number | null;
+    gender?: string | null;
+    house_no?: string | null;
+    address?: string | null;
+    constituency_name?: string | null;
+    year?: string | null;
+    booth_number?: string | null;
+    source_pdf?: string | null;
+    confidence_score?: number | null;
+    created_at?: string | null;
+};
+
+export type VoterDataPage = {
+    page: number;
+    page_size: number;
+    total: number;
+    total_pages: number;
+    items: VoterDataItem[];
+};
+
+export type VoterDataQualityRow = {
+    pdf_name: string | null;
+    total_records: number;
+    epic_present_pct: number;
+    name_present_pct: number;
+    age_present_pct: number;
+    gender_present_pct: number;
+    house_no_present_pct: number;
+    address_present_pct: number;
+    avg_confidence_pct: number;
+};
+
 /** Bulk with progress: POST to stream endpoint, call onProgress for each event, resolve with result on 'done'. */
 export async function bulkElectoralRollWithProgress(
     formData: FormData,
@@ -151,6 +192,8 @@ export const extractPdfByPath = (body: {
     booth_number?: string;
     use_ocr?: boolean;
     extraction_config?: Record<string, number | string>;
+    save_to_db?: boolean;
+    year?: string;
 }) => api.post(API_ENDPOINTS.SIR_EXTRACT_PDF_BY_PATH, body);
 
 /** Debug PDF: returns raw page text and structure (when extraction returns 0 records). */
@@ -271,6 +314,19 @@ export const getRollSample = (constituencyId: number, roll: 'pre' | 'post', limi
     api.get(API_ENDPOINTS.SIR_DASHBOARD_ROLL_SAMPLE, {
         params: { constituency_id: constituencyId, roll, limit }
     });
+
+export const getBulkVoterData = (params: {
+    page?: number;
+    page_size?: number;
+    q?: string;
+    pdf_name?: string;
+}) => api.get<VoterDataPage>(API_ENDPOINTS.SIR_BULK_ELECTORAL_ROLL_DATA, { params });
+
+export const getBulkVoterDataQuality = (limit: number = 500) =>
+    api.get<{ count: number; items: VoterDataQualityRow[] }>(
+        API_ENDPOINTS.SIR_BULK_ELECTORAL_ROLL_QUALITY,
+        { params: { limit } }
+    );
 
 // SIR Analytics APIs
 export const runAnalytics = (constituencyId: number) => 

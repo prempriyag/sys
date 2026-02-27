@@ -44,6 +44,7 @@ import re
 import json
 import logging
 import os
+import sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple
@@ -75,18 +76,28 @@ _TESSERACT_HELP = (
     r"(example: C:\Program Files\Tesseract-OCR\tesseract.exe)."
 )
 
+# Common Windows install paths (used when TESSERACT_CMD is not set).
+_TESSERACT_WINDOWS_PATHS = (
+    r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+    r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
+)
+
 
 def _configure_tesseract_cmd() -> None:
-    """Configure pytesseract to use explicit TESSERACT_CMD when provided."""
-    cmd = (os.getenv("TESSERACT_CMD") or "").strip()
-    if not cmd:
-        return
+    """Configure pytesseract command from env var or common Windows paths."""
     try:
         import pytesseract
-        pytesseract.pytesseract.tesseract_cmd = cmd
     except Exception:
-        # If pytesseract isn't installed, the caller will handle it.
         return
+    cmd = (os.getenv("TESSERACT_CMD") or "").strip()
+    if cmd and os.path.isfile(cmd):
+        pytesseract.pytesseract.tesseract_cmd = cmd
+        return
+    if sys.platform == "win32":
+        for p in _TESSERACT_WINDOWS_PATHS:
+            if os.path.isfile(p):
+                pytesseract.pytesseract.tesseract_cmd = p
+                return
 
 
 def _require_tesseract() -> None:
@@ -185,6 +196,111 @@ def _img_to_pil(img) -> "Any":
     if isinstance(img, np.ndarray):
         return Image.fromarray(img)
     return img
+
+
+def _preprocess_card_for_ocr(img) -> "Any":
+    """
+    Lightweight per-card preprocessing before OCR.
+    Keeps details while improving text contrast for small card crops.
+    """
+    try:
+        from PIL import ImageEnhance
+    except ImportError:
+        return img
+    pil = _img_to_pil(img)
+    try:
+        pil = pil.convert("L")
+        pil = ImageEnhance.Contrast(pil).enhance(1.5)
+    except Exception:
+        return _img_to_pil(img)
+    return pil
+
+
+def _extract_epic_token(text: str) -> Optional[str]:
+    """
+    Extract a single EPIC-like token from any OCR line (e.g. "667 IVZ2392736").
+    """
+    if not text:
+        return None
+    raw = text.strip().upper()
+    for tok in re.findall(r"[A-Z0-9/]{5,16}", raw):
+        if _looks_like_epic(tok):
+            return tok
+    m = RE_EPIC_ANYWHERE.search(raw)
+    if m:
+        return m.group(0).upper().replace(" ", "")
+    return None
+
+
+def _sanitize_block_to_single_voter(block: List[str], max_lines: int = 12) -> List[str]:
+    """
+    Keep one voter per block by trimming everything after the next EPIC anchor.
+    This prevents cross-card field mixing when OCR crop includes neighboring text.
+    """
+    lines = [ln.strip() for ln in block if ln and ln.strip()]
+    if not lines:
+        return []
+    epic_idx = [i for i, ln in enumerate(lines) if _extract_epic_token(ln)]
+    if not epic_idx:
+        return lines[:max_lines]
+    start = epic_idx[0]
+    end = epic_idx[1] if len(epic_idx) > 1 else len(lines)
+    return lines[start:end][:max_lines]
+
+
+def _ocr_page_by_detected_boxes(
+    img,
+    min_boxes: int = 18,
+    max_boxes: int = 80,
+) -> List[List[str]]:
+    """
+    Contour-based per-box OCR.
+    Reads one detected card box at a time and returns blocks in row-major order.
+    """
+    try:
+        import pytesseract
+    except ImportError:
+        return []
+
+    pil_img = _img_to_pil(img)
+    w_page, h_page = pil_img.size
+    boxes = _detect_voter_boxes_adaptive(pil_img)
+    if not boxes or len(boxes) < min_boxes or len(boxes) > max_boxes:
+        return []
+
+    # Group boxes into visual rows (then left->right inside row).
+    median_h = sorted(b[3] for b in boxes)[len(boxes) // 2] if boxes else 20
+    y_threshold = max(10, int(median_h * 0.6))
+    rows: List[List[Tuple[int, int, int, int]]] = []
+    for bx in sorted(boxes, key=lambda b: (b[1], b[0])):
+        if not rows:
+            rows.append([bx])
+            continue
+        prev_row_y = min(r[1] for r in rows[-1])
+        if abs(bx[1] - prev_row_y) <= y_threshold:
+            rows[-1].append(bx)
+        else:
+            rows.append([bx])
+    ordered_boxes: List[Tuple[int, int, int, int]] = []
+    for row in rows:
+        ordered_boxes.extend(sorted(row, key=lambda b: b[0]))
+
+    blocks: List[List[str]] = []
+    for x, y, w, h in ordered_boxes:
+        pad_x = max(2, int(w * 0.02))
+        pad_y = max(2, int(h * 0.03))
+        x0 = max(0, x - pad_x)
+        y0 = max(0, y - pad_y)
+        x1 = min(w_page, x + w + pad_x)
+        y1 = min(h_page, y + h + pad_y)
+        crop = pil_img.crop((x0, y0, x1, y1))
+        crop = _preprocess_card_for_ocr(crop)
+        text = pytesseract.image_to_string(crop, config=TESSERACT_CARD_CONFIG)
+        lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+        lines = _sanitize_block_to_single_voter(lines)
+        if lines:
+            blocks.append(lines)
+    return blocks
 
 
 def _cluster_x_into_columns(words: List[dict], num_cols: int) -> List[List[dict]]:
@@ -834,6 +950,14 @@ def _extract_blocks_via_ocr(
         def _spatial_page(img, page_idx: int = 0) -> List[List[str]]:
             # Data pages (page 2+): always use EPIC-first; never fallback to full-page split.
             if page_idx >= 2:
+                # Prefer true per-box OCR when contour detection is reliable.
+                box_blocks = _ocr_page_by_detected_boxes(
+                    img,
+                    min_boxes=int(cfg.get("min_detected_boxes", 18)),
+                    max_boxes=int(cfg.get("max_detected_boxes", 80)),
+                )
+                if box_blocks:
+                    return box_blocks
                 blocks, seg_err, seg_metrics = _ocr_page_epic_first(
                     img, num_cols=num_cols,
                     page_number=page_idx + 1, debug_config=debug_config,
@@ -1764,6 +1888,7 @@ def _parse_one_card_block(
     # Normalize OCR typos (Cender→Gender, Falher→Father, etc.) and strip footer
     normalized = _normalize_ocr_card_lines(block)
     lines = _strip_footer_from_card_block(normalized)
+    lines = _sanitize_block_to_single_voter(lines)
     if not lines:
         return
 
@@ -2066,9 +2191,13 @@ def _parse_voter_cards_from_blocks(
     for card_index, block in enumerate(blocks):
         if not block:
             continue
+        block = _sanitize_block_to_single_voter(block)
         # Use tolerant anchor for blocks from EPIC-first (OCR-noisy EPICs like WQd2597805, WOD2614642)
-        epics_in = [ln for ln in block if _looks_like_epic(ln.strip())]
-        epic = epics_in[0] if epics_in else None
+        epic = None
+        for ln in block:
+            epic = _extract_epic_token(ln)
+            if epic:
+                break
         if not epic:
             continue
         rec: Dict[str, Any] = {
@@ -2120,8 +2249,12 @@ def _parse_voter_cards_from_text(
             for block in blocks:
                 if not block:
                     continue
-                epics_in = [ln for ln in block if RE_EPIC.match(ln)]
-                epic = epics_in[0] if epics_in else None
+                block = _sanitize_block_to_single_voter(block)
+                epic = None
+                for ln in block:
+                    epic = _extract_epic_token(ln)
+                    if epic:
+                        break
                 if not epic:
                     continue
                 rec: Dict[str, Any] = {

@@ -138,120 +138,104 @@ const BulkElectoralRollPage: React.FC = () => {
         description="Process multiple Electoral Roll PDFs: text or scanned, EPIC validation, bulk insert (UNIQUE)."
       />
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
           Bulk Electoral Roll Import
         </h2>
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-          <strong>Production:</strong> Enter server folder path (e.g. backend/download/Tamil_Nadu/2026/Erode/83_-_Gobichettipalayam) — extracts all pages, box_id per PDF, insert then move. <strong>Or</strong> select folder / pick PDF files to upload. Fill State, Year, District, Constituency for extracted subfolders.
+          Server folder path, or choose folder / pick PDF files. One box = one insert.
         </p>
 
         <div className="space-y-4 mb-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                State (optional, for folder structure)
-              </label>
-              <input
-                type="text"
-                value={state}
-                onChange={(e) => setState(e.target.value)}
-                placeholder="e.g. Tamil Nadu"
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                disabled={loading}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                District (optional, for folder structure)
-              </label>
-              <input
-                type="text"
-                value={district}
-                onChange={(e) => setDistrict(e.target.value)}
-                placeholder="e.g. Chennai"
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                disabled={loading}
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Constituency name (optional)
-              </label>
-              <input
-                type="text"
-                value={constituencyName}
-                onChange={(e) => setConstituencyName(e.target.value)}
-                placeholder="e.g. Dr.Radhakrishnan Nagar"
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                disabled={loading}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Year (optional)
-              </label>
-              <input
-                type="text"
-                value={year}
-                onChange={(e) => setYear(e.target.value)}
-                placeholder="e.g. 2026"
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                disabled={loading}
-              />
-            </div>
-          </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Server folder path (production)
+              Server folder path
             </label>
             <input
               type="text"
               value={folderPath}
               onChange={(e) => setFolderPath(e.target.value)}
-              placeholder="e.g. C:\...\backend\download\Tamil_Nadu\2026\Erode\83_-_Gobichettipalayam"
+              placeholder="e.g. C:\...\download\Tamil_Nadu\2026\Erode\Constituency"
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
               disabled={loading}
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Or select folder (browser)
-            </label>
+          <div className="flex flex-wrap gap-3 items-center">
             <button
               type="button"
               onClick={handleSelectFolder}
               disabled={loading}
               className="px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-700 transition font-medium"
             >
-              Choose folder…
+              Choose folder
             </button>
-            {selectedFolderName && (
-              <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                Folder: {selectedFolderName} — {selectedFiles.length} PDF(s)
-              </p>
-            )}
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Or pick PDF files
+            <label className="cursor-pointer px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-700 transition font-medium inline-block">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,application/pdf"
+                multiple
+                onChange={handleFileChange}
+                className="hidden"
+                disabled={loading}
+              />
+              Pick PDF files
             </label>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".pdf,application/pdf"
-              multiple
-              onChange={handleFileChange}
-              className="block w-full text-sm text-gray-500 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:bg-emerald-600 file:text-white"
-              disabled={loading}
-            />
-            {selectedFiles.length > 0 && !selectedFolderName && (
-              <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                {selectedFiles.length} PDF(s) selected
-              </p>
+            {(selectedFolderName || selectedFiles.length > 0) && (
+              <span className="text-sm text-gray-600 dark:text-gray-400">
+                {selectedFolderName ? `${selectedFolderName} — ` : ''}{selectedFiles.length} PDF(s)
+              </span>
             )}
           </div>
+
+          <details className="text-sm text-gray-600 dark:text-gray-400">
+            <summary className="cursor-pointer font-medium text-gray-700 dark:text-gray-300">Optional: State, Year, District, Constituency</summary>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+              <div>
+                <label className="block text-xs text-gray-500 dark:text-gray-400 mb-0.5">State</label>
+                <input
+                  type="text"
+                  value={state}
+                  onChange={(e) => setState(e.target.value)}
+                  placeholder="Tamil Nadu"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                  disabled={loading}
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 dark:text-gray-400 mb-0.5">Year</label>
+                <input
+                  type="text"
+                  value={year}
+                  onChange={(e) => setYear(e.target.value)}
+                  placeholder="2026"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                  disabled={loading}
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 dark:text-gray-400 mb-0.5">District</label>
+                <input
+                  type="text"
+                  value={district}
+                  onChange={(e) => setDistrict(e.target.value)}
+                  placeholder="Erode"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                  disabled={loading}
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 dark:text-gray-400 mb-0.5">Constituency</label>
+                <input
+                  type="text"
+                  value={constituencyName}
+                  onChange={(e) => setConstituencyName(e.target.value)}
+                  placeholder="Constituency name"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                  disabled={loading}
+                />
+              </div>
+            </div>
+          </details>
         </div>
 
         <button

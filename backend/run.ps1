@@ -28,7 +28,7 @@ Write-Host "Clearing Python cache for better auto-reload..." -ForegroundColor Ye
 Get-ChildItem -Path . -Include __pycache__,*.pyc -Recurse -Force | Remove-Item -Force -Recurse -ErrorAction SilentlyContinue
 
 # Run the server
-Write-Host "Starting FastAPI server on http://localhost:8000" -ForegroundColor Green
+Write-Host "Starting FastAPI server on http://localhost:8001" -ForegroundColor Green
 Write-Host "Auto-reload enabled - changes will reflect automatically" -ForegroundColor Cyan
 Write-Host "Press CTRL+C to stop the server" -ForegroundColor Yellow
 Write-Host ""

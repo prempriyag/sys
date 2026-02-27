@@ -18,6 +18,7 @@ import PdfExtractPage from "./pages/SIR/PdfExtractPage";
 import EciDownloadPage from "./pages/SIR/EciDownloadPage";
 import OcrPdfDetector from "./pages/SIR/OcrPdfDetector";
 import BulkElectoralRollPage from "./pages/SIR/BulkElectoralRollPage";
+import AllVoterDataPage from "./pages/SIR/AllVoterDataPage";
 import BoothAnalysis from "./pages/SIR/BoothAnalysis";
 import BoothKPIs from "./pages/SIR/BoothKPIs";
 import RiskHeatmap from "./pages/SIR/RiskHeatmap";
@@ -77,6 +78,7 @@ export default function App() {
           <Route path="/upload/eci-download" element={<EciDownloadPage />} />
           <Route path="/upload/ocr-pdf-detector" element={<OcrPdfDetector />} />
           <Route path="/upload/bulk-electoral-roll" element={<BulkElectoralRollPage />} />
+          <Route path="/upload/all-voter-data" element={<AllVoterDataPage />} />
           <Route path="/upload" element={<UploadPage />} />
 
           {/* Booth Analysis */}

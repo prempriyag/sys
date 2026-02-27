@@ -34,7 +34,7 @@ You **MUST** register these callback URLs in your Azure AD App Registration:
 
 ### KTech SSO Callback URL:
 ```
-http://localhost:8000/api/sso/ktech/oauth/callback
+http://localhost:8001/api/sso/ktech/oauth/callback
 ```
 
 For production, replace `localhost:8000` with your production domain:
@@ -44,7 +44,7 @@ https://yourdomain.com/api/sso/ktech/oauth/callback
 
 ### Client SSO Callback URL:
 ```
-http://localhost:8000/api/sso/client/oauth/callback
+http://localhost:8001/api/sso/client/oauth/callback
 ```
 
 For production:
@@ -61,7 +61,7 @@ https://yourdomain.com/api/sso/client/oauth/callback
    - Click "Add a platform" → "Web"
    - Add the callback URLs listed above
    - Make sure to add both:
-     - `http://localhost:8000/api/sso/ktech/oauth/callback` (for development)
+     - `http://localhost:8001/api/sso/ktech/oauth/callback` (for development)
      - `https://yourdomain.com/api/sso/ktech/oauth/callback` (for production)
 5. **Save** the changes
 
@@ -110,7 +110,7 @@ CLIENT_OAUTH_RESOURCE_URI=https://graph.windows.net
 CLIENT_OAUTH_AUTHORITY=https://login.microsoftonline.com
 
 # Base URLs
-BASE_URL=http://localhost:8000
+BASE_URL=http://localhost:8001
 FRONTEND_URL=http://localhost:5173
 ```
 
@@ -118,7 +118,7 @@ FRONTEND_URL=http://localhost:5173
 
 After configuration:
 1. Restart your backend server
-2. Try accessing: `http://localhost:8000/sso/ktech`
+2. Try accessing: `http://localhost:8001/sso/ktech`
 3. You should be redirected to Azure AD login
 4. After login, you'll be redirected back to the callback URL
 

@@ -110,11 +110,17 @@ export const API_ENDPOINTS = {
   SIR_CONVERT_PDF: "/api/upload/convert-scanned-pdf",
   SIR_PARSE_ELECTORAL_PDF: "/api/upload/convert-scanned-pdf",
   SIR_ECI_DOWNLOAD: "/api/upload/eci-download",
+  SIR_BULK_ELECTORAL_ROLL: "/api/upload/bulk-electoral-roll",
+  SIR_BULK_ELECTORAL_ROLL_STREAM: "/api/upload/bulk-electoral-roll-stream",
+  SIR_BULK_ELECTORAL_ROLL_DATA: "/api/upload/bulk-electoral-roll-data",
+  SIR_BULK_ELECTORAL_ROLL_QUALITY: "/api/upload/bulk-electoral-roll-quality",
+
   SIR_ECI_STATES: "/api/upload/eci-states",
   SIR_ECI_DISTRICTS: "/api/upload/eci-districts",
   SIR_ECI_ASSEMBLY_CONSTITUENCIES: "/api/upload/eci-assembly-constituencies",
-  // Production extractor v1 (auto-detect text vs scanned, validation)
+
   EXTRACTOR_V1_EXTRACT: "/api/v1/extract-voters",
+  EXTRACTOR_V1_OCR_UPLOAD: "/api/v1/ocr-upload",
   EXTRACTOR_V1_HEALTH: "/api/v1/extractor/health",
   SIR_MATCHING_RUN: "/api/matching/run",
   SIR_KPI_BOOTH: "/api/kpi/booth",

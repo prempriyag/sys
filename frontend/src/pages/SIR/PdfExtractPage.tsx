@@ -229,6 +229,7 @@ const PdfExtractPage: React.FC = () => {
           booth_number: boothNumber.trim() || undefined,
           use_ocr: forceOcr,
           extraction_config: hasConfig ? cfg : undefined,
+          save_to_db: true,
         });
         const data = res.data as { records?: ExtractedRecord[]; metadata?: ExtractMetadata; raw_page_texts?: { page: number; length: number; text: string }[]; accuracy_summary?: AccuracySummary };
         setRecords(data.records ?? []);
@@ -241,6 +242,7 @@ const PdfExtractPage: React.FC = () => {
         if (constituencyName.trim()) formData.append('constituency_name', constituencyName.trim());
         if (boothNumber.trim()) formData.append('booth_number', boothNumber.trim());
         formData.append('use_ocr', forceOcr ? 'true' : 'false');
+        formData.append('save_to_db', 'true');
         if (hasConfig) formData.append('extraction_config_json', JSON.stringify(cfg));
 
         const res = await extractPdfRoll(formData);
@@ -312,7 +314,7 @@ const PdfExtractPage: React.FC = () => {
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Extract PDF Roll</h1>
           <p className="text-gray-500 dark:text-gray-400 mt-1">
-            Upload an electoral roll PDF (e.g. SIR Draft Roll). Click Submit to extract and view data below. Data is not saved to the database.
+            Upload an electoral roll PDF (e.g. SIR Draft Roll). Click Submit to extract, save to database, and view data below.
           </p>
         </div>
 

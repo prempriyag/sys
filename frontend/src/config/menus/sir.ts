@@ -54,6 +54,11 @@ export const sirMenu: MenuConfig = {
           path: "/upload/bulk-electoral-roll",
           icon: "file-text",
         },
+        {
+          name: "All Voter Data",
+          path: "/upload/all-voter-data",
+          icon: "table",
+        },
       ],
     },
     {

@@ -10,7 +10,7 @@ export default function ErrorScreenshot() {
 
   useEffect(() => {
     if (batchId) {
-      // Construct URL: API_BASE_URL is "http://localhost:8000", so we need /api/viewfile/errorscreenshot/{batchId}
+      // Construct URL: API_BASE_URL is "http://localhost:8001", so we need /api/viewfile/errorscreenshot/{batchId}
       const url = `${API_BASE_URL}/api/viewfile/errorscreenshot/${batchId}`;
       setImageUrl(url);
     }

@@ -3,18 +3,26 @@ FastAPI Main Application - SIR Impact Analysis System
 """
 import logging
 import os
+import asyncio
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse
+from starlette.responses import Response
 
 
 class ForceCORSOriginMiddleware(BaseHTTPMiddleware):
     """Ensure CORS response echoes request Origin for localhost (fixes proxy/cache sending wrong port)."""
 
     async def dispatch(self, request: Request, call_next):
-        response = await call_next(request)
+        try:
+            response = await call_next(request)
+        except asyncio.CancelledError:
+            # Happens on shutdown/reload or client disconnect while a request is in-flight.
+            # Return a quiet response to avoid noisy "Exception in ASGI application" logs.
+            return Response(status_code=499)
         origin = request.headers.get("origin")
         if origin and (
             origin.startswith("http://localhost") or origin.startswith("http://127.0.0.1")
@@ -70,7 +78,7 @@ CORS_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:5173",
     "http://localhost:51590",
-    "http://localhost:8000",
+    "http://localhost:8001",
     "http://127.0.0.1:3000",
     "http://127.0.0.1:5173",
     "http://127.0.0.1:51590",
@@ -87,6 +95,29 @@ app.add_middleware(
     expose_headers=["*"],
 )
 
+def _cors_headers(request: Request) -> dict:
+    """Add CORS Allow-Origin for localhost so error responses don't get blocked by browser."""
+    origin = request.headers.get("origin")
+    if origin and (origin.startswith("http://localhost") or origin.startswith("http://127.0.0.1")):
+        return {"Access-Control-Allow-Origin": origin}
+    return {}
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+        headers=_cors_headers(request),
+    )
+
+# Ensure unhandled exceptions still return a response with CORS (exception response bypasses middleware).
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    logging.exception("Unhandled exception: %s", exc)
+    debug = os.getenv("DEBUG", "").strip().lower() in ("1", "true", "yes")
+    detail = str(exc) if debug else "Internal server error"
+    return JSONResponse(status_code=500, content={"detail": detail}, headers=_cors_headers(request))
+
 # Include Routers
 app.include_router(auth_controller.router)
 app.include_router(users_controller.router)
@@ -101,8 +132,10 @@ from controllers.sir import upload_router, matching_router, kpi_router, dashboar
 from controllers.sir.validation_controller import router as validation_router
 from controllers.sir.reports_controller import router as reports_router
 from controllers.sir.extractor_controller import router as extractor_router
+from controllers.sir.docling_controller import router as docling_router
 
 app.include_router(upload_router)
+app.include_router(docling_router)
 app.include_router(extractor_router)
 app.include_router(matching_router)
 app.include_router(kpi_router)

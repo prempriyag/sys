@@ -11,7 +11,7 @@ This error occurs when the `resource` parameter in the OAuth request doesn't mat
 **For KTech SSO**, the resource URI should be (matches CI3 aad_auth_ktech.php):
 
 ```env
-KTECH_OAUTH_RESOURCE_URI=https://graph.microsoft.com
+KKOAUTH_RESOURCE_URI=https://graph.microsoft.com
 ```
 
 **Note:** KTech SSO uses Microsoft Graph API, while Client SSO uses Azure AD Graph API.
@@ -96,11 +96,11 @@ Make sure your `.env` file has:
 
 ```env
 # KTech SSO - OAuth (uses Microsoft Graph API)
-KTECH_OAUTH_TENANT_ID=your-tenant-id
-KTECH_OAUTH_CLIENT_ID=your-client-id
-KTECH_OAUTH_CLIENT_SECRET=your-client-secret
-KTECH_OAUTH_RESOURCE_URI=https://graph.microsoft.com
-KTECH_OAUTH_AUTHORITY=https://login.microsoftonline.com
+KKOAUTH_TENANT_ID=your-tenant-id
+KKOAUTH_CLIENT_ID=your-client-id
+KKOAUTH_CLIENT_SECRET=your-client-secret
+KKOAUTH_RESOURCE_URI=https://graph.microsoft.com
+KKOAUTH_AUTHORITY=https://login.microsoftonline.com
 
 # Client SSO - OAuth
 CLIENT_OAUTH_TENANT_ID=your-tenant-id
@@ -135,7 +135,7 @@ After configuration:
   5. Try SSO login again
 
 ### Error: "The resource principal named https://graph.microsoft.com/v1.0 was not found"
-- **Fix**: Change `KTECH_OAUTH_RESOURCE_URI` to `https://graph.windows.net` in `.env`
+- **Fix**: Change `KKOAUTH_RESOURCE_URI` to `https://graph.windows.net` in `.env`
 
 ### Error: "redirect_uri_mismatch"
 - **Fix**: Make sure the callback URL in Azure AD exactly matches what's in your code

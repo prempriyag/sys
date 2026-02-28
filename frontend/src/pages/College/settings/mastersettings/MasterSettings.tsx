@@ -22,9 +22,7 @@ interface SystemSettings {
   two_way_auth_exept: string;
   trigger_update: string;
   trigger_update_mail: string;
-  ktech_SSO_client_secret: string;
-  ktech_SSO_clientId: string;
-  ktech_SSO_tenantId: string;
+ 
   bot_process_name: string;
   Develper_mail: string;
 }
@@ -67,9 +65,7 @@ const MasterSettings: React.FC = () => {
     two_way_auth_exept: '[]',
     trigger_update: '',
     trigger_update_mail: '',
-    ktech_SSO_client_secret: '',
-    ktech_SSO_clientId: '',
-    ktech_SSO_tenantId: '',
+   
     bot_process_name: '',
     Develper_mail: ''
   });
@@ -491,12 +487,7 @@ const MasterSettings: React.FC = () => {
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                         kk surveys & strategies SSO Client Id
                       </label>
-                      <input
-                        type="text"
-                        value={systemSettings.ktech_SSO_clientId}
-                        onChange={(e) => setSystemSettings({...systemSettings, ktech_SSO_clientId: e.target.value})}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-gray-100"
-                      />
+                      
                     </div>
                   </div>
 
@@ -641,24 +632,14 @@ const MasterSettings: React.FC = () => {
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                         kk surveys & strategies SSO TenantId
                       </label>
-                      <input
-                        type="text"
-                        value={systemSettings.ktech_SSO_tenantId}
-                        onChange={(e) => setSystemSettings({...systemSettings, ktech_SSO_tenantId: e.target.value})}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-gray-100"
-                      />
+                     
                     </div>
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                         kk surveys & strategies SSO Client Secret
                       </label>
-                      <input
-                        type="password"
-                        value={systemSettings.ktech_SSO_client_secret}
-                        onChange={(e) => setSystemSettings({...systemSettings, ktech_SSO_client_secret: e.target.value})}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-gray-100"
-                      />
+                      
                     </div>
                   </div>
                 </div>

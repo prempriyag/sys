@@ -4,7 +4,7 @@ import PageMeta from "../../components/common/PageMeta";
 import PageContainer, { PageWrapper } from "../../components/common/PageContainer";
 import DataTable from "../../components/ui/DataTable";
 import Button from "../../components/ui/button/Button";
-import { api, API_BASE_URL } from "../../config/api";
+import { api, API_BASE_URL, buildApiUrl } from "../../config/api";
 import { RefreshIcon, PlusIcon, PencilIcon, TrashBinIcon } from "../../icons";
 import { useAuth } from "../../context/AuthContext";
 import { alertsuccess, alerterror } from "../../utils/toast";
@@ -85,7 +85,7 @@ export default function TermMapping() {
     try {
       const endpoint = isEdit ? "/api/termmapping/update" : "/api/termmapping/insert";
       const body = isEdit ? { Id: editingId, ...formData } : formData;
-      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      const response = await fetch(buildApiUrl(endpoint), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -18,12 +18,7 @@ load_dotenv()
 
 # --- Configuration ---
 
-# MSSQL Configuration (Source)
-MSSQL_HOST = r"172.16.2.34\SQL2014"
-MSSQL_DB = "OSUCSCDEV"
-MSSQL_USER = "DIGISCRIPT_KTECH_DEV"
-MSSQL_PASS = "xNFk@q5;p/!U"
-MSSQL_DRIVER = "ODBC Driver 17 for SQL Server"
+
 
 # PostgreSQL Configuration (Target)
 PG_HOST = os.getenv("DB_HOST", "localhost")

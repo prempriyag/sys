@@ -97,6 +97,6 @@ window.location.href = "http://localhost:8001/sso/ktech";
 
 ## Notes
 - The SSO method (OAuth or SAML) is automatically detected by the backend
-- You can force a specific method by setting `CLIENT_SSO_METHOD` or `KTECH_SSO_METHOD` in backend `.env`
+- You can force a specific method by setting `CLIENT_SSO_METHOD` or `KKSSO_METHOD` in backend `.env`
 - The frontend callback page automatically handles token storage and user session setup
 - After successful SSO login, users are redirected based on their permissions (college_perm, hs_perm, ocr_perm)

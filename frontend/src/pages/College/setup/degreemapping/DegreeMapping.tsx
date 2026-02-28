@@ -7,7 +7,7 @@ import Button from "../../../../components/ui/button/Button";
 import { Modal } from "../../../../components/ui/modal";
 import Input from "../../../../components/form/input/InputField";
 import Label from "../../../../components/form/Label";
-import { API_BASE_URL } from "../../../../config/api";
+import { API_BASE_URL, buildApiUrl } from "../../../../config/api";
 import { alertsuccess, alerterror } from "../../../../utils/toast";
 import { RefreshIcon, PlusIcon, PencilIcon, TrashBinIcon } from "../../../../icons";
 import { useAuth } from "../../../../context/AuthContext";
@@ -88,7 +88,7 @@ export default function DegreeMapping() {
         ? { Id: editingId, ...formData }
         : formData;
 
-      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      const response = await fetch(buildApiUrl(endpoint), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

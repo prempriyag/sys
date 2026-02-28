@@ -23,7 +23,7 @@ The FastAPI code was using the wrong resource URI for KTech SSO.
 In your `backend/.env` file, make sure you have:
 
 ```env
-KTECH_OAUTH_RESOURCE_URI=https://graph.microsoft.com
+KKOAUTH_RESOURCE_URI=https://graph.microsoft.com
 ```
 
 **NOT** `https://graph.windows.net`
@@ -34,7 +34,7 @@ The default in `backend/config/sso_config.py` has been updated to match CI3:
 - Changed from: `https://graph.windows.net`
 - Changed to: `https://graph.microsoft.com`
 
-If you don't have `KTECH_OAUTH_RESOURCE_URI` in your `.env`, it will now use the correct default.
+If you don't have `KKOAUTH_RESOURCE_URI` in your `.env`, it will now use the correct default.
 
 ## Required API Permissions for Microsoft Graph
 
@@ -51,7 +51,7 @@ Check your `backend/.env` file:
 
 ```env
 # Should be graph.microsoft.com for KTech (matches CI3)
-KTECH_OAUTH_RESOURCE_URI=https://graph.microsoft.com
+KKOAUTH_RESOURCE_URI=https://graph.microsoft.com
 
 # Client SSO uses graph.windows.net (different from KTech)
 CLIENT_OAUTH_RESOURCE_URI=https://graph.windows.net
@@ -79,7 +79,7 @@ CLIENT_OAUTH_RESOURCE_URI=https://graph.windows.net
 
 ## Summary
 
-The issue was a **resource URI mismatch**. CI3 KTech SSO uses `graph.microsoft.com`, but FastAPI was defaulting to `graph.windows.net`. The fix is to set `KTECH_OAUTH_RESOURCE_URI=https://graph.microsoft.com` in your `.env` file (or rely on the updated default in the code).
+The issue was a **resource URI mismatch**. CI3 KTech SSO uses `graph.microsoft.com`, but FastAPI was defaulting to `graph.windows.net`. The fix is to set `KKOAUTH_RESOURCE_URI=https://graph.microsoft.com` in your `.env` file (or rely on the updated default in the code).
 
 ---
 

@@ -22,10 +22,20 @@ import pandas as pd
 import io
 import tempfile
 import os
+import re
 import logging
 import queue
 import threading
 import asyncio
+
+# OCR for convert-scanned-pdf (optional)
+try:
+    from pdf2image import convert_from_bytes
+    import pytesseract
+except ImportError:
+    convert_from_bytes = None
+    pytesseract = None
+OCR_DPI = 400
 
 logger = logging.getLogger(__name__)
 
@@ -474,30 +484,117 @@ def _extract_page(cropped_page, ncol, nrow):
     return out
 
 
+def _parse_block_lines_to_record(lines: list) -> dict:
+    """Parse one card block (list of text lines) into one record dict. Returns {} if no EPIC."""
+    if not lines:
+        return {}
+    text = "\n".join(lines) if isinstance(lines[0], str) else "\n".join(str(x) for x in lines)
+    epic_re = re.compile(r"\b([A-Za-z]{2,5}\d{5,10})\b", re.IGNORECASE)
+    m = epic_re.search(text)
+    if not m:
+        return {}
+    raw = m.group(1).upper().replace("/", "")
+    epic = raw.replace("O", "0").replace("I", "1").replace("Z", "2")
+    if not re.match(r"^[A-Z]{3}\d{7}$", epic):
+        epic = re.sub(r"[^A-Z0-9]", "", epic)
+    if len(epic) < 5:
+        return {}
+    name = rel_name = rel_role = house_no = ""
+    age = None
+    gender = ""
+    for i, line in enumerate(lines):
+        line = (line.strip() if isinstance(line, str) else str(line)).strip()
+        if not line:
+            continue
+        if re.search(r"^Name\s*[:\-]", line, re.I) and not name:
+            part = line.split(":", 1)[-1].split("-", 1)[-1].strip()
+            name = part or (lines[i + 1].strip() if i + 1 < len(lines) else "")
+        elif re.search(r"(Father|Husband|Mother)(?:'s)?\s*Name\s*[:\-]", line, re.I):
+            rm = re.search(r"(Father|Husband|Mother)", line, re.I)
+            rel_role = rm.group(1) if rm else "Other"
+            part = line.split(":", 1)[-1].split("-", 1)[-1].strip()
+            rel_name = part or (lines[i + 1].strip() if i + 1 < len(lines) else "")
+        elif re.search(r"House\s*Number\s*[:\-]", line, re.I):
+            part = line.split(":", 1)[-1].split("-", 1)[-1].strip()
+            house_no = part or (lines[i + 1].strip() if i + 1 < len(lines) else "")
+    am = re.search(r"Age\s*[:\-]?\s*(\d+)", text, re.I)
+    if am:
+        try:
+            age = int(am.group(1))
+        except (ValueError, IndexError):
+            pass
+    if re.search(r"\bMale\b", text, re.I):
+        gender = "Male"
+    elif re.search(r"\bFemale\b", text, re.I):
+        gender = "Female"
+    house_no = clean_house_number(house_no)
+    name = clean_ocr_field(name)
+    rel_name = clean_ocr_field(rel_name)
+    card_no = None
+    cn = re.search(r"^\s*(\d+)\b", text) or re.search(r"\b(\d{2,5})\b", text)
+    if cn:
+        try:
+            card_no = int(cn.group(1))
+        except (ValueError, IndexError):
+            pass
+    return {
+        "Card No": card_no,
+        "Voter ID (EPIC)": epic,
+        "Name": name,
+        "Relation": rel_role or "",
+        "Relative Name": rel_name,
+        "House Number": house_no,
+        "Age": age,
+        "Gender": gender,
+    }
+
+
 def _run_ocr_pdf_to_records(content: bytes) -> list:
     if not content or convert_from_bytes is None or pytesseract is None:
         return []
     images = convert_from_bytes(content, dpi=OCR_DPI)
     records = []
+    # Import extractor page-level OCR so we can use EPIC-first → grid → contour → spatial fallback.
+    from services.electoral_roll_pdf_extractor import (
+        _ocr_page_epic_first,
+        _ocr_page_grid,
+        _ocr_page_contour_boxes,
+        _ocr_page_spatial,
+    )
     for page_idx, page in enumerate(images):
-        if page_idx < 1:
+        # Skip only cover pages: no EPIC-like pattern in preview (do not hard-skip page 0).
+        text_preview = pytesseract.image_to_string(page, config="--psm 6")
+        if not re.search(r"[A-Za-z]{3}\d{6,7}", text_preview):
             continue
         w, h = page.size
         top = int(h * 0.06)
         bottom = int(h * 0.04)
         cropped = page.crop((0, top, w, h - bottom))
-        page_records = _extract_page(cropped, 3, 10)
-        if len(page_records) < 15:
-            alt = _extract_page(cropped, 2, 15)
-            if len(alt) > len(page_records):
-                page_records = alt
+        page_number = page_idx + 1
+        # Fallback chain: EPIC-first → grid → contour → spatial (never drop page).
+        blocks, _, _ = _ocr_page_epic_first(cropped, num_cols=3, page_number=page_number)
+        if not blocks or len(blocks) < 15:
+            blocks = _ocr_page_grid(cropped, num_cols=3, rows_per_page=10, page_number=page_number)
+        if not blocks or len(blocks) < 10:
+            blocks = _ocr_page_contour_boxes(cropped, page_number=page_number)
+        if not blocks:
+            blocks = _ocr_page_spatial(cropped, num_cols=3)
+        page_records = []
+        for b in blocks:
+            r = _parse_block_lines_to_record(b)
+            if r.get("Voter ID (EPIC)"):
+                page_records.append(r)
+        logger.info("Page %d: extracted %d records", page_number, len(page_records))
         records.extend(page_records)
+    # Dedup by (Card No, EPIC) so OCR variants of same EPIC don't drop records; rely on DB unique (pdf_name, box_id) for insert.
     seen = {}
     for r in records:
-        e = r["Voter ID (EPIC)"]
-        if e not in seen:
-            seen[e] = r
-    return sorted(seen.values(), key=lambda x: (x.get("Card No") or 0, x["Voter ID (EPIC)"]))
+        key = (r.get("Card No"), r.get("Voter ID (EPIC)"))
+        if key not in seen:
+            seen[key] = r
+    result = sorted(seen.values(), key=lambda x: (x.get("Card No") or 0, x.get("Voter ID (EPIC)", "")))
+    logger.info("Total extracted: %d", len(result))
+    return result
 
 
 @router.post("/convert-scanned-pdf")

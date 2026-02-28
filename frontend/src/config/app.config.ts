@@ -42,8 +42,15 @@ const API_BASE_URL_BY_ENV: Record<string, string> = {
   PROD: "https://digiscript-csc.ktechproducts.com/backend",
 };
 
-export const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || API_BASE_URL_BY_ENV[APP_ENV] || API_BASE_URL_BY_ENV.DEV;
+export const API_BASE_URL = (() => {
+  const raw =
+    import.meta.env.VITE_API_BASE_URL || API_BASE_URL_BY_ENV[APP_ENV] || API_BASE_URL_BY_ENV.DEV;
+  // Avoid using literal "undefined" when env var is missing or mis-set
+  if (raw === undefined || raw === "undefined" || raw === "") {
+    return API_BASE_URL_BY_ENV.DEV;
+  }
+  return raw;
+})();
 
 // Profiler Configuration
 export const PROFILER_ENABLED = import.meta.env.VITE_PROFILER_ENABLED !== "false";

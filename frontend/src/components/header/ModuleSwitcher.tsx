@@ -5,9 +5,7 @@ import { ModuleType } from "../../types/menu";
 import { ChevronDownIcon } from "../../icons";
 
 const modules: { value: ModuleType; label: string }[] = [
-  { value: "college", label: "College" },
-  { value: "school", label: "School" },
-  { value: "ocrverify", label: "OCR Verify" },
+  { value: "sir", label: "SIR" },
 ];
 
 const ModuleSwitcher: React.FC = () => {
@@ -16,7 +14,7 @@ const ModuleSwitcher: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const currentModuleLabel = modules.find((m) => m.value === currentModule)?.label || "College";
+  const currentModuleLabel = modules.find((m) => m.value === currentModule)?.label || "SIR";
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -33,13 +31,7 @@ const ModuleSwitcher: React.FC = () => {
 
   const handleModuleChange = (module: ModuleType) => {
     setIsOpen(false);
-    // Navigate to the module's dashboard - ModuleContext will update automatically based on URL
-    // College is the default module, so use /dashboard instead of /college/dashboard
-    // if (module === "college") {
-    //   navigate("/dashboard");
-    // } else {
-      navigate(`/${module}/dashboard`);
-    // }
+    navigate(`/${module}/dashboard`);
   };
 
   return (
@@ -53,11 +45,7 @@ const ModuleSwitcher: React.FC = () => {
       >
         <span className="hidden sm:inline">{currentModuleLabel}</span>
         <span className="sm:hidden">
-          {currentModule === "college"
-            ? "C"
-            : currentModule === "school"
-            ? "S"
-            : "O"}
+          S
         </span>
         <ChevronDownIcon
           className={`w-4 h-4 transition-transform duration-200 ${

@@ -43,7 +43,7 @@ DB_HOST=172.16.2.34\SQL2014
 DB_NAME=OSUCSCDEV
 
 # Database Username
-DB_USER=DIGISCRIPT_KTECH_DEV
+DB_USER=DIGISCRIPT_KKDEV
 
 # Database Password
 DB_PASSWORD=xNFk@q5;p/!U
@@ -81,7 +81,7 @@ mssql+pyodbc://DB_USER:DB_PASSWORD@DB_HOST/DB_NAME?driver=DB_DRIVER&TrustServerC
 
 Example:
 ```
-mssql+pyodbc://DIGISCRIPT_KTECH_DEV:xNFk@q5;p/!U@172.16.2.34\SQL2014/OSUCSCDEV?driver=ODBC+Driver+17+for+SQL+Server&TrustServerCertificate=yes
+mssql+pyodbc://DIGISCRIPT_KKDEV:xNFk@q5;p/!U@172.16.2.34\SQL2014/OSUCSCDEV?driver=ODBC+Driver+17+for+SQL+Server&TrustServerCertificate=yes
 ```
 
 ## ODBC Driver Options
@@ -176,7 +176,7 @@ DEBUG=False
 Based on your CodeIgniter configuration:
 - **Host:** 172.16.2.34\SQL2014
 - **Database:** OSUCSCDEV  
-- **Username:** DIGISCRIPT_KTECH_DEV
+- **Username:** DIGISCRIPT_KKDEV
 - **Password:** xNFk@q5;p/!U
 
 These details are already configured in the `.env` file.

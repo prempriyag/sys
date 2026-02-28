@@ -34,12 +34,11 @@ class ForceCORSOriginMiddleware(BaseHTTPMiddleware):
 from controllers import (
     auth_controller, 
     users_controller, 
-    theme_settings_controller
-)
-from controllers.college import (
+    theme_settings_controller,
     permissions_controller, 
     roles_controller,
-    settings_controller,
+    notification_controller,
+    app_settings_controller,
     mastersettings_controller
 )
 
@@ -124,7 +123,8 @@ app.include_router(users_controller.router)
 app.include_router(roles_controller.router)
 app.include_router(permissions_controller.router)
 app.include_router(theme_settings_controller.router)
-app.include_router(settings_controller.router)
+app.include_router(notification_controller.router)
+app.include_router(app_settings_controller.router)
 app.include_router(mastersettings_controller.router)
 
 # Import and include SIR controllers

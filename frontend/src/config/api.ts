@@ -8,6 +8,22 @@ import { APP_ENV, API_BASE_URL as CONFIG_API_BASE_URL } from "./app.config";
 export const API_BASE_URL = CONFIG_API_BASE_URL;
 export const APP_ENVIRONMENT = APP_ENV;
 
+/** Build full API URL, being forgiving about missing paths.
+ * If path is undefined/null/empty, we log a warning and return the base URL only,
+ * avoiding invalid URLs like "http://localhost:8000undefined".
+ */
+export function buildApiUrl(path: string | undefined | null): string {
+  const base = API_BASE_URL ?? "";
+  let p = "";
+  if (path == null || path === "" || String(path) === "undefined") {
+    // Log for developers, but don't break the user flow
+    console.warn("[buildApiUrl] Missing or invalid path, using base URL only. Call stack:", new Error().stack);
+  } else {
+    p = path.startsWith("/") ? path : `/${path}`;
+  }
+  return `${base.replace(/\/$/, "")}${p}`;
+}
+
 export const API_ENDPOINTS = {
   LOGIN: "/api/login",
   LOGOUT: "/api/logout",
@@ -80,8 +96,7 @@ export const API_ENDPOINTS = {
   SSO_KTECH: "/sso/ktech",
   SSO_CLIENT_OAUTH_CALLBACK: "/api/sso/client/oauth/callback",
   SSO_CLIENT_SAML_CALLBACK: "/api/sso/client/saml/callback",
-  SSO_KTECH_OAUTH_CALLBACK: "/api/sso/ktech/oauth/callback",
-  SSO_KTECH_SAML_CALLBACK: "/api/sso/ktech/saml/callback",
+
 
   //School
   SCHOOL_TRANSCRIPT_REPORTS: "/api/school/transcriptreports",
@@ -102,6 +117,8 @@ export const API_ENDPOINTS = {
   SIR_UPLOAD_POST: "/api/upload/post-sir",
   SIR_UPLOAD_PRE_PDF: "/api/upload/pre-sir-pdf",
   SIR_UPLOAD_POST_PDF: "/api/upload/post-sir-pdf",
+  SIR_BULK_ELECTORAL_ROLL: "/api/upload/bulk-electoral-roll",
+  SIR_BULK_ELECTORAL_ROLL_STREAM: "/api/upload/bulk-electoral-roll-stream",
   SIR_EXTRACT_PDF: "/api/upload/extract-pdf",
   SIR_EXTRACT_PDF_BY_PATH: "/api/upload/extract-pdf-by-path",
   SIR_PDF_FILES: "/api/upload/pdf-files",
@@ -273,9 +290,11 @@ export const apiRequest = async (
 
   let response: Response;
   const fetchStart = performance.now();
-  
+
+  const requestUrl = buildApiUrl(endpoint);
+
   try {
-    response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    response = await fetch(requestUrl, {
       ...options,
       headers,
     });
@@ -454,13 +473,16 @@ export const api = {
     
     if (isFormData) {
       // For FormData, use fetch directly to avoid Content-Type header issues
+      if (endpoint == null || endpoint === "" || String(endpoint) === "undefined") {
+        console.warn("[api.post] Missing or invalid endpoint, using base URL only. Call stack:", new Error().stack);
+      }
       const token = getAuthToken();
       const headers: Record<string, string> = {};
       if (token) {
         headers["Authorization"] = `Bearer ${token}`;
       }
-      // Don't set Content-Type - browser will set it with correct boundary
-      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      const requestUrl = buildApiUrl(endpoint);
+      const response = await fetch(requestUrl, {
         method: "POST",
         headers,
         body: data as FormData,
@@ -497,7 +519,7 @@ export const api = {
  * @param returnTo Optional URL to return to after SSO login
  */
 export const redirectToClientSSO = (returnTo?: string) => {
-  const url = new URL(`${API_BASE_URL}${API_ENDPOINTS.SSO_CLIENT}`);
+  const url = new URL(buildApiUrl(API_ENDPOINTS.SSO_CLIENT));
   if (returnTo) {
     url.searchParams.set("return_to", returnTo);
   }
@@ -509,7 +531,7 @@ export const redirectToClientSSO = (returnTo?: string) => {
  * @param returnTo Optional URL to return to after SSO login
  */
 export const redirectToKTechSSO = (returnTo?: string) => {
-  const url = new URL(`${API_BASE_URL}${API_ENDPOINTS.SSO_KTECH}`);
+  const url = new URL(buildApiUrl(API_ENDPOINTS.SSO_KTECH));
   if (returnTo) {
     url.searchParams.set("return_to", returnTo);
   }

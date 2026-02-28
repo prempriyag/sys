@@ -166,67 +166,63 @@ async def client_sso_login(
         )
 
 
-@router.get("/ktech")
-async def ktech_sso_login(
-    request: Request,
-    return_to: Optional[str] = Query(None)
-):
+
     """
     Unified KTech SSO entry point
     Automatically routes to OAuth or SAML based on configuration
     """
-    try:
-        sso_method = SSOConfig.get_ktech_sso_method()
+    # try:
+    #     
         
-        if not sso_method:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="KTech SSO is not configured. Please configure either OAuth or SAML."
-            )
+    #     if not sso_method:
+    #         raise HTTPException(
+    #             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+    #             detail="KTech SSO is not configured. Please configure either OAuth or SAML."
+    #         )
         
-        if sso_method == 'oauth':
-            # Redirect to OAuth login
-            oauth_config = SSOConfig.get_ktech_oauth_config()
-            oauth_config['prompt_login'] = True  # Force login prompt for KTech
-            if not oauth_config.get('tenant_id') or not oauth_config.get('client_id'):
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="KTech OAuth configuration is not set up"
-                )
-            state = generate_nonce()
-            auth_url = get_authorization_url(oauth_config, state, return_to)
-            return RedirectResponse(url=auth_url)
-        elif sso_method == 'saml':
-            # Redirect to SAML login
-            saml_config = SSOConfig.get_ktech_saml_config()
-            if not saml_config.get('sp', {}).get('entityId'):
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="KTech SAML configuration is not set up"
-                )
-            request_data = {
-                'scheme': request.url.scheme,
-                'host': request.url.hostname,
-                'port': request.url.port or (443 if request.url.scheme == 'https' else 80),
-                'path': request.url.path,
-                'query_params': dict(request.query_params),
-            }
-            redirect_url = initiate_saml_login(saml_config, request_data)
-            return RedirectResponse(url=redirect_url)
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Invalid SSO method: {sso_method}"
-            )
+    #     if sso_method == 'oauth':
+    #         # Redirect to OAuth login
+    #       
+    #         oauth_config['prompt_login'] = True  # Force login prompt for KTech
+    #         if not oauth_config.get('tenant_id') or not oauth_config.get('client_id'):
+    #             raise HTTPException(
+    #                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+    #                 detail="KTech OAuth configuration is not set up"
+    #             )
+    #         state = generate_nonce()
+    #         auth_url = get_authorization_url(oauth_config, state, return_to)
+    #         return RedirectResponse(url=auth_url)
+    #     elif sso_method == 'saml':
+    #         # Redirect to SAML login
+    #         
+    #         if not saml_config.get('sp', {}).get('entityId'):
+    #             raise HTTPException(
+    #                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+    #                 detail="KTech SAML configuration is not set up"
+    #             )
+    #         request_data = {
+    #             'scheme': request.url.scheme,
+    #             'host': request.url.hostname,
+    #             'port': request.url.port or (443 if request.url.scheme == 'https' else 80),
+    #             'path': request.url.path,
+    #             'query_params': dict(request.query_params),
+    #         }
+    #         redirect_url = initiate_saml_login(saml_config, request_data)
+    #         return RedirectResponse(url=redirect_url)
+    #     else:
+    #         raise HTTPException(
+    #             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+    #             detail=f"Invalid SSO method: {sso_method}"
+    #         )
             
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"KTech SSO Login Error: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error initiating SSO login: {str(e)}"
-        )
+    # except HTTPException:
+    #     raise
+    # except Exception as e:
+        # logger.error(f"KTech SSO Login Error: {str(e)}")
+        # raise HTTPException(
+        #     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        #     detail=f"Error initiating SSO login: {str(e)}"
+        # )
 
 
 # ==================== CLIENT SSO - OAuth ====================
@@ -471,36 +467,36 @@ async def client_saml_sls(request: Request):
 
 # ==================== KTech SSO - OAuth ====================
 
-@router.get("/ktech/oauth/login")
-async def ktech_oauth_login(
-    request: Request,
-    return_to: Optional[str] = Query(None)
-):
-    """
-    Initiate KTech OAuth login
-    Based on index() in CI3 Ktechsso.php
-    """
-    try:
-        oauth_config = SSOConfig.get_ktech_oauth_config()
-        oauth_config['prompt_login'] = True  # Force login prompt for KTech
+# @router.get("/ktech/oauth/login")
+# async def kk_oauth_login(
+#     request: Request,
+#     return_to: Optional[str] = Query(None)
+# ):
+#     """
+#     Initiate KTech OAuth login
+#     Based on index() in CI3 Ktechsso.php
+#     """
+#     try:
+#         oauth_config = SSOConfig.get_KKoauth_config()
+#         oauth_config['prompt_login'] = True  # Force login prompt for KTech
         
-        if not oauth_config.get('tenant_id') or not oauth_config.get('client_id'):
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="KTech OAuth configuration is not set up"
-            )
+#         if not oauth_config.get('tenant_id') or not oauth_config.get('client_id'):
+#             raise HTTPException(
+#                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+#                 detail="KTech OAuth configuration is not set up"
+#             )
         
-        state = generate_nonce()
-        auth_url = get_authorization_url(oauth_config, state, return_to)
+#         state = generate_nonce()
+#         auth_url = get_authorization_url(oauth_config, state, return_to)
         
-        return RedirectResponse(url=auth_url)
+#         return RedirectResponse(url=auth_url)
         
-    except Exception as e:
-        logger.error(f"KTech OAuth Login Error: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error initiating OAuth login: {str(e)}"
-        )
+#     except Exception as e:
+#         logger.error(f"KTech OAuth Login Error: {str(e)}")
+#         raise HTTPException(
+#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+#             detail=f"Error initiating OAuth login: {str(e)}"
+#         )
 
 
 def _redirect_sso_error(message: str) -> RedirectResponse:
@@ -515,7 +511,7 @@ def _redirect_sso_error(message: str) -> RedirectResponse:
 
 
 @router.get("/ktech/oauth/callback")
-async def ktech_oauth_callback(
+async def KKoauth_callback(
     request: Request,
     code: Optional[str] = Query(None),
     state: Optional[str] = Query(None),
@@ -539,7 +535,7 @@ async def ktech_oauth_callback(
         logger.exception("DB session failed in KTech OAuth callback")
         return _redirect_sso_error("Service temporarily unavailable")
     try:
-        oauth_config = SSOConfig.get_ktech_oauth_config()
+        oauth_config = SSOConfig.get_KKoauth_config()
         result = await request_tokens(oauth_config, code, state or "", db)
         if result['status'] == 0:
             return _redirect_sso_error(result.get('message', 'Token exchange failed'))
@@ -569,27 +565,27 @@ async def ktech_oauth_callback(
 
 
 # Expose same callback at /api/api/sso/... for prod when redirect URI has double /api
-router_double_api.add_api_route("/ktech/oauth/callback", ktech_oauth_callback, methods=["GET"])
+router_double_api.add_api_route("/ktech/oauth/callback", KKoauth_callback, methods=["GET"])
 
 
-async def ktech_oauth_callback_ping():
+async def KKoauth_callback_ping():
     """Immediate 302 to verify /api/api/sso path is reachable (no DB, no token exchange)."""
     from config.settings import settings
     return RedirectResponse(url=f"{settings.FRONTEND_URL}/sso/callback?error=ping&error_description=SSO+callback+path+reachable")
 
 
-router_double_api.add_api_route("/ktech/oauth/callback-ping", ktech_oauth_callback_ping, methods=["GET"])
-router.add_api_route("/ktech/oauth/callback-ping", ktech_oauth_callback_ping, methods=["GET"])
+router_double_api.add_api_route("/ktech/oauth/callback-ping", KKoauth_callback_ping, methods=["GET"])
+router.add_api_route("/ktech/oauth/callback-ping", KKoauth_callback_ping, methods=["GET"])
 
 
 @router.get("/ktech/oauth/logout")
-async def ktech_oauth_logout(return_to: Optional[str] = Query(None)):
+async def KKoauth_logout(return_to: Optional[str] = Query(None)):
     """
     KTech OAuth logout
     Based on logout() in CI3 Ktechsso.php
     """
     try:
-        oauth_config = SSOConfig.get_ktech_oauth_config()
+        oauth_config = SSOConfig.get_KKoauth_config()
         logout_url = get_logout_url(oauth_config, return_to)
         return RedirectResponse(url=logout_url)
     except Exception as e:
@@ -602,42 +598,42 @@ async def ktech_oauth_logout(return_to: Optional[str] = Query(None)):
 
 # ==================== KTech SSO - SAML ====================
 
-@router.get("/ktech/saml/login")
-async def ktech_saml_login(request: Request):
-    """
-    Initiate KTech SAML login
-    Based on login() in CI3 Saml.php
-    """
-    try:
-        saml_config = SSOConfig.get_ktech_saml_config()
+# @router.get("/ktech/saml/login")
+# async def KKsaml_login(request: Request):
+#     """
+#     Initiate KTech SAML login
+#     Based on login() in CI3 Saml.php
+#     """
+#     try:
+#         saml_config = SSOConfig.get_KKsaml_config()
         
-        if not saml_config.get('sp', {}).get('entityId'):
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="KTech SAML configuration is not set up"
-            )
+#         if not saml_config.get('sp', {}).get('entityId'):
+#             raise HTTPException(
+#                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+#                 detail="KTech SAML configuration is not set up"
+#             )
         
-        request_data = {
-            'scheme': request.url.scheme,
-            'host': request.url.hostname,
-            'port': request.url.port or (443 if request.url.scheme == 'https' else 80),
-            'path': request.url.path,
-            'query_params': dict(request.query_params),
-        }
+#         request_data = {
+#             'scheme': request.url.scheme,
+#             'host': request.url.hostname,
+#             'port': request.url.port or (443 if request.url.scheme == 'https' else 80),
+#             'path': request.url.path,
+#             'query_params': dict(request.query_params),
+#         }
         
-        redirect_url = initiate_saml_login(saml_config, request_data)
-        return RedirectResponse(url=redirect_url)
+#         redirect_url = initiate_saml_login(saml_config, request_data)
+#         return RedirectResponse(url=redirect_url)
         
-    except Exception as e:
-        logger.error(f"KTech SAML Login Error: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error initiating SAML login: {str(e)}"
-        )
+#     except Exception as e:
+#         logger.error(f"KTech SAML Login Error: {str(e)}")
+#         raise HTTPException(
+#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+#             detail=f"Error initiating SAML login: {str(e)}"
+#         )
 
 
 @router.post("/ktech/saml/callback")
-async def ktech_saml_callback(request: Request, db: Session = Depends(get_db)):
+async def KKsaml_callback(request: Request, db: Session = Depends(get_db)):
     """
     Handle KTech SAML callback
     Based on callback() in CI3 Saml.php
@@ -654,7 +650,7 @@ async def ktech_saml_callback(request: Request, db: Session = Depends(get_db)):
             'form_data': dict(form_data),
         }
         
-        saml_config = SSOConfig.get_ktech_saml_config()
+        saml_config = SSOConfig.get_KKsaml_config()
         result = process_saml_response(saml_config, request_data, "ktech", db)
         
         if result['status'] == 0:
@@ -704,26 +700,3 @@ async def ktech_saml_callback(request: Request, db: Session = Depends(get_db)):
         )
 
 
-@router.get("/ktech/saml/sls")
-async def ktech_saml_sls(request: Request):
-    """
-    Handle KTech SAML Single Logout Service
-    Based on sls() in CI3 Saml.php
-    """
-    try:
-        saml_config = SSOConfig.get_ktech_saml_config()
-        
-        request_data = {
-            'scheme': request.url.scheme,
-            'host': request.url.hostname,
-            'port': request.url.port or (443 if request.url.scheme == 'https' else 80),
-            'path': request.url.path,
-            'query_params': dict(request.query_params),
-        }
-        
-        redirect_url = initiate_saml_logout(saml_config, request_data, "", "")
-        return RedirectResponse(url=redirect_url or "/")
-        
-    except Exception as e:
-        logger.error(f"KTech SAML SLS Error: {str(e)}")
-        return RedirectResponse(url="/")

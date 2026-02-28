@@ -1,5 +1,5 @@
 import axios, { AxiosRequestConfig } from 'axios';
-import { API_BASE_URL, API_ENDPOINTS, getAuthToken } from '../config/api';
+import { API_BASE_URL, API_ENDPOINTS, getAuthToken, buildApiUrl } from '../config/api';
 
 const api = axios.create({
     baseURL: API_BASE_URL,
@@ -109,7 +109,7 @@ export async function bulkElectoralRollWithProgress(
     onProgress: (p: BulkProgress) => void,
 ): Promise<BulkResult> {
     const token = getAuthToken();
-    const url = `${API_BASE_URL}${API_ENDPOINTS.SIR_BULK_ELECTORAL_ROLL_STREAM}`;
+    const url = buildApiUrl(API_ENDPOINTS.SIR_BULK_ELECTORAL_ROLL_STREAM);
     const res = await fetch(url, {
         method: 'POST',
         body: formData,
@@ -169,7 +169,7 @@ export const listPdfFiles = async (): Promise<{ data: { files: string[]; folder:
         const res = await api.get(API_ENDPOINTS.SIR_PDF_FILES);
         return res;
     } catch {
-        const url = `${API_BASE_URL}${API_ENDPOINTS.SIR_PDF_FILES}`;
+        const url = buildApiUrl(API_ENDPOINTS.SIR_PDF_FILES);
         const r = await fetch(url, { credentials: 'omit' });
         if (!r.ok) throw new Error(`Failed to load PDF list: ${r.status}`);
         const data = await r.json();

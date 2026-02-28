@@ -359,6 +359,9 @@ def _cluster_words_into_lines_scipy(col_words: List[dict], y_threshold: float = 
     if not col_words:
         return []
 
+    if len(col_words) < 2:
+        return [col_words]
+
     # Use word top-Y (or centre-Y) for clustering
     ys = np.array([w["y"] + w["h"] // 2 for w in col_words], dtype=float).reshape(-1, 1)
     labels = fclusterdata(ys, t=float(y_threshold), criterion="distance", metric="euclidean")
@@ -421,8 +424,9 @@ def _cluster_words_into_lines(col_words: List[dict]) -> List[List[dict]]:
 _RE_EPIC_ANCHOR_LOOSE = re.compile(r"^[A-Za-z0-9/]{5,14}$", re.IGNORECASE)
 # 2) VALIDATION (final data only): strict, after normalisation.
 _RE_EPIC_STRICT = re.compile(r"^[A-Z]{3}[0-9]{6,7}(/[0-9]+)?$", re.IGNORECASE)
-# Minimum EPICs on a data page to accept segmentation; below this we log failure and do not fallback.
-EPIC_MIN_FOR_DATA_PAGE = 25
+# Minimum EPICs on a data page to consider EPIC-first segmentation reliable.
+# Below this we log failure and FALL BACK to spatial/full-page OCR instead of skipping the page.
+EPIC_MIN_FOR_DATA_PAGE = 8
 
 
 def _looks_like_epic(text: str) -> bool:
@@ -438,6 +442,20 @@ def _looks_like_epic(text: str) -> bool:
     digit_count = sum(1 for c in t if c.isdigit())
     letter_count = sum(1 for c in t if c.isalpha())
     return digit_count >= 5 and letter_count >= 2
+
+
+def _line_contains_epic(line: str) -> bool:
+    """True if the line contains a token that looks like an EPIC (for splitting merged blocks)."""
+    if not line or not line.strip():
+        return False
+    # Whole line
+    if _looks_like_epic(line.strip()):
+        return True
+    # Serial + EPIC on same line (e.g. "073 SSL0738015")
+    for token in line.strip().split():
+        if _looks_like_epic(token):
+            return True
+    return False
 
 
 # PSM 6 = uniform block of text (best for small card crops). OEM 3 = default LSTM.
@@ -462,7 +480,7 @@ def _ocr_page_epic_first(
       1. image_to_data on full page → per-word bounding boxes
       2. Find all words matching EPIC anchor (tolerant) → EPIC positions
       3. Sort EPICs by Y, cluster into rows
-      4. If EPIC count < EPIC_MIN_FOR_DATA_PAGE → return failure (no fallback)
+      4. If EPIC count < EPIC_MIN_FOR_DATA_PAGE → return [], "weak_epic" so caller falls back to grid/contour/full-page.
       5. Compute card bounding boxes, crop each card
       6. Preprocess crop, OCR per card with --psm 6 --oem 3 -l eng
       7. Return card blocks + segmentation metrics
@@ -476,6 +494,7 @@ def _ocr_page_epic_first(
     except ImportError:
         return [], "pytesseract or PIL not available", None
 
+    _configure_tesseract_cmd()
     pil_img = _img_to_pil(img)
     w_page, h_page = pil_img.size
 
@@ -584,15 +603,19 @@ def _ocr_page_epic_first(
             "EPIC-first segmentation failure: expected %d EPICs per page, got %d",
             expected_epics, total_epics,
         )
-    # Do not return blocks if EPIC count too low — force caller to treat as segmentation failure (no fallback).
+    # Weak EPIC count: return empty blocks so caller can fall back to grid/contour/full-page (do not drop page).
     if total_epics < EPIC_MIN_FOR_DATA_PAGE:
+        logger.warning(
+            "Page %s: EPIC-first weak (%d), fallback to grid.",
+            page_number, total_epics,
+        )
         metrics = {
             "epic_count": total_epics,
             "rows_detected": len(rows),
             "cards_extracted": 0,
             "segmentation_failure": True,
         }
-        return [], "segmentation_failure: EPIC count %d < %d" % (total_epics, EPIC_MIN_FOR_DATA_PAGE), metrics
+        return [], "weak_epic", metrics
 
     # Step 5: compute card bounding boxes from EPIC positions (resilient to column drift)
     margin_left = 15
@@ -660,7 +683,265 @@ def _ocr_page_epic_first(
     return card_blocks, None, metrics
 
 
-def _ocr_page_spatial(img, num_cols: int = 3, conf_threshold: int = 40) -> List[List[str]]:
+# Fixed grid for TN ECI format: 3 columns × 10 rows per page. Skip header (top 18%), use up to 95% height.
+# Horizontal margins (2% each side) so each cell is one card only — no vertical separator lines.
+# Primary production path: each card OCR'd separately → no merging, no cross-contamination.
+def _ocr_page_fixed_grid(
+    img: "Any",
+    page_number: Optional[int] = None,
+    num_cols: int = 3,
+    rows_per_page: int = 10,
+    header_top_ratio: float = 0.18,
+    data_bottom_ratio: float = 0.95,
+    margin_left_ratio: float = 0.02,
+    margin_right_ratio: float = 0.02,
+) -> List[List[str]]:
+    """
+    Fixed 3×10 grid: slice page into 30 rectangles, OCR each cell separately.
+    Uses horizontal margins so each crop is one card only (no column boundary bleed).
+    Guarantees one block per card slot (no merging). Production path for electoral rolls.
+    """
+    try:
+        import pytesseract
+        from PIL import Image
+    except ImportError:
+        return []
+
+    _configure_tesseract_cmd()
+    pil_img = _img_to_pil(img)
+    w_page, h_page = pil_img.size
+
+    top_px = int(h_page * header_top_ratio)
+    bottom_px = int(h_page * data_bottom_ratio)
+    usable_height = max(1, bottom_px - top_px)
+    left_px = int(w_page * margin_left_ratio)
+    right_px = int(w_page * (1 - margin_right_ratio))
+    usable_width = max(1, right_px - left_px)
+    col_width = usable_width // num_cols
+    row_height = usable_height // rows_per_page
+    if col_width < 10 or row_height < 10:
+        return []
+
+    card_blocks: List[List[str]] = []
+    for row in range(rows_per_page):
+        for col in range(num_cols):
+            x_min = left_px + col * col_width
+            x_max = left_px + (col + 1) * col_width
+            y_min = top_px + row * row_height
+            y_max = top_px + (row + 1) * row_height
+            try:
+                crop = pil_img.crop((x_min, y_min, x_max, y_max))
+                crop = _preprocess_card_for_ocr(crop)
+                text = pytesseract.image_to_string(crop, config=TESSERACT_CARD_CONFIG)
+                lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+                card_blocks.append(lines if lines else [])
+            except Exception as e:
+                if page_number is not None:
+                    logger.debug("Fixed grid cell (%d,%d) page %s: %s", row, col, page_number, e)
+                card_blocks.append([])
+
+    if page_number is not None and card_blocks:
+        logger.info(
+            "Page %d: extracted %d voters (fixed grid 3×10)",
+            page_number,
+            len(card_blocks),
+        )
+    return card_blocks
+
+
+# Full-page EPIC split: no layout/contour/grid — OCR whole page then split by EPIC pattern.
+# Production approach for scanned electoral rolls: layout-independent, max coverage.
+EPIC_SPLIT_PATTERN = re.compile(r"(?=[A-Za-z]{2,4}\d{5,})", re.IGNORECASE)
+EPIC_BLOCK_CONTAINS = re.compile(r"[A-Za-z]{2,4}\d{5,}", re.IGNORECASE)
+
+
+def _ocr_page_full_page_epic_split(
+    img: "Any",
+    page_number: Optional[int] = None,
+) -> List[List[str]]:
+    """
+    EPIC-first full-page segmentation: OCR entire page, split by EPIC pattern, return one block per voter.
+
+    Does NOT depend on contour, grid, or box detection. As long as EPIC is readable in the page text,
+    the voter is captured. Stable for scanned TN electoral rolls (layout shifts, skew, partial pages).
+
+    Returns:
+        List of card blocks; each block = list of text lines for one voter.
+    """
+    try:
+        import pytesseract
+    except ImportError:
+        return []
+
+    _configure_tesseract_cmd()
+    pil_img = _img_to_pil(img)
+    config = "--oem 3 --psm 6"
+    text = pytesseract.image_to_string(pil_img, config=config)
+    if not text or not text.strip():
+        return []
+
+    chunks = EPIC_SPLIT_PATTERN.split(text)
+    blocks: List[List[str]] = []
+    for chunk in chunks:
+        chunk = chunk.strip()
+        if not chunk:
+            continue
+        if not EPIC_BLOCK_CONTAINS.search(chunk):
+            continue
+        lines = [ln.strip() for ln in chunk.splitlines() if ln.strip()]
+        if lines:
+            blocks.append(lines)
+    if blocks and page_number is not None:
+        logger.info(
+            "Page %d: extracted %d voters (full-page EPIC split)",
+            page_number,
+            len(blocks),
+        )
+    return blocks
+
+
+def _ocr_page_grid(
+    img,
+    num_cols: int = 3,
+    rows_per_page: int = 10,
+    header_top_ratio: float = 0.10,
+    data_bottom_ratio: float = 0.96,
+    margin_left_ratio: float = 0.02,
+    margin_right_ratio: float = 0.02,
+    page_number: Optional[int] = None,
+) -> List[List[str]]:
+    """
+    Deterministic grid extraction: divide page into num_cols × rows_per_page cells,
+    OCR each cell, return one block per cell. No EPIC dependency — processes every card.
+
+    Use this first for scanned ECI rolls (e.g. 3×10 = 30 cards per page) to avoid
+    missing records when EPIC detection fails. Order: row-major (col 0..num_cols-1 for row 0, then row 1, ...).
+    """
+    try:
+        import pytesseract
+        from PIL import Image
+    except ImportError:
+        return []
+
+    _configure_tesseract_cmd()
+    pil_img = _img_to_pil(img)
+    w_page, h_page = pil_img.size
+
+    # Data region (ratios so DPI-agnostic)
+    top_px = int(h_page * header_top_ratio)
+    bottom_px = int(h_page * data_bottom_ratio)
+    left_px = int(w_page * margin_left_ratio)
+    right_px = int(w_page * (1 - margin_right_ratio))
+    usable_height = max(1, bottom_px - top_px)
+    usable_width = max(1, right_px - left_px)
+
+    col_width = usable_width // num_cols
+    row_height = usable_height // rows_per_page
+    if col_width < 10 or row_height < 10:
+        return []
+
+    card_blocks: List[List[str]] = []
+    for row in range(rows_per_page):
+        for col in range(num_cols):
+            x_min = left_px + col * col_width
+            x_max = left_px + (col + 1) * col_width
+            y_min = top_px + row * row_height
+            y_max = top_px + (row + 1) * row_height
+            try:
+                crop = pil_img.crop((x_min, y_min, x_max, y_max))
+                crop = _preprocess_card_for_ocr(crop)
+                text = pytesseract.image_to_string(crop, config=TESSERACT_CARD_CONFIG)
+                lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+                if lines:
+                    card_blocks.append(lines)
+            except Exception as e:
+                if page_number is not None:
+                    logger.debug("Grid OCR cell (%d,%d) page %s: %s", row, col, page_number, e)
+
+    return card_blocks
+
+
+def _detect_card_boxes_cv2(pil_img) -> List[Tuple[int, int, int, int]]:
+    """
+    Detect rectangular card boundaries using OpenCV contours.
+    Filter by relative page area (0.5%–15%) so it works across DPI/layout; no fixed pixel size.
+    Returns list of (x, y, w, h) sorted top-to-bottom then left-to-right.
+    """
+    try:
+        import cv2
+        import numpy as np
+    except ImportError:
+        return []
+
+    try:
+        arr = np.array(pil_img)
+        if len(arr.shape) == 3:
+            gray = cv2.cvtColor(arr, cv2.COLOR_RGB2GRAY)
+        else:
+            gray = arr
+        h_page, w_page = gray.shape[0], gray.shape[1]
+        page_area = w_page * h_page
+
+        blur = cv2.GaussianBlur(gray, (5, 5), 0)
+        thresh = cv2.adaptiveThreshold(
+            blur, 255,
+            cv2.ADAPTIVE_THRESH_MEAN_C,
+            cv2.THRESH_BINARY_INV, 15, 5,
+        )
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (7, 7))
+        morph = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel)
+        contours, _ = cv2.findContours(
+            morph, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE,
+        )
+        boxes: List[Tuple[int, int, int, int]] = []
+        for cnt in contours:
+            x, y, w, h = cv2.boundingRect(cnt)
+            area = w * h
+            # Relative page area: 0.003–0.20 to catch partial/small cards (was 0.005–0.15)
+            if 0.003 * page_area < area < 0.20 * page_area:
+                boxes.append((x, y, w, h))
+        boxes.sort(key=lambda b: (b[1] // 100, b[0]))
+        return boxes
+    except Exception as e:
+        logger.debug("Contour card detection failed: %s", e)
+        return []
+
+
+def _ocr_page_contour_boxes(img, page_number: Optional[int] = None) -> List[List[str]]:
+    """
+    Extract card blocks by detecting rectangular boundaries (contours), then OCR each crop.
+    Use when fixed grid fails; works for skewed/different layouts.
+    """
+    try:
+        import pytesseract
+    except ImportError:
+        return []
+
+    _configure_tesseract_cmd()
+    pil_img = _img_to_pil(img)
+    boxes = _detect_card_boxes_cv2(pil_img)
+    if not boxes:
+        return []
+
+    if page_number is not None:
+        logger.info("Page %d: detected %d candidate boxes", page_number, len(boxes))
+
+    card_blocks: List[List[str]] = []
+    for (x, y, w, h) in boxes:
+        try:
+            crop = pil_img.crop((x, y, x + w, y + h))
+            crop = _preprocess_card_for_ocr(crop)
+            text = pytesseract.image_to_string(crop, config=TESSERACT_CARD_CONFIG)
+            lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+            if lines:
+                card_blocks.append(lines)
+        except Exception as e:
+            if page_number is not None:
+                logger.debug("Contour box OCR failed for (%d,%d,%d,%d) page %s: %s", x, y, w, h, page_number, e)
+    return card_blocks
+
+
+def _ocr_page_spatial(img, num_cols: int = 3, conf_threshold: int = 20) -> List[List[str]]:
     """
     Production-grade spatial OCR for 3-column electoral roll pages.
 
@@ -764,7 +1045,7 @@ def _ocr_page_spatial(img, num_cols: int = 3, conf_threshold: int = 40) -> List[
 def _render_pdf_images(
     pdf_path: Path,
     max_pages: int = 1000,
-    dpi: int = 300,
+    dpi: int = 400,
 ) -> List["Any"]:
     """
     Render PDF pages to PIL Images.
@@ -806,7 +1087,7 @@ def _render_pdf_images(
 def _extract_text_via_ocr(
     pdf_path: Path,
     max_pages: Optional[int] = 1000,
-    dpi: int = 300,
+    dpi: int = 400,
     preprocess: bool = False,
     num_cols: int = 3,
 ) -> List[str]:
@@ -903,10 +1184,93 @@ def _extract_text_via_ocr(
             return []
 
 
+def _process_page_production(
+    img: "Any",
+    page_idx: int,
+    num_cols: int,
+    rows_per_page: int,
+    cfg: Dict[str, Any],
+    debug_config: Optional[Dict[str, Any]] = None,
+) -> List[List[str]]:
+    """
+    Single production page-processing: fixed grid (primary) → full-page EPIC split → EPIC-first layout → contour → grid → spatial → full-page.
+    Fixed grid: 3×10 rectangles, OCR each cell separately — no merging, production-grade.
+    """
+    import pytesseract
+
+    page_number = page_idx + 1
+    blocks: List[List[str]] = []
+
+    # 0) Fixed grid (primary): 3 cols × 10 rows, top 18% bottom 95%. One card per cell, no merging.
+    fixed_grid_blocks = _ocr_page_fixed_grid(
+        img,
+        page_number=page_number,
+        num_cols=num_cols,
+        rows_per_page=rows_per_page,
+        header_top_ratio=float(cfg.get("header_top_ratio", 0.18)),
+        data_bottom_ratio=float(cfg.get("data_bottom_ratio", 0.95)),
+    )
+    if fixed_grid_blocks:
+        return fixed_grid_blocks
+
+    # 1) Full-page EPIC split fallback
+    full_page_blocks = _ocr_page_full_page_epic_split(img, page_number=page_number)
+    if full_page_blocks:
+        return full_page_blocks
+
+    # 2) EPIC-first (layout-based: image_to_data → EPIC positions → crop per card)
+    epic_blocks, _err, _metrics = _ocr_page_epic_first(
+        img, num_cols=num_cols, page_number=page_number, debug_config=debug_config,
+    )
+    if epic_blocks:
+        blocks = epic_blocks
+        logger.info("Page %d: extracted %d voters (EPIC-first layout)", page_number, len(blocks))
+        return blocks
+
+    # 2) Contour + 3) Grid (always run both, merge if needed)
+    contour_blocks = _ocr_page_contour_boxes(img, page_number=page_number)
+    grid_blocks = _ocr_page_grid(
+        img,
+        num_cols=num_cols,
+        rows_per_page=rows_per_page,
+        header_top_ratio=float(cfg.get("header_top_ratio", 0.06)),
+        data_bottom_ratio=float(cfg.get("data_bottom_ratio", 0.98)),
+        margin_left_ratio=float(cfg.get("margin_left_ratio", 0.01)),
+        margin_right_ratio=float(cfg.get("margin_right_ratio", 0.01)),
+        page_number=page_number,
+    )
+    if contour_blocks or grid_blocks:
+        seen_sig: set = set()
+        merged: List[List[str]] = []
+        for bl in (contour_blocks or []) + (grid_blocks or []):
+            sig = "|".join((ln.strip()[:50] for ln in bl[:5] if ln.strip())) or str(id(bl))
+            if sig not in seen_sig:
+                seen_sig.add(sig)
+                merged.append(bl)
+        if merged:
+            blocks = merged
+    if blocks:
+        logger.info("Page %d: extracted %d voters (contour+grid)", page_number, len(blocks))
+        return blocks
+
+    # 4) Spatial OCR
+    spatial_blocks = _ocr_page_spatial(img, num_cols=num_cols, conf_threshold=20)
+    if spatial_blocks:
+        logger.info("Page %d: extracted %d voters (spatial)", page_number, len(spatial_blocks))
+        return spatial_blocks
+
+    # 5) Full-page OCR
+    text = pytesseract.image_to_string(img, config="--psm 6 --oem 3")
+    lines = [ln.strip() for ln in text.split("\n") if ln.strip()]
+    blocks = [lines] if lines else []
+    logger.info("Page %d: extracted %d voters (full-page)", page_number, len(blocks))
+    return blocks
+
+
 def _extract_blocks_via_ocr(
     pdf_path: Path,
     max_pages: int = 1000,
-    dpi: int = 300,
+    dpi: int = 400,
     preprocess: bool = False,
     num_cols: int = 3,
     extraction_config: Optional[Dict[str, Any]] = None,
@@ -925,6 +1289,8 @@ def _extract_blocks_via_ocr(
     images = _render_pdf_images(pdf_path, max_pages=max_pages, dpi=dpi)
     if not images:
         return []
+
+    logger.info("Total pages detected: %d", len(images))
 
     cfg = extraction_config or {}
     if preprocess:
@@ -988,6 +1354,11 @@ def _extract_blocks_via_ocr(
             text = pytesseract.image_to_string(img)
             lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
             return [lines] if lines else []
+            """Production page processing: EPIC → contour → grid → spatial → full-page. Logs per-page."""
+            rows_per_page = int(cfg.get("rows_per_page", EXTRACTION_CONFIG_DEFAULTS["rows_per_page"]))
+            return _process_page_production(
+                img, page_idx, num_cols, rows_per_page, cfg, debug_config,
+            )
 
         max_workers = min(4, len(images))
         if max_workers <= 1:
@@ -1000,6 +1371,9 @@ def _extract_blocks_via_ocr(
             len(result),
             sum(len(p) for p in result),
         )
+        total_voters = sum(len(p) for p in result)
+        logger.info("Total cards extracted from PDF: %d", total_voters)
+        logger.info("Total voters extracted (for tuning): %d across %d pages", total_voters, len(result))
         return result
 
     except Exception as e:
@@ -1070,6 +1444,30 @@ HEADER_PATTERNS = {
         r"parliamentary\s+constituency[^\n]*[\n:]?\s*(\d+\s*-\s*[^\n]+)",
         re.IGNORECASE
     ),
+}
+# Page-1 metadata for electoral_roll_metadata table (State, Assembly No/Name, Part, Year, Total Electors)
+ELECTORAL_METADATA_PATTERNS = {
+    "state": re.compile(r"state\s*[:\-]?\s*([^\n]+?)(?=\s*District|\s*Assembly|\s*Part|\s*$)", re.IGNORECASE),
+    "district": re.compile(r"district\s*[:\-]?\s*([^\n]+?)(?=\s*Assembly|\s*Part|\s*$)", re.IGNORECASE),
+    "assembly_no": re.compile(r"assembly\s*(?:no\.?|number)?\s*[:\-]?\s*(\d+)", re.IGNORECASE),
+    "assembly_name": re.compile(
+        r"(?:assembly\s+(?:constituency|name|no\.?)[^\n]*[\n:]?\s*)?(?:\d+\s*-\s*)?([A-Z][A-Z\.\s]+?)(?:\s*\(GEN\)|\s*\(SC\)|\s*\(ST\)|\s+Part\s+No\.|\s*$)",
+        re.IGNORECASE
+    ),
+    "parliament_constituency": re.compile(
+        r"parliament(?:ary)?\s+constituency[^\n]*[\n:]?\s*(\d+\s*-\s*[^\n]+)",
+        re.IGNORECASE
+    ),
+    "part_number": re.compile(r"part\s*(?:no\.?|number)?\s*[:\-]?\s*(\d+)", re.IGNORECASE),
+    "year": re.compile(r"year\s*(?:of\s+revision)?\s*[:\-]?\s*(\d{4})", re.IGNORECASE),
+    "total_electors": re.compile(r"total\s+electors?\s*[:\-]?\s*(\d+)", re.IGNORECASE),
+}
+# Number of Electors summary on page 1 (e.g. "561 Male", "556 Female", "Total 1117")
+ELECTOR_COUNT_PATTERNS = {
+    "male_count": re.compile(r"(\d+)\s+Male\b", re.IGNORECASE),
+    "female_count": re.compile(r"(\d+)\s+Female\b", re.IGNORECASE),
+    "total_from_summary": re.compile(r"\bTotal\s+(\d+)\b", re.IGNORECASE),
+    "number_of_electors": re.compile(r"number\s+of\s+electors?\s*[:\-]?\s*(\d+)", re.IGNORECASE),
 }
 # Extended first-page metadata (TN ECI cover page)
 # Sample uses "Year of Revision 2026" (space) or "Year of Revision: 2026" (colon)
@@ -1170,8 +1568,8 @@ RE_RECORD_START_SERIAL_ONLY = re.compile(r"^\s*(\d+)\s*$")
 RE_FATHER = re.compile(r"father\s*name\s*[:\-]\s*(.+)", re.IGNORECASE)
 RE_HUSBAND = re.compile(r"husband\s*name\s*[:\-]\s*(.+)", re.IGNORECASE)
 RE_MOTHER = re.compile(r"mother\s*name\s*[:\-]\s*(.+)", re.IGNORECASE)
-# "Name: xxx" or "Nama: xxx" (elector name with prefix)
-RE_NAME_PREFIX = re.compile(r"^(?:name|nama|namo|namc|namne|narne)\s*[:\-]\s*(.+)", re.IGNORECASE)
+# "Name: xxx" or "Nama: xxx" or "Mame: xxx" (OCR) / "Narmne: xxx" (OCR)
+RE_NAME_PREFIX = re.compile(r"^(?:name|nama|namo|namc|namne|narne|mame|narmne)\s*[:\-]\s*(.+)", re.IGNORECASE)
 # "House Number: xxx" or "House No: xxx"
 RE_HOUSE_NUMBER_PREFIX = re.compile(r"house\s*(?:number|no\.?)\s*[:\-]\s*(.+)", re.IGNORECASE)
 # "Age: 32 Gender: Male Photo" on same line
@@ -1183,8 +1581,8 @@ RE_AGE = re.compile(r"^\d{1,3}$")
 RE_GENDER = re.compile(r"^(Male|Female|M|F)$", re.IGNORECASE)
 
 # ----- OCR-tolerant patterns (scanned TN ECI cards) -----
-# Name: "Name" / "Nama" / "Namo" / "Namc" / "Namne" / "Narne" (OCR typos)
-RE_NAME_FUZZY = re.compile(r"^(?:name|nama|namo|namc|namne|narne)\s*[:\-]?\s*(.*)$", re.IGNORECASE)
+# Name: "Name" / "Nama" / "Mame" / "Narmne" (OCR typos)
+RE_NAME_FUZZY = re.compile(r"^(?:name|nama|namo|namc|namne|narne|mame|narmne)\s*[:\-]?\s*(.*)$", re.IGNORECASE)
 # Father/Husband/Mother: Fatnar Namo, Fether Name, Falher Narne, Fatner Narie
 RE_FATHER_FUZZY = re.compile(
     r"(?:falhe?r?|father|falner|falhar|fatnar|fether|fatner)\s*(?:naine?|name|namie|nama|namo|narne|narie)?\s*[:\-\"]?\s*(.*)$",
@@ -1276,6 +1674,7 @@ def _normalize_ocr_card_lines(lines: List[str]) -> List[str]:
 CARD_FOOTER_KEYWORDS = (
     "age as on",
     "date of publication",
+    "publication",
     "total pages",
     "page ",
     "signature of",
@@ -1293,13 +1692,42 @@ def _strip_footer_from_card_block(lines: List[str]) -> List[str]:
 
 # Keyword-anchor regexes (TN rolls: order varies; use anchors, not line index)
 RE_EPIC_ANYWHERE_STRICT = re.compile(r"\b[A-Z]{3}[0-9]{6,7}\b", re.IGNORECASE)
+# EPIC in card text allowing OCR noise ($ and 8 for S) so "$SL2526283", "8BJ1504851" are detected and normalized
+RE_EPIC_CARD = re.compile(r"\b[$8A-Z][A-Za-z0-9$]{2,4}[0-9]{6,7}\b", re.IGNORECASE)
+
+
+def _normalize_epic_ocr_noise(epic: Optional[str]) -> Optional[str]:
+    """
+    Fix common OCR noise in EPIC: $ and 8 become S in letter prefix; O and I become 0 and 1 in digit part.
+    Example: 8BJ1504851 becomes SBJ1504851; WQD25978O1 becomes WQD2597801.
+    """
+    if not epic or not isinstance(epic, str):
+        return None
+    s = epic.strip().upper().replace(" ", "").replace("$", "S")
+    if len(s) < 6:
+        return s or None
+    # Letter prefix: treat 8 as part of prefix (OCR for S), then replace 8->S only there
+    letters_end = 0
+    for i, c in enumerate(s):
+        if c.isalpha() or c == "S" or c == "8":
+            letters_end = i + 1
+        else:
+            break
+    prefix = s[:letters_end].replace("8", "S")
+    s = prefix + s[letters_end:]
+    if letters_end < len(s):
+        digit_part = s[letters_end:].replace("O", "0").replace("I", "1")
+        s = s[:letters_end] + digit_part
+    return s or None
+
+
 RE_AGE_ANCHOR = re.compile(r"Age\s*[:;]?\s*(\d{1,3})", re.IGNORECASE)
 RE_AGE_FALLBACK_GENDER = re.compile(r"\b(\d{2})\s*(Male|Female)\b", re.IGNORECASE)
 RE_RELATIVE_ANCHOR = re.compile(r"(Father|Husband|Mother)\s*Name\s*[:;]?\s*(.*)", re.IGNORECASE)
 RE_HOUSE_ANCHOR = re.compile(r"House\s*Number\s*[:;]?\s*([0-9A-Za-z\/\-]+)", re.IGNORECASE)
 RE_HOUSE_FALLBACK = re.compile(r"\b([0-9]+[A-Za-z]*[/\-][0-9A-Za-z\/\-]+)\b")
-# Name with prefix on same line (after normalization)
-RE_NAME_ANCHOR = re.compile(r"^Name\s*[:;]?\s*(.+)$", re.IGNORECASE)
+# Name with prefix on same line (after normalization); include OCR variants Mame, Narmne
+RE_NAME_ANCHOR = re.compile(r"^(?:name|nama|namo|namc|namne|narne|mame|narmne)\s*[:;]?\s*(.+)$", re.IGNORECASE)
 
 
 def _parse_card_keyword_anchored(block: List[str], rec: Dict[str, Any]) -> None:
@@ -1312,7 +1740,7 @@ def _parse_card_keyword_anchored(block: List[str], rec: Dict[str, Any]) -> None:
     full_text = " ".join(block)
     lines = [ln.strip() for ln in block if ln.strip()]
 
-    # 1) EPIC: find anywhere in block (do not assume first line)
+    # 1) EPIC: find anywhere in block (do not assume first line); allow $ as S (OCR noise)
     if not rec.get("epic_number"):
         for ln in lines:
             m = RE_RECORD_START.match(ln)
@@ -1320,23 +1748,42 @@ def _parse_card_keyword_anchored(block: List[str], rec: Dict[str, Any]) -> None:
                 if rec.get("serial_number") is None:
                     rec["serial_number"] = m.group(1)
                 if _looks_like_epic(m.group(2)):
-                    rec["epic_number"] = m.group(2)
+                    rec["epic_number"] = _normalize_epic_ocr_noise(m.group(2)) or m.group(2)
                     break
             if _looks_like_epic(ln):
-                rec["epic_number"] = ln
+                rec["epic_number"] = _normalize_epic_ocr_noise(ln) or ln
                 break
         if not rec.get("epic_number"):
             m = RE_EPIC_ANYWHERE_STRICT.search(full_text)
             if m:
-                rec["epic_number"] = m.group(0)
+                rec["epic_number"] = _normalize_epic_ocr_noise(m.group(0)) or m.group(0)
+        if not rec.get("epic_number"):
+            m = RE_EPIC_CARD.search(full_text)
+            if m:
+                raw = m.group(0)
+                rec["epic_number"] = _normalize_epic_ocr_noise(raw) or raw
+    if rec.get("epic_number"):
+        rec["epic_number"] = _normalize_epic_ocr_noise(rec["epic_number"]) or rec["epic_number"]
 
-    # 2) Relative: (Father|Husband|Mother) Name : value
+    # 2) Name: "Name : xxx" / "Mame: xxx" / "Narmne: xxx" (elector name on any line)
+    if not rec.get("name"):
+        for ln in lines:
+            m = RE_NAME_ANCHOR.match(ln)
+            if m:
+                val = (m.group(1) or "").strip().rstrip("-").strip()
+                if val and len(val) >= 2:
+                    v_lower = val.lower()
+                    if v_lower not in ("name", "nama", "naine", "namie", "mame", "narmne", "photo", "phote", "phota", "fhoto", "available", "avallable", "availabhe", "pnoio", "ptoto"):
+                        if not RE_EPIC_CARD.search(val) and not _looks_like_epic(_normalize_epic_ocr_noise(val) or ""):
+                            rec["name"] = val
+                            break
+    # 3) Relative: (Father|Husband|Mother) Name : value
     if not rec.get("relative_name"):
         for ln in lines:
             m = RE_RELATIVE_ANCHOR.search(ln)
             if m:
                 val = (m.group(2) or "").strip().rstrip("-").rstrip('"').strip()
-                if val and len(val) >= 2 and val.lower() not in ("name", "nama", "narie", "nartie"):
+                if val and len(val) >= 2 and val.lower() not in ("name", "nama", "narie", "nartie", "available", "avallable", "availabhe", "photo", "phote", "phota", "fhoto", "pnoio", "ptoto"):
                     rec["relative_name"] = val
                     break
 
@@ -1399,9 +1846,15 @@ def _parse_card_keyword_anchored(block: List[str], rec: Dict[str, Any]) -> None:
                     rec["name"] = val
                     break
         if rec.get("name") is None:
-            skip_starts = ("father", "husband", "mother", "house", "age", "gender", "photo", "available", "name:")
+            skip_starts = ("father", "husband", "mother", "house", "age", "gender", "photo", "available", "name:", "publication", "publication :")
             for ln in lines:
                 if RE_EPIC.match(ln) or _looks_like_epic(ln):
+                    continue
+                # Skip lines that are EPIC with OCR noise ($SL...)
+                if RE_EPIC_CARD.search(ln):
+                    continue
+                normalized_ln = _normalize_epic_ocr_noise(ln)
+                if normalized_ln and _looks_like_epic(normalized_ln):
                     continue
                 low = ln.lower().strip()
                 if any(low.startswith(s) for s in skip_starts) or low in ("male", "female"):
@@ -1414,10 +1867,24 @@ def _parse_card_keyword_anchored(block: List[str], rec: Dict[str, Any]) -> None:
 
 
 def _normalize_house_no(s: str) -> str:
-    """Fix common OCR errors in house numbers: &→8, Q→0, O→0, C→0, I→1 (e.g. 8/100, &/10Q→8/100)."""
+    """Fix common OCR errors in house numbers: &->8, Q->0, O->0; strip trailing 'Photo', 'Photo Hous', 'Available' etc."""
     if not s or len(s) > 80:
         return s
     s = s.strip()
+    # Never allow house_no to be only "Photo" or "Available" (OCR line bleed)
+    if re.match(r"^(?:photo|phote|phota|fhoto|available|avallable|availabhe)\s*$", s, re.IGNORECASE):
+        return ""
+    # Strip leading "Photo " / "Available " so we don't assign "Photo" as house_no
+    s = re.sub(r"^(?:photo|phote|phota|fhoto|available|avallable|availabhe)\s+", "", s, flags=re.IGNORECASE).strip()
+    # Strip trailing OCR junk (e.g. "5/10 Photo Hous" -> "5/10")
+    for junk in (" photo hous", " photo house", " photo", " phote", " phota", " fhoto", " available", " avallable", " hous", " house", " pnoio", " ptoto"):
+        if s.lower().endswith(junk):
+            s = s[: -len(junk)].strip()
+    # If middle part has " Photo" etc., take only the leading house-number-like part
+    if re.search(r"\s+(?:photo|phote)\s*", s, re.IGNORECASE) or re.search(r"\s+available\s*", s, re.IGNORECASE):
+        m = re.match(r"^([0-9A-Za-z\/\-\.\,]+)", s)
+        if m and re.search(r"\d", m.group(1)):
+            s = m.group(1).strip()
     # Only in digit/slash context: replace common OCR misreads.
     out = []
     for i, c in enumerate(s):
@@ -1454,6 +1921,19 @@ def _is_date_like(s: str) -> bool:
     return False
 
 
+def _clean_relative_name(s: Optional[str]) -> Optional[str]:
+    """Strip relation labels from end of relative name (e.g. 'Ramasamy Husband' -> 'Ramasamy')."""
+    if not s or not isinstance(s, str):
+        return s
+    t = s.strip()
+    if t.lower() in ("available", "avallable", "availabhe", "photo", "phote", "phota", "fhoto", "pnoio", "ptoto", "name", "naine", "namie"):
+        return None
+    for suffix in (r"\s+husband\s*$", r"\s+father\s*$", r"\s+mother\s*$", r"\s+husband's\s+name\s*$",
+                   r"\s+father's\s+name\s*$", r"\s+mother's\s+name\s*$", r"\s+f\/h\s*$"):
+        t = re.sub(suffix, "", t, flags=re.IGNORECASE).strip()
+    return t or None
+
+
 # ----- Position-aware extraction -----
 # Layout: 3 cards per row × 10 rows = 30 voters per page (configurable)
 # Extraction config: cards_per_row, rows_per_page, row_gap, header_top, data_bottom
@@ -1469,21 +1949,26 @@ EPIC_DIGIT_CORRECTIONS_DEFAULT = [
 ]
 
 EXTRACTION_CONFIG_DEFAULTS = {
-    "cards_per_row": 3,       # 3 cards per row (10 rows × 3 = 30 per page)
+    "cards_per_row": 3,
     "rows_per_page": 10,
-    "row_gap": 25,            # Vertical gap (px) between cards; if word top - prev_top > row_gap → new card
-    "header_top": 120,        # Skip content above this y (page header)
-    "data_bottom": 750,       # Skip content below this y (footer, page numbers)
+    "use_grid_first": True,
+    "header_top_ratio": 0.06,   # Lower so grid doesn't crop away cards (was 0.12)
+    "data_bottom_ratio": 0.98,
+    "margin_left_ratio": 0.01,
+    "margin_right_ratio": 0.01,
+    "row_gap": 25,
+    "header_top": 120,
+    "data_bottom": 750,
     "margin_left": 20,
     "margin_right": 20,
-    "epic_corrections": None,       # Optional list of (from, to) for EPIC prefix; None = use default
-    "epic_digit_corrections": None, # Optional list of (from, to) for digit part; None = use default (0→6)
-    "epic_fix_digit_0_as_6": True,  # When True, replace 0→6 in EPIC digit part (common OCR error)
+    "epic_corrections": None,
+    "epic_digit_corrections": None,
+    "epic_fix_digit_0_as_6": True,
 }
 
 
 # EPIC valid pattern: 3 letters + 6-7 digits (TN format)
-RE_EPIC_VALID = re.compile(r"^[A-Za-z]{3}[0-9]{6,7}(/[0-9]+)?$", re.IGNORECASE)
+RE_EPIC_VALID = re.compile(r"^[A-Z]{3}[0-9]{7}$", re.IGNORECASE)
 
 # Known ECI EPIC prefixes (TN and common states) for confidence scoring
 ALLOWED_EPIC_PREFIXES = frozenset(("WQD", "WOD", "FBT", "ABC", "XYZ", "TMB", "TN", "AP", "KL", "KA", "DL", "MH", "WB", "UP", "RJ", "PB", "HR", "GJ"))
@@ -1596,6 +2081,8 @@ def _validate_and_score_records(records: List[Dict[str, Any]]) -> Tuple[List[Dic
     VALID_GENDERS = {"M", "F", "O", "MALE", "FEMALE", "OTHER"}
     CONFIDENCE_WEIGHTS = {"epic": 0.40, "name": 0.20, "age": 0.15, "gender": 0.15, "house_no": 0.10}
     LOW_CONFIDENCE_THRESHOLD = 0.70
+    # Records below this confidence are flagged for human manual verification (100% accuracy strategy)
+    MANUAL_VERIFICATION_THRESHOLD = 0.95
 
     seen_epics: set = set()
     stats = {
@@ -1604,6 +2091,7 @@ def _validate_and_score_records(records: List[Dict[str, Any]]) -> Tuple[List[Dic
         "gender_valid_count": 0,
         "duplicate_epic_count": 0,
         "low_confidence_count": 0,
+        "needs_manual_verification_count": 0,
         "multi_epic_warnings": 0,
         "possible_cross_card_merge_count": 0,
     }
@@ -1683,9 +2171,12 @@ def _validate_and_score_records(records: List[Dict[str, Any]]) -> Tuple[List[Dic
         r["epic_confidence"] = epic_conf
         r["confidence_score"] = round(score, 2)
         r["low_confidence"] = score < LOW_CONFIDENCE_THRESHOLD
+        r["needs_manual_verification"] = score < MANUAL_VERIFICATION_THRESHOLD
         r["quality_flag"] = "ok" if score >= 0.85 else "review"
         if r["low_confidence"]:
             stats["low_confidence_count"] += 1
+        if r["needs_manual_verification"]:
+            stats["needs_manual_verification_count"] += 1
         r["_warnings"] = warnings
 
     n = len(records)
@@ -1706,7 +2197,7 @@ def _merge_ocr_config(extraction_config: Optional[Dict[str, Any]] = None) -> Dic
             "ocr_preprocess": ecfg.ocr_preprocess,
         }
     except Exception:
-        base = {"ocr_dpi": 300, "ocr_max_pages": 1000, "ocr_preprocess": False}
+        base = {"ocr_dpi": 400, "ocr_max_pages": 1000, "ocr_preprocess": False}
     return {**base, **(extraction_config or {})}
 
 
@@ -1818,6 +2309,90 @@ def _extract_cards_by_position(
     return records
 
 
+def _fill_card_from_positional_order(lines: List[str], rec: Dict[str, Any]) -> None:
+    """
+    Fill missing card fields from line order (unlabeled OCR layout).
+    TN S22 scanned cards often look like: EPIC, Name, Relative, HouseNo, Age Gender.
+    Only sets fields that are still None/empty; does not overwrite keyword-extracted values.
+    """
+    if not lines:
+        return
+    lines = [ln.strip() for ln in lines if ln.strip()]
+
+    # 1) EPIC from first line if not set
+    if not rec.get("epic_number") and lines:
+        m = RE_EPIC_CARD.search(lines[0]) or RE_EPIC_ANYWHERE_STRICT.search(lines[0])
+        if m:
+            rec["epic_number"] = _normalize_epic_ocr_noise(m.group(0)) or m.group(0)
+        elif _looks_like_epic(lines[0]):
+            rec["epic_number"] = _normalize_epic_ocr_noise(lines[0]) or lines[0]
+
+    # 2) Name from line 1 if missing and line looks like a name (not EPIC, not age/gender, not house)
+    if not rec.get("name") and len(lines) > 1:
+        ln1 = lines[1]
+        if not RE_EPIC_CARD.search(ln1) and not _looks_like_epic(_normalize_epic_ocr_noise(ln1) or ""):
+            if not ln1.isdigit() and "publication" not in ln1.lower() and "photo" not in ln1.lower():
+                if not re.match(r"^\d{1,3}\s*[MF]$", ln1.strip()) and not RE_HOUSE_FALLBACK.match(ln1):
+                    if len(ln1) >= 2 and len(ln1) <= 100:
+                        rec["name"] = ln1.rstrip("-").strip()
+
+    # 3) Relative from line 2 if missing
+    if not rec.get("relative_name") and len(lines) > 2:
+        ln2 = lines[2]
+        if not RE_EPIC_CARD.search(ln2) and not _looks_like_epic(_normalize_epic_ocr_noise(ln2) or ""):
+            if not ln2.isdigit() and "publication" not in ln2.lower() and "photo" not in ln2.lower():
+                if not re.match(r"^\d{1,3}\s*[MF]$", ln2.strip()) and len(ln2) >= 2 and len(ln2) <= 100:
+                    rec["relative_name"] = ln2.rstrip("-").strip() or ""
+
+    # 4) House number: first line that looks like house (digits/slash, short)
+    if not rec.get("house_no"):
+        for ln in lines:
+            if re.search(r"[\d/]", ln) and not _is_date_like(ln) and len(ln) <= 25:
+                if not RE_EPIC.match(ln) and not RE_EPIC_CARD.search(ln):
+                    if re.search(r"\d", ln):
+                        rec["house_no"] = _normalize_house_no(ln)
+                        break
+
+    # 5) Age and Gender: scan all lines for "NN M/F" or "NN Male/Female" or standalone age/gender
+    if rec.get("age") is None or not rec.get("gender"):
+        re_age_mf = re.compile(r"\b(\d{2,3})\s*([MF])\b", re.IGNORECASE)
+        for ln in lines:
+            m = re_age_mf.search(ln)
+            if m:
+                try:
+                    a = int(m.group(1))
+                    if 18 <= a <= 120 and rec.get("age") is None:
+                        rec["age"] = a
+                except (ValueError, TypeError):
+                    pass
+                if not rec.get("gender") and m.lastindex >= 2:
+                    rec["gender"] = (m.group(2) or "").upper()[:1]
+            else:
+                m = RE_AGE_FALLBACK_GENDER.search(ln) or RE_AGE_GENDER_LINE_FUZZY.search(ln) or RE_AGE_FUZZY.search(ln)
+                if m:
+                    try:
+                        a = int(m.group(1))
+                        if 18 <= a <= 120 and rec.get("age") is None:
+                            rec["age"] = a
+                    except (ValueError, TypeError):
+                        pass
+                    if m.lastindex and m.lastindex >= 2 and m.group(2) and not rec.get("gender"):
+                        g = _normalize_gender(m.group(2))
+                        if g and g in ("M", "F"):
+                            rec["gender"] = g
+            if not rec.get("gender"):
+                g = _normalize_gender(ln)
+                if g and g in ("M", "F"):
+                    rec["gender"] = g
+            if rec.get("age") is None and re.match(r"^\d{1,3}$", ln.strip()):
+                try:
+                    a = int(ln.strip())
+                    if 18 <= a <= 120:
+                        rec["age"] = a
+                except ValueError:
+                    pass
+
+
 def _apply_positional_card_parsing(block: List[str], rec: Dict[str, Any]) -> None:
     """
     Positional extraction: Line 0 = EPIC/serial, 1 = Name, 2 = Father, 3 = House, 4+ = Age/Gender.
@@ -1835,13 +2410,14 @@ def _apply_positional_card_parsing(block: List[str], rec: Dict[str, Any]) -> Non
                 rec["epic_number"] = rec.get("epic_number") or m.group(2)
         elif _looks_like_epic(lines[0]):
             rec["epic_number"] = rec.get("epic_number") or lines[0]
-    # Line 1: Name (if not a label line)
+    # Line 1: Name (if not a label line and not EPIC/noise)
     if len(lines) > 1 and not re.match(r"^(?:name|nama|father|house|age|sex|gender)", lines[1], re.I):
-        if not RE_EPIC.match(lines[1]) and len(lines[1]) > 1 and not lines[1].isdigit():
-            rec["name"] = rec.get("name") or lines[1].rstrip("-").strip()
+        if not RE_EPIC.match(lines[1]) and not RE_EPIC_CARD.search(lines[1]) and not _looks_like_epic(_normalize_epic_ocr_noise(lines[1]) or ""):
+            if len(lines[1]) > 1 and not lines[1].isdigit() and "publication" not in lines[1].lower():
+                rec["name"] = rec.get("name") or lines[1].rstrip("-").strip()
     # Line 2: Father/relative (if not a label)
     if len(lines) > 2 and not re.match(r"^(?:father|husband|mother|house|age)", lines[2], re.I):
-        if not RE_EPIC.match(lines[2]) and len(lines[2]) > 1:
+        if not RE_EPIC.match(lines[2]) and not RE_EPIC_CARD.search(lines[2]) and len(lines[2]) > 1 and "publication" not in lines[2].lower():
             rec["relative_name"] = rec.get("relative_name") or lines[2].rstrip("-").strip() or ""
     # Line 3: House (digits/slash) or next line that looks like house
     for idx in (3, 4):
@@ -1895,6 +2471,9 @@ def _parse_one_card_block(
     # Keyword-anchor extraction first (no positional assumptions)
     _parse_card_keyword_anchored(lines, rec)
 
+    # Position-aware fill for unlabeled OCR (e.g. EPIC, Name, Relative, 94, 59 F)
+    _fill_card_from_positional_order(lines, rec)
+
     if os.getenv("EXTRACT_DEBUG", "").strip().lower() in ("1", "true", "yes"):
         logger.debug(
             "Parsed card (before gap-fill): epic=%s name=%s relative=%s age=%s gender=%s house_no=%s",
@@ -1915,19 +2494,21 @@ def _parse_one_card_block(
     # Label-based gap-fill (next-line values, fuzzy labels)
     while i < len(lines):
         bl = lines[i].strip()
-        if not bl or bl.lower() in ("photo", "available", "pnoio", "ptoto", "pnoto", "avallable", "availabl", "availablc", "avallablo"):
+        if not bl or bl.lower() in ("photo", "available", "pnoio", "ptoto", "pnoto", "avallable", "availabl", "availablc", "avallablo") or "publication" in bl.lower():
             i += 1
             continue
         # Name: "Name : value" or "Name" then next line is value
         m_name = RE_NAME_PREFIX.match(bl) or RE_NAME_FUZZY.match(bl)
         if m_name:
             val = (m_name.group(1) or "").strip().rstrip("-")
-            if val and val.lower() not in ("name", "naine", "namie", "nama", "namo", "namc"):
-                rec["name"] = val
+            if val and val.lower() not in ("name", "naine", "namie", "nama", "namo", "namc", "photo", "phote", "phota", "fhoto", "available", "avallable", "availabhe", "pnoio", "ptoto"):
+                if not RE_EPIC_CARD.search(val) and not _looks_like_epic(_normalize_epic_ocr_noise(val) or ""):
+                    rec["name"] = val
             elif i + 1 < len(lines):
                 next_val = lines[i + 1].strip()
-                if next_val and not RE_EPIC.match(next_val) and next_val.lower() not in ("name", "father", "house", "age", "gender", "photo", "available"):
-                    rec["name"] = next_val.rstrip("-").strip()
+                if next_val and next_val.lower() not in ("name", "father", "house", "age", "gender", "photo", "phote", "available", "publication", "publication :"):
+                    if not RE_EPIC.match(next_val) and not RE_EPIC_CARD.search(next_val) and not _looks_like_epic(_normalize_epic_ocr_noise(next_val) or ""):
+                        rec["name"] = next_val.rstrip("-").strip()
                     i += 1
             i += 1
             continue
@@ -2058,6 +2639,13 @@ def _parse_one_card_block(
                 if "name" not in bl_lower or ":" in bl:
                     rec["name"] = bl.rstrip("-").strip()
         i += 1
+
+    # Clean relation label from relative_name (e.g. "Ramasamy Husband" → "Ramasamy")
+    if rec.get("relative_name"):
+        rec["relative_name"] = _clean_relative_name(rec["relative_name"]) or ""
+    # Ensure house_no has no trailing Photo/Available (e.g. "5/10 Photo Hous" → "5/10")
+    if rec.get("house_no"):
+        rec["house_no"] = _normalize_house_no(rec["house_no"])
 
 
 def _try_parse_column_layout(
@@ -2454,6 +3042,79 @@ def _extract_metadata_from_text(first_page_text: str) -> Tuple[Optional[str], Op
     return constituency_name, part_no, part_name
 
 
+def extract_electoral_roll_metadata_from_page1(first_page_text: str, pdf_name: str = "") -> Dict[str, Any]:
+    """
+    Extract metadata from first page for electoral_roll_metadata table.
+    Returns dict with: state, district, assembly_no, assembly_name, parliament_constituency,
+    part_number, year, total_electors, pdf_name.
+    """
+    def clean(v: str) -> str:
+        return " ".join((v or "").split()).strip() if v else ""
+
+    out: Dict[str, Any] = {"pdf_name": pdf_name, "state": None, "district": None, "assembly_no": None,
+                           "assembly_name": None, "parliament_constituency": None, "part_number": None,
+                           "year": None, "total_electors": None, "male_count": None, "female_count": None}
+    if not first_page_text or not first_page_text.strip():
+        return out
+
+    # Number of Electors summary (e.g. "561 Male", "556 Female", "Total 1117")
+    for key, pattern in ELECTOR_COUNT_PATTERNS.items():
+        m = pattern.search(first_page_text)
+        if m:
+            try:
+                val = int(m.group(1))
+                if key == "male_count":
+                    out["male_count"] = val
+                elif key == "female_count":
+                    out["female_count"] = val
+                elif key in ("total_from_summary", "number_of_electors"):
+                    if out.get("total_electors") is None:
+                        out["total_electors"] = val
+            except (ValueError, IndexError):
+                pass
+
+    for key, pattern in ELECTORAL_METADATA_PATTERNS.items():
+        m = pattern.search(first_page_text)
+        if m:
+            val = clean(m.group(1))
+            if key == "total_electors":
+                try:
+                    out[key] = int(val) if val and val.isdigit() else None
+                except ValueError:
+                    out[key] = None
+            elif key in ("assembly_no", "part_number"):
+                out[key] = val or None
+            else:
+                out[key] = val or None
+
+    # Assembly name from constituency pattern "149 - ARIYALUR" or "9 - ARITYALUR"
+    if not out.get("assembly_name"):
+        cn, _, _ = _extract_metadata_from_text(first_page_text)
+        if cn and " - " in cn:
+            out["assembly_name"] = clean(cn.split(" - ", 1)[1].split("(")[0])
+        elif cn:
+            out["assembly_name"] = clean(cn)
+    if not out.get("assembly_no") and out.get("assembly_name"):
+        m = re.search(r"(\d+)\s*-\s*" + re.escape(out["assembly_name"]), first_page_text, re.IGNORECASE)
+        if m:
+            out["assembly_no"] = m.group(1)
+    if not out.get("year"):
+        rev = REVISION_PATTERNS.get("revision_year")
+        if rev:
+            mm = rev.search(first_page_text)
+            if mm:
+                out["year"] = mm.group(1).strip()
+    # Use "Total N" from summary line if total_electors still missing
+    if out.get("total_electors") is None and ELECTOR_COUNT_PATTERNS.get("total_from_summary"):
+        m = ELECTOR_COUNT_PATTERNS["total_from_summary"].search(first_page_text)
+        if m:
+            try:
+                out["total_electors"] = int(m.group(1))
+            except (ValueError, IndexError):
+                pass
+    return out
+
+
 def _get_page_text(page) -> str:
     """
     Get full text from a pdfplumber page. Tries extract_text(layout=True), then
@@ -2674,7 +3335,7 @@ def extract_from_pdf(
         page_blocks_list = _extract_blocks_via_ocr(
             pdf_path,
             max_pages=cfg.get("ocr_max_pages", 1000),
-            dpi=cfg.get("ocr_dpi", 300),
+            dpi=cfg.get("ocr_dpi", 400),
             preprocess=cfg.get("ocr_preprocess", False),
             num_cols=num_cols,
             extraction_config=ecfg,
@@ -2818,6 +3479,18 @@ def extract_from_pdf(
     meta["validation_stats"] = validation_stats
     if segmentation_metrics_ocr:
         meta["segmentation_metrics"] = segmentation_metrics_ocr
+    roll_meta = extract_electoral_roll_metadata_from_page1(
+        first_page_text, pdf_name=Path(pdf_path).name
+    )
+    # Cross-check totals: flag PDF when extracted count doesn't match page-1 summary (100% accuracy strategy)
+    extracted_count = len(all_records)
+    summary_total = roll_meta.get("total_electors")
+    count_matches_summary = summary_total is not None and extracted_count == summary_total
+    roll_meta["extracted_count"] = extracted_count
+    roll_meta["count_matches_summary"] = count_matches_summary
+    if summary_total is not None and not count_matches_summary:
+        roll_meta["total_mismatch"] = True
+    meta["electoral_roll_metadata"] = roll_meta
     return {
         "records": all_records,
         "metadata": meta,

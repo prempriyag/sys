@@ -116,15 +116,9 @@ export default function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
           const batchId = item.BATCH_ID || "";
           const projectId = item.PROJECT_ID || "2";
 
-          // Determine URL based on project ID
-          let url = "";
-          if (projectId === "1") {
-            url = `/school/batchdetails/${batchId}`;
-          } else if (projectId === "3") {
-            url = `/grad/batchdetails/${batchId}`;
-          } else {
-            url = `/college/batchdetails/${batchId}`;
-          }
+          // Legacy projects (school/college/grad) were removed in SIR-only app.
+          // Keep global search usable by routing to dashboard.
+          const url = "/dashboard";
 
           results.push({
             id: url,
@@ -192,9 +186,7 @@ export default function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
   // Group suggestions by project
   const groupedSuggestions = suggestions.reduce((acc, item) => {
     const projectId = item.PROJECT_ID || "2";
-    let groupName = "Undergrad";
-    if (projectId === "1") groupName = "Highschool";
-    else if (projectId === "3") groupName = "Grad";
+    const groupName = "Results";
 
     if (!acc[groupName]) {
       acc[groupName] = [];

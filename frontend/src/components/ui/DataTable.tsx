@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from "react";
 import { Table, TableHeader, TableBody, TableRow, TableCell } from "./table";
 import Input from "../form/input/InputField";
-import { getAuthToken, removeAuthToken, API_BASE_URL } from "../../config/api";
+import { getAuthToken, removeAuthToken, API_BASE_URL, buildApiUrl } from "../../config/api";
 
 interface Column {
   data: string;
@@ -266,9 +266,33 @@ const DataTableComponent = (props: DataTableProps, ref: React.ForwardedRef<DataT
         ...(ajaxData || {}),
       };
 
-      // Construct full URL - if ajaxUrl is relative, prepend API_BASE_URL
-      const fullUrl = ajaxUrl.startsWith("http") ? ajaxUrl : `${API_BASE_URL}${ajaxUrl}`;
-      
+      // Construct full URL - if ajaxUrl is relative, prepend API_BASE_URL. Reject invalid URLs.
+      let fullUrl: string;
+      if (ajaxUrl == null || ajaxUrl === "" || String(ajaxUrl) === "undefined") {
+        console.error("[DataTable] ajaxUrl is undefined or empty");
+        setData([]);
+        setLoading(false);
+        return;
+      }
+      if (ajaxUrl.startsWith("http")) {
+        fullUrl = ajaxUrl;
+      } else {
+        try {
+          fullUrl = buildApiUrl(ajaxUrl);
+        } catch (e) {
+          console.error("[DataTable] Invalid ajaxUrl:", e);
+          setData([]);
+          setLoading(false);
+          return;
+        }
+      }
+      if (fullUrl.includes("undefined")) {
+        console.error("[DataTable] Refusing to fetch URL containing 'undefined':", fullUrl);
+        setData([]);
+        setLoading(false);
+        return;
+      }
+
       const response = await fetch(fullUrl, {
         method: method,
         headers: {

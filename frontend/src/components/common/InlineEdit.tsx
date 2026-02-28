@@ -105,6 +105,12 @@ export default function InlineEdit({
       console.log('BatchId:', batchId);
       console.log('EditValue:', editValue);
 
+      if (!endpoint) {
+        setValidationError("Invalid edit type: no API endpoint");
+        setIsSaving(false);
+        return;
+      }
+
       try {
         const response = await api.post(endpoint, payload);
         

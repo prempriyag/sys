@@ -54,6 +54,11 @@ export const sirMenu: MenuConfig = {
           path: "/upload/bulk-electoral-roll",
           icon: "file-text",
         },
+        {
+          name: "Extract Batches",
+          path: "/upload/extract-batches",
+          icon: "folder",
+        },
       ],
     },
     {

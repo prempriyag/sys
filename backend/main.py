@@ -75,6 +75,9 @@ CORS_ORIGINS = [
     "http://127.0.0.1:5173",
     "http://127.0.0.1:51590",
     "http://127.0.0.1:8000",
+    # UAT server
+    "http://65.1.93.82",
+    "http://65.1.93.82:80",
 ]
 CORS_ORIGIN_REGEX = r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
 app.add_middleware(
@@ -101,7 +104,11 @@ from controllers.sir import upload_router, matching_router, kpi_router, dashboar
 from controllers.sir.validation_controller import router as validation_router
 from controllers.sir.reports_controller import router as reports_router
 from controllers.sir.extractor_controller import router as extractor_router
+from controllers.sir.extract_batch_controller import router as extract_batch_router
+from bulk_electoral import router as bulk_electoral_router
 
+app.include_router(extract_batch_router)
+app.include_router(bulk_electoral_router)
 app.include_router(upload_router)
 app.include_router(extractor_router)
 app.include_router(matching_router)
@@ -110,6 +117,16 @@ app.include_router(dashboard_router)
 app.include_router(analytics_router)
 app.include_router(validation_router)
 app.include_router(reports_router)
+
+# Optional: start folder watcher on startup when EXTRACT_OCR_FOLDER is set
+@app.on_event("startup")
+async def startup_event():
+    try:
+        from services.extract_folder_watcher import start_folder_watcher
+        start_folder_watcher()
+    except Exception as e:
+        logging.getLogger(__name__).debug("Extract folder watcher not started: %s", e)
+
 
 @app.get("/")
 async def root():

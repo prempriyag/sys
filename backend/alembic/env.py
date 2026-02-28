@@ -20,10 +20,22 @@ if config.config_file_name is not None:
 # target_metadata = mymodel.Base.metadata
 target_metadata = None
 
-# other values from the config, defined by the needs of env.py,
-# can be acquired:
-# my_important_option = config.get_main_option("my_important_option")
-# ... etc.
+
+def get_url():
+    """Use app's database URL instead of alembic.ini placeholder (driver://...)."""
+    try:
+        from config.settings import settings
+        import urllib.parse
+        import os
+        encoded = urllib.parse.quote_plus(settings.DB_PASSWORD)
+        port = (os.environ.get("DB_PORT") or getattr(settings, "DB_PORT", None) or "").strip() or "5432"
+        host = settings.DB_HOST
+        if ":" not in host:
+            host = f"{host}:{port}"
+        return f"postgresql://{settings.DB_USER}:{encoded}@{host}/{settings.DB_NAME}"
+    except Exception:
+        pass
+    return config.get_main_option("sqlalchemy.url")
 
 
 def run_migrations_offline() -> None:
@@ -38,7 +50,7 @@ def run_migrations_offline() -> None:
     script output.
 
     """
-    url = config.get_main_option("sqlalchemy.url")
+    url = get_url()
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -57,8 +69,10 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
+    configuration = config.get_section(config.config_ini_section, {}) or {}
+    configuration["sqlalchemy.url"] = get_url()
     connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
+        configuration,
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )

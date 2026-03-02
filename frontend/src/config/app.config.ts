@@ -38,7 +38,7 @@ export const APP_NAME = import.meta.env.VITE_APP_NAME || "DigiScript";
 // API Base URLs by environment
 const API_BASE_URL_BY_ENV: Record<string, string> = {
   DEV: "http://localhost:8000",
-  UAT: "https://digiscript-csc-uat.ktechproducts.com/backend",
+  UAT: "http://65.1.93.82/backend",
   PROD: "https://digiscript-csc.ktechproducts.com/backend",
 };
 

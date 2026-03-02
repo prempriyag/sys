@@ -135,7 +135,13 @@ export const API_ENDPOINTS = {
   SIR_ECI_STATES: "/api/upload/eci-states",
   SIR_ECI_DISTRICTS: "/api/upload/eci-districts",
   SIR_ECI_ASSEMBLY_CONSTITUENCIES: "/api/upload/eci-assembly-constituencies",
+  // Extract batches (automated file processing)
+  EXTRACT_BATCHES_LIST: "/api/extract-batches/list",
+  EXTRACT_BATCH_DETAIL: "/api/extract-batches",
+  EXTRACT_BATCHES_START_WATCHER: "/api/extract-batches/start-watcher",
+  EXTRACT_BATCHES_PROCESS_FILE: "/api/extract-batches/process-file",
 
+  // Production extractor v1 (auto-detect text vs scanned, validation)
   EXTRACTOR_V1_EXTRACT: "/api/v1/extract-voters",
   EXTRACTOR_V1_OCR_UPLOAD: "/api/v1/ocr-upload",
   EXTRACTOR_V1_HEALTH: "/api/v1/extractor/health",

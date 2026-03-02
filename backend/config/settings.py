@@ -15,8 +15,8 @@ _ENV_PATH = _BACKEND_DIR / ".env"
 _ENV_URLS = {
     "DEV": ("http://localhost:8000", "http://localhost:5173"),
     "UAT": (
-        "https://digiscript-csc-uat.ktechproducts.com/backend",
-        "https://digiscript-csc-uat.ktechproducts.com",
+        "http://65.1.93.82/backend",
+        "http://65.1.93.82",
     ),
     "PROD": (
         "https://digiscript-csc.ktechproducts.com/backend",
@@ -73,6 +73,10 @@ class Settings(BaseSettings):
 
     # ECI electoral roll download: subprocess timeout (seconds). ECI portal can be slow; 600=10min, 900=15min if needed.
     ECI_DOWNLOAD_TIMEOUT_SECONDS: int = 600
+
+    # Automated file processing: monitored folder and archive (env: EXTRACT_OCR_FOLDER, EXTRACT_ARCHIVE_FOLDER)
+    EXTRACT_OCR_FOLDER: Optional[str] = None  # e.g. C:\extractocr\
+    EXTRACT_ARCHIVE_FOLDER: Optional[str] = None  # e.g. C:\extractocr\archived\
 
     @model_validator(mode="after")
     def set_default_urls_by_env(self):

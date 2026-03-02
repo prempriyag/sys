@@ -55,9 +55,9 @@ export const sirMenu: MenuConfig = {
           icon: "file-text",
         },
         {
-          name: "All Voter Data",
-          path: "/upload/all-voter-data",
-          icon: "table",
+          name: "Extract Batches",
+          path: "/upload/extract-batches",
+          icon: "folder",
         },
       ],
     },

@@ -305,6 +305,19 @@ export const parseElectoralRollPdf = (formData: FormData) =>
         responseType: 'blob',
     });
 
+// Extract batches (automated file processing)
+export const getExtractBatchesList = (params?: { skip?: number; limit?: number }) =>
+    api.get(API_ENDPOINTS.EXTRACT_BATCHES_LIST, { params });
+export const getExtractBatchDetail = (batchId: string) =>
+    api.get(`${API_ENDPOINTS.EXTRACT_BATCH_DETAIL}/${batchId}`);
+export const startExtractFolderWatcher = () =>
+    api.post(API_ENDPOINTS.EXTRACT_BATCHES_START_WATCHER);
+export const processExtractFile = (formData: FormData) =>
+    api.post(API_ENDPOINTS.EXTRACT_BATCHES_PROCESS_FILE, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 300000,
+    });
+
 /** Summary of uploaded Pre-SIR and Post-SIR data per constituency/booth (see where your upload went). */
 export const getRollSummary = () =>
     api.get(API_ENDPOINTS.SIR_DASHBOARD_ROLL_SUMMARY);

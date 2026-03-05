@@ -7,8 +7,8 @@ The frontend supports SSO login for both Client and KTech users. The SSO flow au
 
 ### 1. Direct URL Access
 You can directly navigate to SSO endpoints:
-- **Client SSO**: `http://localhost:5173/sso/client` or `http://localhost:8000/sso/client`
-- **KTech SSO**: `http://localhost:5173/sso/ktech` or `http://localhost:8000/sso/ktech`
+- **Client SSO**: `http://localhost:5173/sso/client` or `http://localhost:8001/sso/client`
+- **KTech SSO**: `http://localhost:5173/sso/ktech` or `http://localhost:8001/sso/ktech`
 
 ### 2. Using Helper Functions
 Import and use the helper functions from `config/api.ts`:
@@ -44,7 +44,7 @@ The Sign-In form already includes SSO buttons:
 ### 5. Configuration
 Make sure your `.env` file has:
 ```env
-BASE_URL=http://localhost:8000
+BASE_URL=http://localhost:8001
 FRONTEND_URL=http://localhost:5173
 ```
 
@@ -92,11 +92,11 @@ const navigate = useNavigate();
 navigate("/sso/ktech");
 
 // Or using window.location
-window.location.href = "http://localhost:8000/sso/ktech";
+window.location.href = "http://localhost:8001/sso/ktech";
 ```
 
 ## Notes
 - The SSO method (OAuth or SAML) is automatically detected by the backend
-- You can force a specific method by setting `CLIENT_SSO_METHOD` or `KTECH_SSO_METHOD` in backend `.env`
+- You can force a specific method by setting `CLIENT_SSO_METHOD` or `KKSSO_METHOD` in backend `.env`
 - The frontend callback page automatically handles token storage and user session setup
 - After successful SSO login, users are redirected based on their permissions (college_perm, hs_perm, ocr_perm)

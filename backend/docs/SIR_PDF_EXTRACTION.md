@@ -61,3 +61,44 @@ This prints the first page text length, table count, and a preview so you can se
 
 - `pdfplumber` – table/text extraction. Install with: `pip install pdfplumber`.
 - For scanned PDFs (--ocr): `pymupdf`, and either `pytesseract`+Tesseract in PATH, or `easyocr` (no system install needed).
+
+## Bulk electoral roll upload (OCR)
+
+The **Bulk electoral roll** feature (`POST /api/upload/bulk-electoral-roll`) detects text vs scanned PDFs and uses:
+
+- **Text PDFs:** pdfminer.six (no extra install).
+- **Scanned PDFs:** Tesseract OCR. If Tesseract is not in PATH:
+  - **Windows:** Set `TESSERACT_CMD` in the environment to the full path, e.g. `C:\Program Files\Tesseract-OCR\tesseract.exe`. The engine also checks that path automatically if the variable is not set.
+  - **Optional fallback:** Install [Tesseract](https://github.com/UB-Mannheim/tesseract/wiki) and add it to PATH, or use EasyOCR: `pip install easyocr` and set `ALLOW_EASYOCR_FALLBACK=true` (or `1`/`yes`) so scanned PDFs are processed when Tesseract is missing.
+
+Invalid or empty PDFs (e.g. "No /Root object!") are skipped; the rest are processed. Check server logs for per-file warnings.
+
+### Data not stored? (troubleshooting)
+
+Data is inserted into the **PostgreSQL** table `voter_data`. If nothing appears in the DB:
+
+1. **Table voter_data missing** – You get a 500 error. Create the table:
+   ```bash
+   cd backend && python create_sir_tables.py
+   ```
+   Or run migrations: `alembic upgrade head`.
+
+2. **Column `year` missing** – If the table was created before the constituency/year feature, add the column:
+   ```bash
+   cd backend && alembic upgrade head
+   ```
+   Or in PostgreSQL: `ALTER TABLE voter_data ADD COLUMN IF NOT EXISTS year VARCHAR(20);`
+
+2b. **Column `relation_type` missing** – To store Father/Husband/Mother separately from relative_name:
+   ```bash
+   psql -d your_db -f backend/scripts/sql/add_relation_type_to_voter_data.sql
+   ```
+   Or: `ALTER TABLE voter_data ADD COLUMN IF NOT EXISTS relation_type VARCHAR(20);`
+
+3. **Wrong database** – The app uses **PostgreSQL** (see `backend/database/connection.py` and `.env`). Ensure you are querying the same DB (same host, port, database name).
+
+4. **No records extracted** – If all PDFs are scanned and Tesseract (or EasyOCR) fails, `total_found` and `inserted` are 0. Check the API response and server logs (e.g. "OCR extract failed", "tesseract is not installed").
+
+5. **All duplicates** – Existing EPICs are skipped (ON CONFLICT DO NOTHING). So `inserted` can be 0 while `duplicates_skipped` is high. Data is already in the table.
+
+**Verify:** `GET /api/upload/bulk-electoral-roll-count` returns `{ "count": N, "table": "voter_data" }` so you can confirm rows are in the DB.

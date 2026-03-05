@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import DataTable from "../../../../components/ui/DataTable";
-import { API_BASE_URL } from "../../../../config/api";
+import { API_BASE_URL, buildApiUrl } from "../../../../config/api";
 import { alertsuccess, alerterror } from "../../../../utils/toast";
 
 const SmtpSetup: React.FC = () => {
@@ -111,7 +111,7 @@ const SmtpSetup: React.FC = () => {
     try {
       const endpoint = isEdit ? "/api/smtp/update" : "/api/smtp/insert";
       const body = isEdit ? { id: editingId, ...formData } : formData;
-      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      const response = await fetch(buildApiUrl(endpoint), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

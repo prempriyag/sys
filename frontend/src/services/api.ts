@@ -1,5 +1,5 @@
 import axios, { AxiosRequestConfig } from 'axios';
-import { API_BASE_URL, API_ENDPOINTS, getAuthToken } from '../config/api';
+import { API_BASE_URL, API_ENDPOINTS, getAuthToken, buildApiUrl } from '../config/api';
 
 const api = axios.create({
     baseURL: API_BASE_URL,
@@ -40,81 +40,46 @@ export const uploadPostSirPdf = (formData: FormData) =>
         headers: { 'Content-Type': 'multipart/form-data' }
     });
 
-/** Bulk Electoral Roll: folder_path (server path) or multiple PDF files. Returns total_found, inserted, duplicates_skipped, invalid_epic_count, invalid_epics. */
-export const bulkElectoralRoll = (formData: FormData, config?: AxiosRequestConfig) =>
-    api.post(API_ENDPOINTS.SIR_BULK_ELECTORAL_ROLL, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-        timeout: 600000,
-        ...(config || {}),
-    });
-
-export type BulkProgress = { current: number; total: number; pdf_name: string; records_so_far: number };
-export type BulkResult = {
-    total_found?: number;
-    inserted?: number;
-    duplicates_skipped?: number;
-    invalid_epic_count?: number;
-    invalid_epics?: string[];
-    pdf_count?: number;
-    moved_count?: number;
-    extracted_folder?: string;
-    message?: string;
-    errors?: string[];
+export type VoterDataItem = {
+    id: number;
+    pdf_name?: string | null;
+    page_number?: number | null;
+    box_id?: number | null;
+    epic_number?: string | null;
+    name?: string | null;
+    relative_name?: string | null;
+    relation_type?: string | null;
+    age?: number | null;
+    gender?: string | null;
+    house_no?: string | null;
+    address?: string | null;
+    constituency_name?: string | null;
+    year?: string | null;
+    booth_number?: string | null;
+    source_pdf?: string | null;
+    confidence_score?: number | null;
+    created_at?: string | null;
 };
 
-/** Bulk with progress: POST to stream endpoint, call onProgress for each event, resolve with result on 'done'. */
-export async function bulkElectoralRollWithProgress(
-    formData: FormData,
-    onProgress: (p: BulkProgress) => void,
-): Promise<BulkResult> {
-    const token = getAuthToken();
-    const url = `${API_BASE_URL}${API_ENDPOINTS.SIR_BULK_ELECTORAL_ROLL_STREAM}`;
-    const res = await fetch(url, {
-        method: 'POST',
-        body: formData,
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        signal: AbortSignal.timeout(600000),
-    });
-    if (!res.ok) {
-        const t = await res.text();
-        throw new Error(t || res.statusText);
-    }
-    const reader = res.body?.getReader();
-    if (!reader) throw new Error('No response body');
-    const dec = new TextDecoder();
-    let buffer = '';
-    let result: BulkResult = {};
-    while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buffer += dec.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() ?? '';
-        for (const line of lines) {
-            if (line.startsWith('data: ')) {
-                try {
-                    const data = JSON.parse(line.slice(6));
-                    if (data.type === 'progress') {
-                        onProgress({
-                            current: data.current,
-                            total: data.total,
-                            pdf_name: data.pdf_name ?? '',
-                            records_so_far: data.records_so_far ?? 0,
-                        });
-                    } else if (data.type === 'done' && data.result) {
-                        result = data.result;
-                    } else if (data.type === 'error') {
-                        throw new Error(data.detail ?? 'Stream error');
-                    }
-                } catch (e) {
-                    if (e instanceof SyntaxError) continue;
-                    throw e;
-                }
-            }
-        }
-    }
-    return result;
-}
+export type VoterDataPage = {
+    page: number;
+    page_size: number;
+    total: number;
+    total_pages: number;
+    items: VoterDataItem[];
+};
+
+export type VoterDataQualityRow = {
+    pdf_name: string | null;
+    total_records: number;
+    epic_present_pct: number;
+    name_present_pct: number;
+    age_present_pct: number;
+    gender_present_pct: number;
+    house_no_present_pct: number;
+    address_present_pct: number;
+    avg_confidence_pct: number;
+};
 
 /** Extract electoral roll from PDF only (no DB save). Returns { records, metadata } for preview. */
 export const extractPdfRoll = (formData: FormData) =>
@@ -128,7 +93,7 @@ export const listPdfFiles = async (): Promise<{ data: { files: string[]; folder:
         const res = await api.get(API_ENDPOINTS.SIR_PDF_FILES);
         return res;
     } catch {
-        const url = `${API_BASE_URL}${API_ENDPOINTS.SIR_PDF_FILES}`;
+        const url = buildApiUrl(API_ENDPOINTS.SIR_PDF_FILES);
         const r = await fetch(url, { credentials: 'omit' });
         if (!r.ok) throw new Error(`Failed to load PDF list: ${r.status}`);
         const data = await r.json();
@@ -150,7 +115,10 @@ export const extractPdfByPath = (body: {
     constituency_name?: string;
     booth_number?: string;
     use_ocr?: boolean;
+    use_textract?: boolean;
     extraction_config?: Record<string, number | string>;
+    save_to_db?: boolean;
+    year?: string;
 }) => api.post(API_ENDPOINTS.SIR_EXTRACT_PDF_BY_PATH, body);
 
 /** Debug PDF: returns raw page text and structure (when extraction returns 0 records). */
@@ -168,14 +136,6 @@ export const getEciDistricts = (state: string) =>
 export const getEciAssemblyConstituencies = (state: string, district: string) =>
   api.get<{ assembly_constituencies: string[] }>(API_ENDPOINTS.SIR_ECI_ASSEMBLY_CONSTITUENCIES, { params: { state, district } });
 
-/** Production v1: Extract voters (auto-detect text vs scanned). Returns { data, metadata, extraction_mode, errors, warnings }. Use max_pages in form to limit OCR and avoid timeout. */
-export const extractVotersV1 = (formData: FormData, config?: AxiosRequestConfig) =>
-    api.post(API_ENDPOINTS.EXTRACTOR_V1_EXTRACT, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-        timeout: 15 * 60 * 1000,
-        ...(config || {}),
-    });
-
 /** Docling-based extraction (layout-aware). Returns { total_extracted, is_scanned, data }. Optional max_pages limits PDF pages (default 15) to avoid OOM. */
 export const extractWithDocling = (
     formData: FormData,
@@ -191,16 +151,6 @@ export const extractWithDocling = (
         ...(config || {}),
     });
 };
-
-/** Production v1: Upload extracted OCR records to sys DB (table ocr_voter_uploads). */
-export const uploadOcrRecords = (payload: {
-  records: Array<Record<string, any>>;
-  constituency_name?: string;
-  booth_number?: string;
-}) => api.post(API_ENDPOINTS.EXTRACTOR_V1_OCR_UPLOAD, payload);
-
-/** Production v1: Extractor health (OCR engines, OpenCV, PyMuPDF availability). */
-export const extractorHealth = () => api.get(API_ENDPOINTS.EXTRACTOR_V1_HEALTH);
 
 /** Database connection info (no password). */
 export const getDbInfo = () => api.get(API_ENDPOINTS.DB_INFO);
@@ -250,8 +200,11 @@ export const getBoothsKPI = (constituencyId: number) =>
 export const getRiskMap = (constituencyId: number) => 
     api.get(`${API_ENDPOINTS.SIR_DASHBOARD_RISK_MAP}/${constituencyId}`);
 
-export const getConstituencies = () => 
-    api.get(API_ENDPOINTS.SIR_DASHBOARD_CONSTITUENCIES);
+export const getConstituencies = (includeVoterData?: boolean) =>
+    api.get(API_ENDPOINTS.SIR_DASHBOARD_CONSTITUENCIES, { params: includeVoterData ? { include_voter_data: true } : {} });
+
+export const getVoterDataSummaryByConstituencyYear = () =>
+    api.get(API_ENDPOINTS.SIR_VOTER_DATA_SUMMARY_BY_CONSTITUENCY_YEAR);
 export const convertScannedPdf = (formData: FormData) =>
     api.post(API_ENDPOINTS.SIR_CONVERT_PDF, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
 
@@ -283,6 +236,30 @@ export const getRollSummary = () =>
 export const getRollSample = (constituencyId: number, roll: 'pre' | 'post', limit: number = 50) =>
     api.get(API_ENDPOINTS.SIR_DASHBOARD_ROLL_SAMPLE, {
         params: { constituency_id: constituencyId, roll, limit }
+    });
+
+export const getBulkVoterData = (params: {
+    page?: number;
+    page_size?: number;
+    q?: string;
+    pdf_name?: string;
+}) => api.get<VoterDataPage>(API_ENDPOINTS.SIR_BULK_ELECTORAL_ROLL_DATA, { params });
+
+export const getBulkVoterDataQuality = (limit: number = 500) =>
+    api.get<{ count: number; items: VoterDataQualityRow[] }>(
+        API_ENDPOINTS.SIR_BULK_ELECTORAL_ROLL_QUALITY,
+        { params: { limit } }
+    );
+
+/** List server folder paths that contain PDFs (for bulk upload dropdown). */
+export const getBulkFolderPaths = () =>
+    api.get<{ paths: string[]; count: number }>(API_ENDPOINTS.SIR_BULK_FOLDER_PATHS);
+
+/** Bulk Textract Extract: process all PDFs in a folder or uploaded files. Extracts via AWS Textract, inserts to voter_data, moves to extracted/. */
+export const bulkTextractExtract = (formData: FormData) =>
+    api.post(API_ENDPOINTS.SIR_BULK_TEXTTRACT_EXTRACT, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 60 * 60 * 1000, // 1 hour for bulk processing
     });
 
 // SIR Analytics APIs

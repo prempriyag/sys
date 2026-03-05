@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
-import { getConstituencyKPI, getRiskMap, getConstituencies } from '../../services/api';
+import { getConstituencyKPI, getRiskMap, getConstituencies, getVoterDataSummaryByConstituencyYear } from '../../services/api';
 import RiskMap from '../../components/RiskMap';
 import ReactApexChart from 'react-apexcharts';
 import PageContainer from '../../components/common/PageContainer';
@@ -9,7 +9,7 @@ import ThemedLoader from '../../components/common/ThemedLoader';
 import { alertsuccess, alerterror } from '../../utils/toast';
 
 interface Constituency {
-  id: number;
+  id: number | null;
   name: string;
   district: string;
   state: string;
@@ -35,6 +35,7 @@ const SIRDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [constituencies, setConstituencies] = useState<Constituency[]>([]);
   const [selectedConstituency, setSelectedConstituency] = useState<number | null>(null);
+  const [selectedConstituencyName, setSelectedConstituencyName] = useState<string | null>(null);
   const [kpi, setKpi] = useState<ConstituencyKPI>({
     total_pre: 0,
     total_post: 0,
@@ -50,27 +51,51 @@ const SIRDashboard: React.FC = () => {
     anomaly_booths: 0,
   });
   const [booths, setBooths] = useState<any[]>([]);
+  const [voterDataSummary, setVoterDataSummary] = useState<Array<{
+    constituency_name: string;
+    years: Array<{ year: string; record_count: number; pdf_count: number }>;
+    total_records: number;
+  }>>([]);
 
   useEffect(() => {
     loadConstituencies();
+    loadVoterDataSummary();
   }, []);
 
   useEffect(() => {
     if (selectedConstituency) {
       loadDashboardData(selectedConstituency);
+    } else if (selectedConstituencyName && !selectedConstituency) {
+      setLoading(false);
     }
-  }, [selectedConstituency]);
+  }, [selectedConstituency, selectedConstituencyName]);
 
   const loadConstituencies = async () => {
     try {
-      const response = await getConstituencies();
+      const response = await getConstituencies(true);
       setConstituencies(response.data);
       if (response.data.length > 0) {
-        setSelectedConstituency(response.data[0].id);
+        const first = response.data[0];
+        if (first.id != null) {
+          setSelectedConstituency(first.id);
+          setSelectedConstituencyName(null);
+        } else {
+          setSelectedConstituency(null);
+          setSelectedConstituencyName(first.name);
+        }
       }
     } catch (error: any) {
       alerterror('Failed to load constituencies');
       console.error(error);
+    }
+  };
+
+  const loadVoterDataSummary = async () => {
+    try {
+      const res = await getVoterDataSummaryByConstituencyYear();
+      setVoterDataSummary((res.data as any)?.items ?? []);
+    } catch {
+      setVoterDataSummary([]);
     }
   };
 
@@ -129,6 +154,25 @@ const SIRDashboard: React.FC = () => {
     Math.max(0, (booths.length || 0) - kpi.high_risk_booths - kpi.high_opportunity_booths - kpi.anomaly_booths)
   ];
 
+  const selectedName = selectedConstituency != null
+    ? (constituencies.find((c) => c.id === selectedConstituency)?.name ?? null)
+    : selectedConstituencyName;
+  const selectedBulkSummary = voterDataSummary.find(
+    (s) => s.constituency_name && selectedName && s.constituency_name.toLowerCase() === selectedName.toLowerCase()
+  );
+  const hasYearComparison = selectedBulkSummary && selectedBulkSummary.years.length > 1;
+  const yearComparisonOptions: ApexCharts.ApexOptions = hasYearComparison ? {
+    chart: { type: 'bar', toolbar: { show: false } },
+    xaxis: { categories: selectedBulkSummary!.years.map((y) => y.year), title: { text: 'Year' } },
+    yaxis: { title: { text: 'Records' } },
+    colors: ['#3b82f6'],
+    dataLabels: { enabled: true },
+    plotOptions: { bar: { borderRadius: 4 } },
+  } : {};
+  const yearComparisonSeries = hasYearComparison
+    ? [{ name: 'Records', data: selectedBulkSummary!.years.map((y) => y.record_count) }]
+    : [];
+
   if (loading) {
     return (
       <PageContainer>
@@ -160,20 +204,80 @@ const SIRDashboard: React.FC = () => {
           
           {constituencies.length > 0 && (
             <select
-              value={selectedConstituency || ''}
-              onChange={(e) => setSelectedConstituency(Number(e.target.value))}
+              value={selectedConstituency != null ? selectedConstituency : selectedConstituencyName ? `voter:${selectedConstituencyName}` : ''}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v.startsWith('voter:')) {
+                  setSelectedConstituency(null);
+                  setSelectedConstituencyName(v.slice(6));
+                } else {
+                  setSelectedConstituency(Number(v));
+                  setSelectedConstituencyName(null);
+                }
+              }}
               className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
             >
               {constituencies.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name} - {c.district}
+                <option key={c.id ?? `voter-${c.name}`} value={c.id != null ? c.id : `voter:${c.name}`}>
+                  {c.name} - {c.district || '(Bulk Upload)'}
                 </option>
               ))}
             </select>
           )}
         </div>
 
-        {/* KPI Cards */}
+        {/* Bulk Upload Summary by Constituency & Year */}
+        {voterDataSummary.length > 0 && (
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
+            <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Bulk Upload Summary by Constituency</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+              Voter records from bulk uploads, grouped by constituency and year
+            </p>
+            <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-600">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-600">
+                <thead className="bg-gray-50 dark:bg-gray-700">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Constituency</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Year</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Records</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">PDFs</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
+                  {voterDataSummary.flatMap((s) =>
+                    s.years.map((y) => (
+                      <tr
+                        key={`${s.constituency_name}-${y.year}`}
+                        className={`bg-white dark:bg-gray-800 ${
+                          selectedName && s.constituency_name.toLowerCase() === selectedName.toLowerCase()
+                            ? 'ring-1 ring-blue-500 dark:ring-blue-400'
+                            : ''
+                        }`}
+                      >
+                        <td className="px-4 py-2 text-sm text-gray-900 dark:text-white">{s.constituency_name}</td>
+                        <td className="px-4 py-2 text-sm text-gray-600 dark:text-gray-300">{y.year}</td>
+                        <td className="px-4 py-2 text-sm text-right font-medium text-gray-900 dark:text-white">{y.record_count.toLocaleString()}</td>
+                        <td className="px-4 py-2 text-sm text-right text-gray-600 dark:text-gray-400">{y.pdf_count}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+            {hasYearComparison && (
+              <div className="mt-6">
+                <h3 className="text-lg font-medium mb-4 text-gray-900 dark:text-white">
+                  Year Comparison: {selectedBulkSummary?.constituency_name}
+                </h3>
+                <ReactApexChart options={yearComparisonOptions} series={yearComparisonSeries} type="bar" height={280} />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* KPI Cards - only when we have a constituency with id */}
+        {selectedConstituency != null && (
+        <>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
             <h3 className="text-gray-500 dark:text-gray-400 text-sm font-medium mb-2">Total Pre-SIR</h3>
@@ -242,8 +346,11 @@ const SIRDashboard: React.FC = () => {
             <p className="text-xs text-gray-400 mt-1">Households with &gt;15 voters</p>
           </div>
         </div>
+        </>
+        )}
 
-        {/* Charts and Maps */}
+        {/* Charts and Maps - only when we have a constituency with id */}
+        {selectedConstituency != null && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
             <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Voter Churn Analysis</h2>
@@ -265,8 +372,10 @@ const SIRDashboard: React.FC = () => {
             />
           </div>
         </div>
+        )}
 
-        {/* Risk Heatmap */}
+        {/* Risk Heatmap - only when we have a constituency with id */}
+        {selectedConstituency != null && (
         <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Risk Heatmap</h2>
@@ -284,11 +393,19 @@ const SIRDashboard: React.FC = () => {
             <RiskMap booths={booths} />
           </div>
         </div>
+        )}
+
+        {selectedConstituencyName != null && selectedConstituency == null && (
+          <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-4 text-amber-800 dark:text-amber-200">
+            <p className="font-medium">Bulk Upload data only</p>
+            <p className="text-sm mt-1">No Pre/Post SIR KPI or risk map for <strong>{selectedConstituencyName}</strong>. Select a constituency from the master list above to view full analysis.</p>
+          </div>
+        )}
 
         {/* Quick Actions */}
         <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
           <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Quick Actions</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <button
               onClick={() => navigate('/upload/pre-sir')}
               className="p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition text-left"
@@ -304,11 +421,19 @@ const SIRDashboard: React.FC = () => {
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Upload electoral roll after SIR</p>
             </button>
             <button
-              onClick={() => selectedConstituency && navigate(`/booths?constituency=${selectedConstituency}`)}
-              className="p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition text-left"
+              onClick={() => selectedConstituency != null && navigate(`/booths?constituency=${selectedConstituency}`)}
+              className="p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition text-left disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={selectedConstituency == null}
             >
               <h3 className="font-semibold text-gray-900 dark:text-white">View Booth Analysis</h3>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Detailed booth-level KPIs</p>
+            </button>
+            <button
+              onClick={() => navigate('/upload/bulk-textract-extract')}
+              className="p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition text-left"
+            >
+              <h3 className="font-semibold text-gray-900 dark:text-white">Bulk Upload</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Extract PDFs to voter_data by constituency</p>
             </button>
           </div>
         </div>

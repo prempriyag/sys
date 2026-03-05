@@ -13,7 +13,7 @@ class SSOConfig(BaseSettings):
     
     # SSO Method Selection (set to 'oauth' or 'saml' or None to auto-detect)
     CLIENT_SSO_METHOD: Optional[str] = None  # 'oauth', 'saml', or None for auto-detect
-    KTECH_SSO_METHOD: Optional[str] = None  # 'oauth', 'saml', or None for auto-detect
+    KKSSO_METHOD: Optional[str] = None  # 'oauth', 'saml', or None for auto-detect
     
     # Client SSO - OAuth (Azure AD)
     CLIENT_OAUTH_TENANT_ID: Optional[str] = None
@@ -32,22 +32,22 @@ class SSOConfig(BaseSettings):
     CLIENT_SAML_SP_PRIVATE_KEY: Optional[str] = None
     
     # KTech SSO - OAuth (Azure AD)
-    KTECH_OAUTH_TENANT_ID: Optional[str] = None
-    KTECH_OAUTH_CLIENT_ID: Optional[str] = None
-    KTECH_OAUTH_CLIENT_SECRET: Optional[str] = None
-    KTECH_OAUTH_AUTHORITY: str = "https://login.microsoftonline.com"
-    KTECH_OAUTH_RESOURCE_URI: str = "https://graph.microsoft.com"  # KTech uses Microsoft Graph API (matches CI3 aad_auth_ktech.php)
-    # Optional: set KTECH_OAUTH_REDIRECT_URI to match Azure app registration exactly (e.g. .../api/api/sso/ktech/oauth/callback)
-    KTECH_OAUTH_REDIRECT_URI_OVERRIDE: Optional[str] = None
+    KKOAUTH_TENANT_ID: Optional[str] = None
+    KKOAUTH_CLIENT_ID: Optional[str] = None
+    KKOAUTH_CLIENT_SECRET: Optional[str] = None
+    KKOAUTH_AUTHORITY: str = "https://login.microsoftonline.com"
+    KKOAUTH_RESOURCE_URI: str = "https://graph.microsoft.com"  # KTech uses Microsoft Graph API (matches CI3 aad_auth_ktech.php)
+    # Optional: set KKOAUTH_REDIRECT_URI to match Azure app registration exactly (e.g. .../api/api/sso/ktech/oauth/callback)
+    KKOAUTH_REDIRECT_URI_OVERRIDE: Optional[str] = None
     
     # KTech SSO - SAML
-    KTECH_SAML_ENTITY_ID: Optional[str] = None
-    KTECH_SAML_IDP_ENTITY_ID: Optional[str] = None
-    KTECH_SAML_IDP_SSO_URL: Optional[str] = None
-    KTECH_SAML_IDP_SLS_URL: Optional[str] = None
-    KTECH_SAML_IDP_X509_CERT: Optional[str] = None
-    KTECH_SAML_SP_X509_CERT: Optional[str] = None
-    KTECH_SAML_SP_PRIVATE_KEY: Optional[str] = None
+    KKSAML_ENTITY_ID: Optional[str] = None
+    KKSAML_IDP_ENTITY_ID: Optional[str] = None
+    KKSAML_IDP_SSO_URL: Optional[str] = None
+    KKSAML_IDP_SLS_URL: Optional[str] = None
+    KKSAML_IDP_X509_CERT: Optional[str] = None
+    KKSAML_SP_X509_CERT: Optional[str] = None
+    KKSAML_SP_PRIVATE_KEY: Optional[str] = None
     
     class Config:
         env_file = ".env"
@@ -76,19 +76,19 @@ class SSOConfig(BaseSettings):
         return f"{self._base_url_for_sso()}/api/sso/client/saml/sls"
     
     @property
-    def KTECH_OAUTH_REDIRECT_URI(self) -> str:
-        """KTech OAuth redirect URI. Use KTECH_OAUTH_REDIRECT_URI_OVERRIDE in .env to match Azure exactly."""
-        if self.KTECH_OAUTH_REDIRECT_URI_OVERRIDE and self.KTECH_OAUTH_REDIRECT_URI_OVERRIDE.strip():
-            return self.KTECH_OAUTH_REDIRECT_URI_OVERRIDE.strip().rstrip("/")
+    def KKOAUTH_REDIRECT_URI(self) -> str:
+        """KTech OAuth redirect URI. Use KKOAUTH_REDIRECT_URI_OVERRIDE in .env to match Azure exactly."""
+        if self.KKOAUTH_REDIRECT_URI_OVERRIDE and self.KKOAUTH_REDIRECT_URI_OVERRIDE.strip():
+            return self.KKOAUTH_REDIRECT_URI_OVERRIDE.strip().rstrip("/")
         return f"{self._base_url_for_sso()}/api/sso/ktech/oauth/callback"
     
     @property
-    def KTECH_SAML_ACS_URL(self) -> str:
+    def KKSAML_ACS_URL(self) -> str:
         """KTech SAML Assertion Consumer Service URL"""
         return f"{self._base_url_for_sso()}/api/sso/ktech/saml/callback"
     
     @property
-    def KTECH_SAML_SLS_URL(self) -> str:
+    def KKSAML_SLS_URL(self) -> str:
         """KTech SAML Single Logout Service URL"""
         return f"{self._base_url_for_sso()}/api/sso/ktech/saml/sls"
 
@@ -103,15 +103,15 @@ class SSOConfig(BaseSettings):
             "resource_uri": self.CLIENT_OAUTH_RESOURCE_URI,
         }
     
-    def get_ktech_oauth_config(self) -> Dict:
+    def get_KKoauth_config(self) -> Dict:
         """Get KTech OAuth configuration"""
         return {
-            "tenant_id": self.KTECH_OAUTH_TENANT_ID,
-            "client_id": self.KTECH_OAUTH_CLIENT_ID,
-            "client_secret": self.KTECH_OAUTH_CLIENT_SECRET,
-            "redirect_uri": self.KTECH_OAUTH_REDIRECT_URI,
-            "authority": self.KTECH_OAUTH_AUTHORITY,
-            "resource_uri": self.KTECH_OAUTH_RESOURCE_URI,
+            "tenant_id": self.KKOAUTH_TENANT_ID,
+            "client_id": self.KKOAUTH_CLIENT_ID,
+            "client_secret": self.KKOAUTH_CLIENT_SECRET,
+            "redirect_uri": self.KKOAUTH_REDIRECT_URI,
+            "authority": self.KKOAUTH_AUTHORITY,
+            "resource_uri": self.KKOAUTH_RESOURCE_URI,
         }
     
     def get_client_saml_config(self) -> Dict:
@@ -151,33 +151,33 @@ class SSOConfig(BaseSettings):
             }
         }
     
-    def get_ktech_saml_config(self) -> Dict:
+    def get_KKsaml_config(self) -> Dict:
         """Get KTech SAML configuration"""
         return {
             "sp": {
-                "entityId": self.KTECH_SAML_ENTITY_ID,
+                "entityId": self.KKSAML_ENTITY_ID,
                 "assertionConsumerService": {
-                    "url": self.KTECH_SAML_ACS_URL,
+                    "url": self.KKSAML_ACS_URL,
                     "binding": "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
                 },
                 "singleLogoutService": {
-                    "url": self.KTECH_SAML_SLS_URL,
+                    "url": self.KKSAML_SLS_URL,
                     "binding": "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
                 },
-                "x509cert": self.KTECH_SAML_SP_X509_CERT or "",
-                "privateKey": self.KTECH_SAML_SP_PRIVATE_KEY or "",
+                "x509cert": self.KKSAML_SP_X509_CERT or "",
+                "privateKey": self.KKSAML_SP_PRIVATE_KEY or "",
             },
             "idp": {
-                "entityId": self.KTECH_SAML_IDP_ENTITY_ID,
+                "entityId": self.KKSAML_IDP_ENTITY_ID,
                 "singleSignOnService": {
-                    "url": self.KTECH_SAML_IDP_SSO_URL,
+                    "url": self.KKSAML_IDP_SSO_URL,
                     "binding": "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
                 },
                 "singleLogoutService": {
-                    "url": self.KTECH_SAML_IDP_SLS_URL,
+                    "url": self.KKSAML_IDP_SLS_URL,
                     "binding": "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
                 },
-                "x509cert": self.KTECH_SAML_IDP_X509_CERT or "",
+                "x509cert": self.KKSAML_IDP_X509_CERT or "",
             },
             "security": {
                 "authnRequestsSigned": False,
@@ -221,18 +221,18 @@ class SSOConfig(BaseSettings):
         else:
             return None
     
-    def get_ktech_sso_method(self) -> Optional[str]:
+    def get_KKsso_method(self) -> Optional[str]:
         """
         Get active KTech SSO method
         Returns 'oauth', 'saml', or None if neither is configured
         """
         # If explicitly set, use that
-        if self.KTECH_SSO_METHOD:
-            return self.KTECH_SSO_METHOD.lower()
+        if self.KKSSO_METHOD:
+            return self.KKSSO_METHOD.lower()
         
         # Auto-detect: Check which one is configured
-        oauth_config = self.get_ktech_oauth_config()
-        saml_config = self.get_ktech_saml_config()
+        oauth_config = self.get_KKoauth_config()
+        saml_config = self.get_KKsaml_config()
         
         oauth_configured = (
             oauth_config.get('tenant_id') and 

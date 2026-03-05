@@ -56,10 +56,10 @@ In your `backend/.env` file, change:
 
 ```env
 # Change from:
-KTECH_OAUTH_RESOURCE_URI=https://graph.windows.net
+KKOAUTH_RESOURCE_URI=https://graph.windows.net
 
 # To:
-KTECH_OAUTH_RESOURCE_URI=https://graph.microsoft.com
+KKOAUTH_RESOURCE_URI=https://graph.microsoft.com
 ```
 
 ### Step 2: Add Microsoft Graph Permissions
@@ -118,7 +118,7 @@ After making changes:
 **Solution:**
 - Azure AD Graph API is being deprecated
 - Use Microsoft Graph API instead (see "Alternative" section above)
-- Update `KTECH_OAUTH_RESOURCE_URI` to `https://graph.microsoft.com`
+- Update `KKOAUTH_RESOURCE_URI` to `https://graph.microsoft.com`
 
 ## Required Permissions Summary
 

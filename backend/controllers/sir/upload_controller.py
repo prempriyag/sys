@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import List, Optional as Opt
 import json
 from sqlalchemy.orm import Session
+from sqlalchemy import func, case, inspect
 from database.connection import get_db, SessionLocal
 from config.settings import settings
 from models.sir.voter import VoterPre, VoterPost
@@ -14,6 +15,7 @@ from models.sir.state import State
 from models.sir.district import District
 from models.sir.assembly_constituency import AssemblyConstituency
 from models.sir.eci_roll_selection import EciRollSelection
+from models.sir.eci_download import EciDownload, EciDownloadFile
 from models.sir.bulk_voter_import import BulkVoterImport
 from services.normalization import NormalizationService
 from services.electoral_roll_pdf_extractor import extract_from_pdf, debug_pdf, get_pdf_page_texts
@@ -21,10 +23,20 @@ import pandas as pd
 import io
 import tempfile
 import os
+import re
 import logging
 import queue
 import threading
 import asyncio
+
+# OCR for convert-scanned-pdf (optional)
+try:
+    from pdf2image import convert_from_bytes
+    import pytesseract
+except ImportError:
+    convert_from_bytes = None
+    pytesseract = None
+OCR_DPI = 400
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +84,7 @@ def get_or_create_booth(db: Session, constituency_id: int, booth_number: str, lo
     return booth
 
 
-def _records_to_voters_pre(db: Session, records: list, batch_size: int = 1000):
+def _records_to_voters_pre(db: Session, records: list, batch_size: int = 100):
     """Insert extracted records into voters_pre_sir. Returns count inserted."""
     inserted = 0
     voters = []
@@ -116,7 +128,7 @@ def _records_to_voters_pre(db: Session, records: list, batch_size: int = 1000):
     return inserted
 
 
-def _records_to_voters_post(db: Session, records: list, batch_size: int = 1000):
+def _records_to_voters_post(db: Session, records: list, batch_size: int = 100):
     """Insert extracted records into voters_post_sir. Returns count inserted."""
     inserted = 0
     voters = []
@@ -159,6 +171,90 @@ def _records_to_voters_post(db: Session, records: list, batch_size: int = 1000):
         db.commit()
     return inserted
 
+
+def _records_to_voter_data(
+    db: Session,
+    records: list,
+    pdf_name: str,
+    default_constituency_name: Opt[str] = None,
+    default_year: Opt[str] = None,
+    batch_size: int = 100,
+) -> dict:
+    """
+    Insert extracted records into voter_data with conflict-safe behavior.
+    Uses (pdf_name, box_id) unique key and skips duplicates.
+    """
+    from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+    if not records:
+        return {"inserted": 0, "duplicates_skipped": 0, "attempted": 0}
+
+    inspector = inspect(db.bind)
+    table_cols = {c.get("name") for c in inspector.get_columns("voter_data")}
+    unique_sets = {frozenset(u.get("column_names") or []) for u in inspector.get_unique_constraints("voter_data")}
+    conflict_cols = None
+    if {"pdf_name", "box_id"}.issubset(table_cols) and frozenset(("pdf_name", "box_id")) in unique_sets:
+        conflict_cols = ["pdf_name", "box_id"]
+    elif "epic_number" in table_cols and frozenset(("epic_number",)) in unique_sets:
+        conflict_cols = ["epic_number"]
+
+    rows = []
+    safe_pdf_name = (pdf_name or "uploaded.pdf")[:255]
+    for idx, r in enumerate(records, start=1):
+        conf = r.get("confidence_score")
+        if conf is None:
+            conf = r.get("confidence")
+        try:
+            conf = float(conf) if conf is not None else None
+        except (TypeError, ValueError):
+            conf = None
+
+        row = {
+            "page_number": r.get("page_number"),
+            "epic_number": ((r.get("epic_number") or "").strip() or None),
+            "name": ((r.get("name") or "").strip()[:255] or None),
+            "relative_name": ((r.get("relative_name") or "").strip()[:255] or None),
+            "age": r.get("age"),
+            "gender": ((r.get("gender") or "").strip()[:10] or None),
+            "house_no": ((r.get("house_no") or "").strip()[:200] or None),
+            "address": ((r.get("address") or "").strip() or None),
+            "constituency_name": (
+                ((default_constituency_name or "").strip() or (r.get("constituency_name") or "").strip())[:200] or None
+            ),
+            "year": (((default_year or "").strip() or (r.get("year") or "").strip())[:20] or None),
+            "booth_number": ((r.get("booth_number") or "").strip()[:50] or None),
+            "source_pdf": (safe_pdf_name[:500] or None),
+            "confidence": conf,
+        }
+        if "pdf_name" in table_cols:
+            row["pdf_name"] = safe_pdf_name
+        if "box_id" in table_cols:
+            row["box_id"] = idx
+        if "relation_type" in table_cols:
+            row["relation_type"] = ((r.get("relation_type") or r.get("relation") or "").strip()[:20] or None)
+        if "confidence_score" in table_cols:
+            row["confidence_score"] = conf
+        rows.append({k: v for k, v in row.items() if k in table_cols})
+
+    inserted = 0
+    attempted = 0
+    for i in range(0, len(rows), max(1, batch_size)):
+        batch = rows[i : i + max(1, batch_size)]
+        stmt = pg_insert(BulkVoterImport).values(batch)
+        if conflict_cols:
+            stmt = stmt.on_conflict_do_nothing(index_elements=conflict_cols)
+        res = db.execute(stmt)
+        db.commit()
+        attempted += len(batch)
+        if res.rowcount is not None and res.rowcount >= 0:
+            inserted += int(res.rowcount)
+
+    return {
+        "inserted": inserted,
+        "duplicates_skipped": max(0, attempted - inserted),
+        "attempted": attempted,
+    }
+
 @router.post("/pre-sir")
 async def upload_pre_sir(file: UploadFile = File(...), db: Session = Depends(get_db)):
 
@@ -183,7 +279,7 @@ async def upload_pre_sir(file: UploadFile = File(...), db: Session = Depends(get
             )
 
         voters = []
-        batch_size = 1000
+        batch_size = 100
 
         for idx, row in df.iterrows():
             try:
@@ -248,7 +344,7 @@ async def upload_post_sir(file: UploadFile = File(...), db: Session = Depends(ge
         df = pd.read_csv(io.BytesIO(content))
 
         voters = []
-        batch_size = 1000
+        batch_size = 100
 
         for idx, row in df.iterrows():
             try:
@@ -389,30 +485,117 @@ def _extract_page(cropped_page, ncol, nrow):
     return out
 
 
+def _parse_block_lines_to_record(lines: list) -> dict:
+    """Parse one card block (list of text lines) into one record dict. Returns {} if no EPIC."""
+    if not lines:
+        return {}
+    text = "\n".join(lines) if isinstance(lines[0], str) else "\n".join(str(x) for x in lines)
+    epic_re = re.compile(r"\b([A-Za-z]{2,5}\d{5,10})\b", re.IGNORECASE)
+    m = epic_re.search(text)
+    if not m:
+        return {}
+    raw = m.group(1).upper().replace("/", "")
+    epic = raw.replace("O", "0").replace("I", "1").replace("Z", "2")
+    if not re.match(r"^[A-Z]{3}\d{7}$", epic):
+        epic = re.sub(r"[^A-Z0-9]", "", epic)
+    if len(epic) < 5:
+        return {}
+    name = rel_name = rel_role = house_no = ""
+    age = None
+    gender = ""
+    for i, line in enumerate(lines):
+        line = (line.strip() if isinstance(line, str) else str(line)).strip()
+        if not line:
+            continue
+        if re.search(r"^Name\s*[:\-]", line, re.I) and not name:
+            part = line.split(":", 1)[-1].split("-", 1)[-1].strip()
+            name = part or (lines[i + 1].strip() if i + 1 < len(lines) else "")
+        elif re.search(r"(Father|Husband|Mother)(?:'s)?\s*Name\s*[:\-]", line, re.I):
+            rm = re.search(r"(Father|Husband|Mother)", line, re.I)
+            rel_role = rm.group(1) if rm else "Other"
+            part = line.split(":", 1)[-1].split("-", 1)[-1].strip()
+            rel_name = part or (lines[i + 1].strip() if i + 1 < len(lines) else "")
+        elif re.search(r"House\s*Number\s*[:\-]", line, re.I):
+            part = line.split(":", 1)[-1].split("-", 1)[-1].strip()
+            house_no = part or (lines[i + 1].strip() if i + 1 < len(lines) else "")
+    am = re.search(r"Age\s*[:\-]?\s*(\d+)", text, re.I)
+    if am:
+        try:
+            age = int(am.group(1))
+        except (ValueError, IndexError):
+            pass
+    if re.search(r"\bMale\b", text, re.I):
+        gender = "Male"
+    elif re.search(r"\bFemale\b", text, re.I):
+        gender = "Female"
+    house_no = clean_house_number(house_no)
+    name = clean_ocr_field(name)
+    rel_name = clean_ocr_field(rel_name)
+    card_no = None
+    cn = re.search(r"^\s*(\d+)\b", text) or re.search(r"\b(\d{2,5})\b", text)
+    if cn:
+        try:
+            card_no = int(cn.group(1))
+        except (ValueError, IndexError):
+            pass
+    return {
+        "Card No": card_no,
+        "Voter ID (EPIC)": epic,
+        "Name": name,
+        "Relation": rel_role or "",
+        "Relative Name": rel_name,
+        "House Number": house_no,
+        "Age": age,
+        "Gender": gender,
+    }
+
+
 def _run_ocr_pdf_to_records(content: bytes) -> list:
     if not content or convert_from_bytes is None or pytesseract is None:
         return []
     images = convert_from_bytes(content, dpi=OCR_DPI)
     records = []
+    # Import extractor page-level OCR so we can use EPIC-first → grid → contour → spatial fallback.
+    from services.electoral_roll_pdf_extractor import (
+        _ocr_page_epic_first,
+        _ocr_page_grid,
+        _ocr_page_contour_boxes,
+        _ocr_page_spatial,
+    )
     for page_idx, page in enumerate(images):
-        if page_idx < 1:
+        # Skip only cover pages: no EPIC-like pattern in preview (do not hard-skip page 0).
+        text_preview = pytesseract.image_to_string(page, config="--psm 6")
+        if not re.search(r"[A-Za-z]{3}\d{6,7}", text_preview):
             continue
         w, h = page.size
         top = int(h * 0.06)
         bottom = int(h * 0.04)
         cropped = page.crop((0, top, w, h - bottom))
-        page_records = _extract_page(cropped, 3, 10)
-        if len(page_records) < 15:
-            alt = _extract_page(cropped, 2, 15)
-            if len(alt) > len(page_records):
-                page_records = alt
+        page_number = page_idx + 1
+        # Fallback chain: EPIC-first → grid → contour → spatial (never drop page).
+        blocks, _, _ = _ocr_page_epic_first(cropped, num_cols=3, page_number=page_number)
+        if not blocks or len(blocks) < 15:
+            blocks = _ocr_page_grid(cropped, num_cols=3, rows_per_page=10, page_number=page_number)
+        if not blocks or len(blocks) < 10:
+            blocks = _ocr_page_contour_boxes(cropped, page_number=page_number)
+        if not blocks:
+            blocks = _ocr_page_spatial(cropped, num_cols=3)
+        page_records = []
+        for b in blocks:
+            r = _parse_block_lines_to_record(b)
+            if r.get("Voter ID (EPIC)"):
+                page_records.append(r)
+        logger.info("Page %d: extracted %d records", page_number, len(page_records))
         records.extend(page_records)
+    # Dedup by (Card No, EPIC) so OCR variants of same EPIC don't drop records; rely on DB unique (pdf_name, box_id) for insert.
     seen = {}
     for r in records:
-        e = r["Voter ID (EPIC)"]
-        if e not in seen:
-            seen[e] = r
-    return sorted(seen.values(), key=lambda x: (x.get("Card No") or 0, x["Voter ID (EPIC)"]))
+        key = (r.get("Card No"), r.get("Voter ID (EPIC)"))
+        if key not in seen:
+            seen[key] = r
+    result = sorted(seen.values(), key=lambda x: (x.get("Card No") or 0, x.get("Voter ID (EPIC)", "")))
+    logger.info("Total extracted: %d", len(result))
+    return result
 
 
 @router.post("/convert-scanned-pdf")
@@ -517,11 +700,14 @@ class ExtractByPathRequest(BaseModel):
     constituency_name: Opt[str] = None
     booth_number: Opt[str] = None
     use_ocr: bool = False
+    use_textract: bool = False
     extraction_config: Opt[dict] = None
+    save_to_db: bool = False
+    year: Opt[str] = None
 
 
 @router.post("/extract-pdf-by-path")
-async def extract_pdf_by_path(body: ExtractByPathRequest = Body(...)):
+async def extract_pdf_by_path(body: ExtractByPathRequest = Body(...), db: Session = Depends(get_db)):
     """
     Extract from a PDF in backend/pdf folder (select filename from dropdown).
     Supports extraction_config for ABBYY-like coordinate tuning:
@@ -537,12 +723,25 @@ async def extract_pdf_by_path(body: ExtractByPathRequest = Body(...)):
             default_constituency_name=body.constituency_name,
             default_booth_number=body.booth_number,
             use_ocr=body.use_ocr,
+            use_textract=body.use_textract,
             extraction_config=body.extraction_config,
         )
-        mode = "ocr" if body.use_ocr else "text"
+        mode = "textract" if body.use_textract else ("ocr" if body.use_ocr else "text")
         result["accuracy_summary"] = _compute_accuracy_summary(
             result.get("records") or [], mode, result.get("metadata", {}).get("validation_stats")
         )
+        if body.save_to_db:
+            stats = _records_to_voter_data(
+                db=db,
+                records=result.get("records") or [],
+                pdf_name=body.filename or "selected.pdf",
+                default_constituency_name=body.constituency_name,
+                default_year=body.year,
+                batch_size=100,
+            )
+            result["db_save"] = {"enabled": True, **stats}
+        else:
+            result["db_save"] = {"enabled": False, "inserted": 0, "duplicates_skipped": 0, "attempted": 0}
         return result
     except ImportError:
         raise HTTPException(status_code=500, detail="pdfplumber required. pip install pdfplumber")
@@ -557,12 +756,19 @@ async def extract_pdf_only(
     constituency_name: str = Form(None),
     booth_number: str = Form(None),
     use_ocr: str = Form("false"),
+    use_textract: str = Form("false"),
     extraction_config_json: str = Form(None),
+    save_to_db: str = Form("false"),
+    year: str = Form(None),
+    db: Session = Depends(get_db),
 ):
     """
-    Extract voter records from an ECI-style electoral roll PDF without saving to database.
+    Extract voter records from an ECI-style electoral roll PDF.
     When the PDF has no text (image-only), OCR runs automatically. Set use_ocr=true to force OCR.
+    use_textract: true to use AWS Textract (requires boto3, AWS_BUCKET, AWS credentials).
     extraction_config_json: Optional JSON for coordinate tuning, e.g. {"cards_per_row":9,"header_top":120,"data_bottom":750}
+      Or {"engine":"textract"} to force Textract.
+    save_to_db: true/false. When true, extracted rows are inserted into voter_data.
     Returns { "records": [...], "metadata": {...}, "raw_page_texts": [...] } for preview.
     """
     if not file.filename or not file.filename.lower().endswith(".pdf"):
@@ -584,6 +790,7 @@ async def extract_pdf_only(
                 default_constituency_name=constituency_name or None,
                 default_booth_number=booth_number or None,
                 use_ocr=use_ocr.lower() in ("true", "1", "yes"),
+                use_textract=use_textract.lower() in ("true", "1", "yes"),
                 extraction_config=extraction_config,
             )
         finally:
@@ -591,13 +798,27 @@ async def extract_pdf_only(
                 os.unlink(tmp_path)
             except OSError:
                 pass
-        mode = "ocr" if use_ocr.lower() in ("true", "1", "yes") else "text"
+        mode = "textract" if use_textract.lower() in ("true", "1", "yes") else ("ocr" if use_ocr.lower() in ("true", "1", "yes") else "text")
         result["accuracy_summary"] = _compute_accuracy_summary(
             result.get("records") or [], mode, result.get("metadata", {}).get("validation_stats")
         )
+        do_save = _parse_bool_form(save_to_db)
+        if do_save:
+            stats = _records_to_voter_data(
+                db=db,
+                records=result.get("records") or [],
+                pdf_name=file.filename or "uploaded.pdf",
+                default_constituency_name=constituency_name,
+                default_year=year,
+                batch_size=100,
+            )
+            result["db_save"] = {"enabled": True, **stats}
+        else:
+            result["db_save"] = {"enabled": False, "inserted": 0, "duplicates_skipped": 0, "attempted": 0}
         return result
     except ImportError as e:
-        raise HTTPException(status_code=500, detail="PDF extraction requires pdfplumber. Install with: pip install pdfplumber")
+        logger.exception("PDF extraction ImportError")
+        raise HTTPException(status_code=500, detail=f"PDF extraction import failed: {e}. In venv run: pip install pdfplumber boto3")
     except Exception as e:
         logger.exception("Error extracting PDF")
         raise HTTPException(status_code=500, detail=f"Error processing PDF: {str(e)}")
@@ -696,6 +917,45 @@ def _safe_folder_name(s: str) -> str:
     return s[:200] or "unknown"
 
 
+def _infer_meta_from_folder_path(folder_path: str) -> dict:
+    """
+    Infer state/year/district/constituency from a server folder path.
+    Expected shape (or deeper): .../<state>/<year>/<district>/<constituency>
+    """
+    try:
+        parts = [p for p in Path(folder_path).resolve().parts if p and p not in ("/", "\\")]
+    except Exception:
+        parts = [p for p in Path(folder_path).parts if p and p not in ("/", "\\")]
+    if len(parts) >= 4:
+        return {
+            "state": parts[-4],
+            "year": parts[-3],
+            "district": parts[-2],
+            "constituency_name": parts[-1],
+        }
+    if len(parts) == 3:
+        return {
+            "state": parts[-3],
+            "year": parts[-2],
+            "district": parts[-1],
+        }
+    return {}
+
+
+def _resolve_extract_path_meta(
+    state: Opt[str], year: Opt[str], district: Opt[str], constituency_name: Opt[str]
+) -> tuple[str, str, str, Opt[str]]:
+    """
+    Always return usable extracted-path metadata.
+    If missing, auto-fill with safe defaults so bulk flow never fails on metadata.
+    """
+    resolved_state = (state or "").strip() or "unknown_state"
+    resolved_year = (year or "").strip() or "unknown_year"
+    resolved_district = (district or "").strip() or "unknown_district"
+    resolved_constituency = (constituency_name or "").strip() or None
+    return resolved_state, resolved_year, resolved_district, resolved_constituency
+
+
 @router.get("/eci-roll-selections")
 def list_eci_roll_selections(db: Session = Depends(get_db), limit: int = 20):
     """List recent eci_roll_selections rows (to verify table and that download save works)."""
@@ -721,6 +981,460 @@ def list_eci_roll_selections(db: Session = Depends(get_db), limit: int = 20):
             for r in rows
         ],
     }
+
+
+@router.get("/bulk-electoral-roll-count")
+def bulk_electoral_roll_count(db: Session = Depends(get_db)):
+    """Return row count in voter_data so you can verify data is stored (PostgreSQL)."""
+    try:
+        count = db.query(BulkVoterImport).count()
+        return {"count": count, "table": "voter_data"}
+    except Exception as e:
+        err = str(e).lower()
+        if "does not exist" in err or "relation" in err:
+            raise HTTPException(
+                status_code=503,
+                detail="Table voter_data missing. Run: python create_sir_tables.py or alembic upgrade head",
+            ) from e
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.get("/bulk-electoral-roll-data")
+def bulk_electoral_roll_data(
+    db: Session = Depends(get_db),
+    page: int = 1,
+    page_size: int = 100,
+    q: Opt[str] = None,
+    pdf_name: Opt[str] = None,
+):
+    """
+    Paginated voter_data listing for UI.
+    """
+    page = max(1, page)
+    page_size = max(1, min(page_size, 500))
+    query = db.query(BulkVoterImport)
+    if pdf_name and pdf_name.strip():
+        query = query.filter(BulkVoterImport.pdf_name.ilike(f"%{pdf_name.strip()}%"))
+    if q and q.strip():
+        term = f"%{q.strip()}%"
+        query = query.filter(
+            (BulkVoterImport.epic_number.ilike(term))
+            | (BulkVoterImport.name.ilike(term))
+            | (BulkVoterImport.relative_name.ilike(term))
+            | (BulkVoterImport.constituency_name.ilike(term))
+            | (BulkVoterImport.booth_number.ilike(term))
+        )
+    total = query.count()
+    rows = (
+        query.order_by(BulkVoterImport.id.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+    return {
+        "page": page,
+        "page_size": page_size,
+        "total": total,
+        "total_pages": (total + page_size - 1) // page_size if total else 0,
+        "items": [
+            {
+                "id": r.id,
+                "pdf_name": r.pdf_name,
+                "page_number": r.page_number,
+                "box_id": r.box_id,
+                "epic_number": r.epic_number,
+                "name": r.name,
+                "relative_name": r.relative_name,
+                "relation_type": r.relation_type,
+                "age": r.age,
+                "gender": r.gender,
+                "house_no": r.house_no,
+                "address": r.address,
+                "constituency_name": r.constituency_name,
+                "year": r.year,
+                "booth_number": r.booth_number,
+                "source_pdf": r.source_pdf,
+                "confidence_score": float(r.confidence_score) if r.confidence_score is not None else None,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            }
+            for r in rows
+        ],
+    }
+
+
+@router.get("/voter-data-summary-by-constituency-year")
+def voter_data_summary_by_constituency_year(db: Session = Depends(get_db)):
+    """
+    Summary of voter_data (Bulk Upload) grouped by constituency_name and year.
+    For dashboard: constituency-based view with year comparison.
+    """
+    from sqlalchemy import func
+
+    rows = (
+        db.query(
+            BulkVoterImport.constituency_name,
+            BulkVoterImport.year,
+            func.count(BulkVoterImport.id).label("record_count"),
+            func.count(func.distinct(BulkVoterImport.pdf_name)).label("pdf_count"),
+        )
+        .filter(
+            BulkVoterImport.constituency_name.isnot(None),
+            BulkVoterImport.constituency_name != "",
+        )
+        .group_by(BulkVoterImport.constituency_name, BulkVoterImport.year)
+        .order_by(BulkVoterImport.constituency_name, BulkVoterImport.year.desc().nullslast())
+        .all()
+    )
+    by_constituency: dict = {}
+    for r in rows:
+        cn = (r.constituency_name or "").strip() or "unknown"
+        yr = (r.year or "").strip() or "unknown"
+        if cn not in by_constituency:
+            by_constituency[cn] = []
+        by_constituency[cn].append({
+            "year": yr,
+            "record_count": int(r.record_count or 0),
+            "pdf_count": int(r.pdf_count or 0),
+        })
+    items = [
+        {"constituency_name": cn, "years": yrs, "total_records": sum(y["record_count"] for y in yrs)}
+        for cn, yrs in sorted(by_constituency.items())
+    ]
+    return {"items": items, "count": len(items)}
+
+
+@router.get("/bulk-electoral-roll-quality")
+def bulk_electoral_roll_quality(db: Session = Depends(get_db), limit: int = 500):
+    """
+    Per-PDF completeness/quality summary from voter_data.
+    """
+    limit = max(1, min(limit, 2000))
+    rows = (
+        db.query(
+            BulkVoterImport.pdf_name.label("pdf_name"),
+            func.count(BulkVoterImport.id).label("total"),
+            func.sum(case((BulkVoterImport.epic_number.isnot(None), 1), else_=0)).label("epic_present"),
+            func.sum(case((BulkVoterImport.name.isnot(None), 1), else_=0)).label("name_present"),
+            func.sum(case((BulkVoterImport.age.isnot(None), 1), else_=0)).label("age_present"),
+            func.sum(case((BulkVoterImport.gender.isnot(None), 1), else_=0)).label("gender_present"),
+            func.sum(case((BulkVoterImport.house_no.isnot(None), 1), else_=0)).label("house_no_present"),
+            func.sum(case((BulkVoterImport.address.isnot(None), 1), else_=0)).label("address_present"),
+            func.avg(BulkVoterImport.confidence_score).label("avg_confidence"),
+        )
+        .group_by(BulkVoterImport.pdf_name)
+        .order_by(func.count(BulkVoterImport.id).desc())
+        .limit(limit)
+        .all()
+    )
+    out = []
+    for r in rows:
+        total = int(r.total or 0)
+        pct = lambda x: round((100.0 * float(x or 0) / total), 1) if total else 0.0
+        out.append(
+            {
+                "pdf_name": r.pdf_name,
+                "total_records": total,
+                "epic_present_pct": pct(r.epic_present),
+                "name_present_pct": pct(r.name_present),
+                "age_present_pct": pct(r.age_present),
+                "gender_present_pct": pct(r.gender_present),
+                "house_no_present_pct": pct(r.house_no_present),
+                "address_present_pct": pct(r.address_present),
+                "avg_confidence_pct": round((float(r.avg_confidence or 0) * 100.0), 1),
+            }
+        )
+    return {"count": len(out), "items": out}
+
+
+@router.post("/bulk-electoral-roll")
+async def bulk_electoral_roll(
+    db: Session = Depends(get_db),
+    folder_path: Opt[str] = Form(None),
+    files: Opt[List[UploadFile]] = File(None),
+    constituency_name: Opt[str] = Form(None),
+    year: Opt[str] = Form(None),
+    state: Opt[str] = Form(None),
+    district: Opt[str] = Form(None),
+):
+    """
+    Bulk Electoral Roll: folder path (production) or file uploads.
+    - **Folder path**: Uses pdf_folder_extractor — extract_from_pdf (all pages), box_id per PDF, insert then move. Target: extracted/state/year/district/constituency/.
+    - **Files**: Uses bulk_electoral_roll_engine — text/OCR, insert then move.
+    """
+    from database.connection import SessionLocal
+    from services.bulk_electoral_roll_engine import run_bulk
+
+    extracted_base = os.environ.get("EXTRACTED_FOLDER", "").strip()
+    if not extracted_base:
+        backend_dir = Path(__file__).resolve().parent.parent.parent
+        extracted_base = str(backend_dir / "extracted")
+
+    # Production path: server folder (e.g. download/Tamil_Nadu/2026/Erode/83_-_Gobichettipalayam)
+    if folder_path and folder_path.strip() and (not files or len(files) == 0):
+        folder = Path(folder_path.strip())
+        if not folder.is_dir():
+            raise HTTPException(status_code=400, detail="folder_path is not a valid directory")
+        inferred = _infer_meta_from_folder_path(folder_path.strip())
+        eff_state = (state or "").strip() or inferred.get("state")
+        eff_year = (year or "").strip() or inferred.get("year")
+        eff_district = (district or "").strip() or inferred.get("district")
+        eff_constituency = (constituency_name or "").strip() or inferred.get("constituency_name")
+        eff_state, eff_year, eff_district, eff_constituency = _resolve_extract_path_meta(
+            eff_state, eff_year, eff_district, eff_constituency
+        )
+        try:
+            from services.pdf_folder_extractor import process_folder
+            result = process_folder(
+                folder_path.strip(),
+                db,
+                extracted_base,
+                constituency_name=eff_constituency,
+                state=eff_state,
+                year=eff_year,
+                district=eff_district,
+                use_ocr=True,
+            )
+        except Exception as e:
+            logger.exception("process_folder failed: %s", e)
+            err_msg = str(e).strip()
+            if "pdf_name" in err_msg or "box_id" in err_msg or "does not exist" in err_msg.lower():
+                err_msg = (
+                    "Table voter_data is missing columns. Run: cd backend && alembic upgrade head "
+                    "or run scripts/sql/add_voter_data_pdf_box_columns.sql in PostgreSQL. Original: "
+                ) + err_msg
+            raise HTTPException(status_code=500, detail=err_msg)
+        if result.get("errors") and result.get("total_inserted", 0) == 0:
+            detail = "; ".join(result["errors"][:5])
+            if "pdf_name" in detail or "box_id" in detail or "does not exist" in detail.lower():
+                detail = "Table voter_data missing columns. Run: cd backend && alembic upgrade head (or run scripts/sql/add_voter_data_pdf_box_columns.sql). " + detail
+            raise HTTPException(status_code=500, detail=detail)
+        return result
+
+    pdf_paths: List[str] = []
+    temp_dir = None
+
+    if files and len(files) > 0:
+        eff_state, eff_year, eff_district, eff_constituency = _resolve_extract_path_meta(
+            state, year, district, constituency_name
+        )
+        import tempfile
+        temp_dir = tempfile.mkdtemp(prefix="bulk_roll_")
+        for f in files:
+            if f.filename and f.filename.lower().endswith(".pdf"):
+                path = Path(temp_dir) / (f.filename or "upload.pdf")
+                content = await f.read()
+                path.write_bytes(content)
+                pdf_paths.append(str(path))
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail="Provide folder_path (server path) or upload PDF files",
+        )
+
+    if not pdf_paths:
+        if temp_dir:
+            try:
+                import shutil
+                shutil.rmtree(temp_dir, ignore_errors=True)
+            except Exception:
+                pass
+        return {
+            "total_found": 0,
+            "inserted": 0,
+            "duplicates_skipped": 0,
+            "invalid_epic_count": 0,
+            "invalid_epics": [],
+            "message": "No PDF files found.",
+        }
+
+    try:
+        result = run_bulk(
+            pdf_paths,
+            SessionLocal,
+            max_workers=1,
+            batch_size=500,
+            constituency_name=eff_constituency,
+            year=eff_year,
+            extracted_base=extracted_base,
+            state=eff_state,
+            district=eff_district,
+        )
+    except Exception as e:
+        logger.exception("bulk-electoral-roll failed: %s", e)
+        if temp_dir:
+            try:
+                import shutil
+                shutil.rmtree(temp_dir, ignore_errors=True)
+            except Exception:
+                pass
+        err_msg = str(e).strip()
+        if "pdf_name" in err_msg or "box_id" in err_msg or "uq_voter_data_pdf_box" in err_msg:
+            err_msg = "Table voter_data needs new columns. Run: cd backend && alembic upgrade head (or run scripts/sql/add_voter_data_pdf_box_columns.sql). " + err_msg
+        elif "voter_data" in err_msg and ("does not exist" in err_msg or "relation" in err_msg.lower()):
+            err_msg = "Table voter_data missing. Run: python create_sir_tables.py or alembic upgrade head"
+        elif "bulk_voter_import" in err_msg and ("does not exist" in err_msg or "relation" in err_msg.lower()):
+            err_msg = "Table voter_data missing (run migration to rename). Run: cd backend && alembic upgrade head"
+        elif "year" in err_msg and ("column" in err_msg.lower() and "does not exist" in err_msg.lower()):
+            err_msg = "Column 'year' missing on voter_data. Run: cd backend && alembic upgrade head"
+        raise HTTPException(status_code=500, detail=err_msg)
+
+    if temp_dir:
+        try:
+            import shutil
+            shutil.rmtree(temp_dir, ignore_errors=True)
+        except Exception:
+            pass
+
+    return result
+
+
+@router.post("/bulk-electoral-roll-stream")
+async def bulk_electoral_roll_stream(
+    folder_path: Opt[str] = Form(None),
+    files: Opt[List[UploadFile]] = File(None),
+    constituency_name: Opt[str] = Form(None),
+    year: Opt[str] = Form(None),
+    state: Opt[str] = Form(None),
+    district: Opt[str] = Form(None),
+):
+    """
+    Same as bulk-electoral-roll but returns Server-Sent Events: progress (current, total, pdf_name, records_so_far)
+    then a final 'done' event with the result. Use for progress bar and live count.
+    - folder_path only: production flow (process_folder → extract_from_pdf, insert, move) with progress.
+    - files: run_bulk (text/OCR) with progress.
+    """
+    from database.connection import SessionLocal
+    from services.bulk_electoral_roll_engine import run_bulk
+
+    pdf_paths: List[str] = []
+    temp_dir = None
+    use_folder_flow = False  # True = process_folder (production), False = run_bulk
+    effective_state = (state or "").strip() or None
+    effective_year = (year or "").strip() or None
+    effective_district = (district or "").strip() or None
+    effective_constituency = (constituency_name or "").strip() or None
+
+    if files and len(files) > 0:
+        effective_state, effective_year, effective_district, effective_constituency = _resolve_extract_path_meta(
+            effective_state, effective_year, effective_district, effective_constituency
+        )
+        temp_dir = tempfile.mkdtemp(prefix="bulk_roll_")
+        for f in files:
+            if f.filename and f.filename.lower().endswith(".pdf"):
+                path = Path(temp_dir) / (f.filename or "upload.pdf")
+                content = await f.read()
+                path.write_bytes(content)
+                pdf_paths.append(str(path))
+    elif folder_path and folder_path.strip():
+        folder = Path(folder_path.strip())
+        if not folder.is_dir():
+            raise HTTPException(status_code=400, detail="folder_path is not a valid directory")
+        inferred = _infer_meta_from_folder_path(folder_path.strip())
+        if not effective_state:
+            effective_state = inferred.get("state")
+        if not effective_year:
+            effective_year = inferred.get("year")
+        if not effective_district:
+            effective_district = inferred.get("district")
+        if not effective_constituency:
+            effective_constituency = inferred.get("constituency_name")
+        effective_state, effective_year, effective_district, effective_constituency = _resolve_extract_path_meta(
+            effective_state, effective_year, effective_district, effective_constituency
+        )
+        pdf_paths = [str(p) for p in sorted(folder.glob("*.pdf"))]
+        use_folder_flow = True
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail="Provide either folder_path or upload multiple PDF files",
+        )
+
+    if not pdf_paths:
+        if temp_dir:
+            try:
+                import shutil
+                shutil.rmtree(temp_dir, ignore_errors=True)
+            except Exception:
+                pass
+        return {"total_found": 0, "inserted": 0, "pdf_count": 0, "message": "No PDF files found."}
+
+    extracted_base = os.environ.get("EXTRACTED_FOLDER", "").strip()
+    if not extracted_base:
+        backend_dir = Path(__file__).resolve().parent.parent.parent
+        extracted_base = str(backend_dir / "extracted")
+    progress_queue: queue.Queue = queue.Queue()
+
+    def run_with_progress():
+        def on_progress(current: int, total: int, pdf_name: str, records_so_far: int):
+            progress_queue.put({"type": "progress", "current": current, "total": total, "pdf_name": pdf_name, "records_so_far": records_so_far})
+        try:
+            if use_folder_flow:
+                from services.pdf_folder_extractor import process_folder
+                db = SessionLocal()
+                try:
+                    result = process_folder(
+                        folder_path.strip(),
+                        db,
+                        extracted_base,
+                        constituency_name=effective_constituency,
+                        state=effective_state,
+                        year=effective_year,
+                        district=effective_district,
+                        use_ocr=True,
+                        progress_callback=on_progress,
+                    )
+                    progress_queue.put({"type": "done", "result": result})
+                finally:
+                    db.close()
+            else:
+                result = run_bulk(
+                    pdf_paths,
+                    SessionLocal,
+                    max_workers=1,
+                    batch_size=500,
+                    constituency_name=effective_constituency,
+                    year=effective_year,
+                    extracted_base=extracted_base,
+                    state=effective_state,
+                    district=effective_district,
+                    progress_callback=on_progress,
+                )
+                progress_queue.put({"type": "done", "result": result})
+        except Exception as e:
+            logger.exception("bulk-electoral-roll-stream failed: %s", e)
+            progress_queue.put({"type": "error", "detail": str(e)})
+
+    thread = threading.Thread(target=run_with_progress, daemon=True)
+    thread.start()
+
+    async def event_stream():
+        try:
+            while True:
+                try:
+                    item = await asyncio.get_event_loop().run_in_executor(None, lambda: progress_queue.get(timeout=1))
+                except queue.Empty:
+                    yield ": keepalive\n\n"
+                    continue
+                yield f"data: {json.dumps(item)}\n\n"
+                if item.get("type") in ("done", "error"):
+                    break
+        except asyncio.CancelledError:
+            logger.info("bulk-electoral-roll-stream client disconnected (request cancelled)")
+            return
+        finally:
+            thread.join(timeout=2)
+            if temp_dir:
+                try:
+                    import shutil
+                    shutil.rmtree(temp_dir, ignore_errors=True)
+                except Exception:
+                    pass
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.post("/eci-download")
@@ -815,6 +1529,7 @@ async def eci_download_roll(
     selection_id = None
     save_db = SessionLocal()
     try:
+        # maintain existing eci_roll_selections behaviour for backward compatibility
         existing = (
             save_db.query(EciRollSelection)
             .filter(
@@ -848,6 +1563,45 @@ async def eci_download_roll(
             record_saved = True
             selection_id = new_row.id
             logger.info("ECI inserted eci_roll_selections id=%s pdf_path=%s", new_row.id, saved_path_str)
+
+        # additionally record in download + files tables
+        try:
+            new_dl = EciDownload(
+                state=state_s,
+                year_of_revision=year_s,
+                district=district_s,
+                assembly_constituency=ac_s,
+                language=language_s,
+                created_by="system",
+            )
+            save_db.add(new_dl)
+            save_db.commit()
+            save_db.refresh(new_dl)
+
+            # unique batch of 4-6 digits
+            from random import randint
+
+            def _generate_batch():
+                for _ in range(20):
+                    candidate = str(randint(1000, 999999))
+                    if not save_db.query(EciDownloadFile).filter_by(batch=candidate).first():
+                        return candidate
+                # fallback to timestamp if something odd
+                return str(int(time.time()))
+
+            import time
+            batch_code = _generate_batch()
+            new_file = EciDownloadFile(
+                download_id=new_dl.id,
+                batch=batch_code,
+                file_path=saved_path_str,
+                status="pending",
+            )
+            save_db.add(new_file)
+            save_db.commit()
+        except Exception as exc:
+            logger.exception("Could not save download/files record: %s", exc)
+            save_db.rollback()
     except Exception as e:
         logger.exception("Could not save eci_roll_selections: %s", e)
         save_db.rollback()
@@ -944,7 +1698,7 @@ async def upload_pre_sir_pdf(
             "metadata": metadata,
         }
     except ImportError as e:
-        raise HTTPException(status_code=500, detail="PDF extraction requires pdfplumber. Install with: pip install pdfplumber")
+        raise HTTPException(status_code=500, detail=f"PDF extraction import failed: {e}. Ensure pdfplumber is installed in the same Python that runs uvicorn: pip install pdfplumber")
     except Exception as e:
         logger.exception("Error uploading Pre-SIR PDF")
         raise HTTPException(status_code=500, detail=f"Error processing PDF: {str(e)}")
@@ -996,7 +1750,7 @@ async def upload_post_sir_pdf(
             "metadata": metadata,
         }
     except ImportError as e:
-        raise HTTPException(status_code=500, detail="PDF extraction requires pdfplumber. Install with: pip install pdfplumber")
+        raise HTTPException(status_code=500, detail=f"PDF extraction import failed: {e}. Ensure pdfplumber is installed in the same Python that runs uvicorn: pip install pdfplumber")
     except Exception as e:
         logger.exception("Error uploading Post-SIR PDF")
         raise HTTPException(status_code=500, detail=f"Error processing PDF: {str(e)}")

@@ -2,11 +2,7 @@ import pyodbc
 import urllib.parse
 import time
 
-MSSQL_HOST = r"172.16.2.34\SQL2014"
-MSSQL_DB = "OSUCSCDEV"
-MSSQL_USER = "DIGISCRIPT_KTECH_DEV"
-MSSQL_PASS = "xNFk@q5;p/!U"
-MSSQL_DRIVER = "ODBC Driver 17 for SQL Server"
+
 
 def test_connection():
     print(f"Testing connection to {MSSQL_HOST}...")

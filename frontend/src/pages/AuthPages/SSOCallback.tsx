@@ -99,17 +99,8 @@ export default function SSOCallback() {
         userData = await fetchUserFromAPI(token);
       }
 
-      // Redirect based on permissions (matching CI3 login/index.php behavior)
-      if (userData.college_perm === 1) {
-        navigate("/college/dashboard");
-      } else if (userData.hs_perm === 1) {
-        navigate("/school/dashboard");
-      } else if (userData.ocr_perm === 1) {
-        navigate("/ocrverify/dashboard");
-      } else {
-        // No specific permission, redirect to dashboard anyway
-        navigate("/college/dashboard");
-      }
+      // SIR-only app: always land on dashboard after successful SSO.
+      navigate("/dashboard");
     } catch (err) {
       console.error("SSO Login Error:", err);
       setError(err instanceof Error ? err.message : "Failed to complete SSO login");

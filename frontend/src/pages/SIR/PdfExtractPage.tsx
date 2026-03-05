@@ -128,6 +128,8 @@ const PdfExtractPage: React.FC = () => {
   const [accuracySummary, setAccuracySummary] = useState<AccuracySummary | null>(null);
   /** Force OCR for data pages (recommended for 3×10 card layout — avoids wrong column alignment from text layer). */
   const [forceOcr, setForceOcr] = useState(true);
+  /** Use AWS Textract instead of Tesseract/EasyOCR (requires AWS_BUCKET, AWS credentials). */
+  const [useTextract, setUseTextract] = useState(false);
 
 
   const loadPdfList = useCallback(async () => {
@@ -170,7 +172,7 @@ const PdfExtractPage: React.FC = () => {
   const handleEciDownload = async () => {
     setEciLoading(true);
     try {
-      const blob = await downloadEciRoll({
+      const { blob } = await downloadEciRoll({
         state: 'Andhra Pradesh',
         revyear: '2025',
         district: 'Kurnool',
@@ -228,7 +230,9 @@ const PdfExtractPage: React.FC = () => {
           constituency_name: constituencyName.trim() || undefined,
           booth_number: boothNumber.trim() || undefined,
           use_ocr: forceOcr,
+          use_textract: useTextract,
           extraction_config: hasConfig ? cfg : undefined,
+          save_to_db: true,
         });
         const data = res.data as { records?: ExtractedRecord[]; metadata?: ExtractMetadata; raw_page_texts?: { page: number; length: number; text: string }[]; accuracy_summary?: AccuracySummary };
         setRecords(data.records ?? []);
@@ -241,6 +245,8 @@ const PdfExtractPage: React.FC = () => {
         if (constituencyName.trim()) formData.append('constituency_name', constituencyName.trim());
         if (boothNumber.trim()) formData.append('booth_number', boothNumber.trim());
         formData.append('use_ocr', forceOcr ? 'true' : 'false');
+        formData.append('use_textract', useTextract ? 'true' : 'false');
+        formData.append('save_to_db', 'true');
         if (hasConfig) formData.append('extraction_config_json', JSON.stringify(cfg));
 
         const res = await extractPdfRoll(formData);
@@ -312,7 +318,7 @@ const PdfExtractPage: React.FC = () => {
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Extract PDF Roll</h1>
           <p className="text-gray-500 dark:text-gray-400 mt-1">
-            Upload an electoral roll PDF (e.g. SIR Draft Roll). Click Submit to extract and view data below. Data is not saved to the database.
+            Upload an electoral roll PDF (e.g. SIR Draft Roll). Click Submit to extract, save to database, and view data below.
           </p>
         </div>
 
@@ -447,10 +453,22 @@ const PdfExtractPage: React.FC = () => {
                   type="checkbox"
                   checked={forceOcr}
                   onChange={(e) => setForceOcr(e.target.checked)}
+                  disabled={useTextract}
                   className="mt-1 rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500"
                 />
                 <span className="text-sm text-gray-700 dark:text-gray-300">
-                  <strong>Force OCR for extraction</strong> — recommended for 3×10 card layout. Uses per-card OCR so Name, Relative, Age, Gender align correctly. If unchecked, the PDF text layer is used (can produce wrong columns).
+                  <strong>Force OCR for extraction</strong> — recommended for 3×10 card layout. Uses per-card OCR so Name, Relative, Age, Gender align correctly. If unchecked, the PDF text layer is used (can produce wrong columns). Disabled when AWS Textract is used.
+                </span>
+              </label>
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={useTextract}
+                  onChange={(e) => setUseTextract(e.target.checked)}
+                  className="mt-1 rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500"
+                />
+                <span className="text-sm text-gray-700 dark:text-gray-300">
+                  <strong>Use AWS Textract</strong> — cloud-based extraction (requires AWS_BUCKET, AWS credentials). Best for scanned PDFs and multi-page rolls (50+ pages).
                 </span>
               </label>
             </div>

@@ -1,6 +1,7 @@
 fastapi
 pydantic>=2.7
 pydantic-settings>=2.0
+email-validator
 uvicorn
 python-dotenv
 sqlalchemy
@@ -24,7 +25,7 @@ opencv-python-headless
 easyocr
 playwright
 opencv-python
-
 pdf2image
 docling
 scipy
+boto3

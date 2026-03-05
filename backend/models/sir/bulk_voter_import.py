@@ -2,7 +2,7 @@
 Bulk Electoral Roll import: one row per voter box; unique per (pdf_name, box_id).
 Used by /upload/bulk-electoral-roll and pdf_folder_extractor (production flow).
 """
-from sqlalchemy import Column, Integer, String, Text, DateTime, BigInteger, Numeric, Float, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Text, DateTime, BigInteger, Numeric, Float, Boolean, UniqueConstraint
 from sqlalchemy.sql import func
 from database.connection import Base
 
@@ -15,7 +15,8 @@ class BulkVoterImport(Base):
     page_number = Column(Integer, nullable=True)
     box_id = Column(Integer, nullable=True)  # unique per PDF (1, 2, 3...)
 
-    epic_number = Column(String(20), nullable=True, index=True)  # 3 letters + 7 digits
+    epic_number = Column(String(20), nullable=True, index=True)  # 3–4 letters + 6–7 digits
+    epic_is_valid = Column(Boolean, default=True, nullable=True)  # False when format invalid or missing (stored, not dropped)
     name = Column(String(255), nullable=True)
     relative_name = Column(String(255), nullable=True)
     relation_type = Column(String(20), nullable=True)  # Father/Husband etc

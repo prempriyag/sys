@@ -97,7 +97,6 @@ export default function UserDropdown() {
 
   // Get permissions from user context
   const collegePerm = user?.college_perm === 1;
-  const hsPerm = user?.hs_perm === 1;
   const ocrPerm = user?.ocr_perm === 1;
   const userName = user?.name || "User";
   const userEmail = user?.email || "";
@@ -107,9 +106,7 @@ export default function UserDropdown() {
   const canAccessSettings = hasAnyPermission(["smtp_setup", "configurations", "permissions", "role"]);
 
   const modules: { value: ModuleType; label: string; perm: boolean }[] = [
-    { value: "college", label: "College", perm: collegePerm },
-    { value: "school", label: "High School", perm: hsPerm },
-    { value: "ocrverify", label: "OCR Portal", perm: ocrPerm },
+    { value: "sir", label: "SIR Portal", perm: collegePerm || ocrPerm },
   ];
 
   const getProfilePath = () => {

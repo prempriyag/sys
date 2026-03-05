@@ -5,6 +5,7 @@ Folder structure: extracted/state/year/district/constituency_name/
 """
 import logging
 import shutil
+import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -33,22 +34,14 @@ def move_pdf(
 ) -> bool:
     """Move PDF to extracted_base/state/year/district/constituency/filename. Creates dirs."""
     try:
-        has_any = bool(
-            (state or "").strip()
-            or (year or "").strip()
-            or (district or "").strip()
-            or (constituency or "").strip()
+        constituency_folder = _safe_folder(constituency) if (constituency or "").strip() else _safe_folder(pdf_path.stem)
+        target_folder = (
+            extracted_base
+            / _safe_folder(state)
+            / _safe_folder(year)
+            / _safe_folder(district)
+            / constituency_folder
         )
-        if not has_any:
-            target_folder = extracted_base / "bulk_rolls"
-        else:
-            target_folder = (
-                extracted_base
-                / _safe_folder(state)
-                / _safe_folder(year)
-                / _safe_folder(district)
-                / _safe_folder(constituency)
-            )
         target_folder.mkdir(parents=True, exist_ok=True)
         dest = target_folder / pdf_path.name
         if dest.resolve() == pdf_path.resolve():
@@ -76,6 +69,8 @@ def process_folder(
     For each PDF in folder: extract ALL pages -> insert with box_id -> commit -> move PDF.
     Returns total_inserted, pdf_processed, errors.
     """
+    from sqlalchemy import inspect
+    from sqlalchemy.dialects.postgresql import insert as pg_insert
     from models.sir.bulk_voter_import import BulkVoterImport
 
     try:
@@ -95,6 +90,15 @@ def process_folder(
     total_inserted = 0
     total_pdfs = len(pdf_files)
     errors: List[str] = []
+    batch_size = 100
+    inspector = inspect(db.bind)
+    table_cols = {c.get("name") for c in inspector.get_columns("voter_data")}
+    unique_sets = {frozenset(u.get("column_names") or []) for u in inspector.get_unique_constraints("voter_data")}
+    conflict_cols = None
+    if {"pdf_name", "box_id"}.issubset(table_cols) and frozenset(("pdf_name", "box_id")) in unique_sets:
+        conflict_cols = ["pdf_name", "box_id"]
+    elif "epic_number" in table_cols and frozenset(("epic_number",)) in unique_sets:
+        conflict_cols = ["epic_number"]
 
     for current_index, pdf_path in enumerate(pdf_files, start=1):
         pdf_name = pdf_path.name
@@ -117,6 +121,25 @@ def process_folder(
 
             box_counter = 1
             inserted_this_pdf = 0
+            pending_rows: List[Dict[str, Any]] = []
+
+            def _commit_pending(sleep_after: bool = False) -> int:
+                nonlocal total_inserted, inserted_this_pdf, pending_rows
+                if not pending_rows:
+                    return 0
+                batch_len = len(pending_rows)
+                stmt = pg_insert(BulkVoterImport).values(pending_rows)
+                if conflict_cols:
+                    stmt = stmt.on_conflict_do_nothing(index_elements=conflict_cols)
+                res = db.execute(stmt)
+                db.commit()
+                count = res.rowcount if res.rowcount is not None and res.rowcount >= 0 else len(pending_rows)
+                total_inserted += count
+                inserted_this_pdf += count
+                pending_rows = []
+                if sleep_after and batch_len >= 100:
+                    time.sleep(2)
+                return count
 
             for rec in records:
                 epic = (rec.get("epic_number") or "").strip()
@@ -139,38 +162,50 @@ def process_folder(
                 else:
                     conf = 1.0
 
-                voter = BulkVoterImport(
-                    pdf_name=pdf_name,
-                    page_number=rec.get("page_number"),
-                    box_id=box_counter,
-                    epic_number=epic or None,
-                    name=name or None,
-                    relative_name=relative_name or None,
-                    relation_type=relation_type or None,
-                    age=age,
-                    gender=gender or None,
-                    house_no=(rec.get("house_no") or "").strip()[:200] or None,
-                    address=(rec.get("address") or "").strip() or None,
-                    constituency_name=(constituency_name or rec.get("constituency_name") or "").strip()[:200] or None,
-                    year=(year or "").strip()[:20] or None,
-                    booth_number=(rec.get("booth_number") or "").strip()[:50] or None,
-                    source_pdf=pdf_name,
-                    confidence_score=conf,
-                    confidence=conf,
-                )
-                db.add(voter)
-                try:
-                    db.commit()
-                    total_inserted += 1
-                    inserted_this_pdf += 1
-                except Exception as commit_err:
-                    db.rollback()
-                    logger.exception("DB INSERT FAILED for %s box_id=%s: %s", pdf_name, box_counter, commit_err)
-                    raise
+                voter = {
+                    "page_number": rec.get("page_number"),
+                    "epic_number": epic or None,
+                    "name": name or None,
+                    "relative_name": relative_name or None,
+                    "age": age,
+                    "gender": gender or None,
+                    "house_no": (rec.get("house_no") or "").strip()[:200] or None,
+                    "address": (rec.get("address") or "").strip() or None,
+                    "constituency_name": (constituency_name or rec.get("constituency_name") or "").strip()[:200] or None,
+                    "year": (year or "").strip()[:20] or None,
+                    "booth_number": (rec.get("booth_number") or "").strip()[:50] or None,
+                    "source_pdf": pdf_name,
+                    "confidence": conf,
+                }
+                if "pdf_name" in table_cols:
+                    voter["pdf_name"] = pdf_name
+                if "box_id" in table_cols:
+                    voter["box_id"] = box_counter
+                if "relation_type" in table_cols:
+                    voter["relation_type"] = relation_type or None
+                if "confidence_score" in table_cols:
+                    voter["confidence_score"] = conf
+                voter = {k: v for k, v in voter.items() if k in table_cols}
+                pending_rows.append(voter)
+                if len(pending_rows) >= batch_size:
+                    try:
+                        _commit_pending(sleep_after=True)
+                    except Exception as commit_err:
+                        db.rollback()
+                        logger.exception("DB INSERT FAILED for %s around box_id=%s: %s", pdf_name, box_counter, commit_err)
+                        raise
                 box_counter += 1
 
+            if pending_rows:
+                try:
+                    _commit_pending(sleep_after=False)
+                except Exception as commit_err:
+                    db.rollback()
+                    logger.exception("DB INSERT FAILED for %s (final batch): %s", pdf_name, commit_err)
+                    raise
+
             if inserted_this_pdf:
-                logger.info("Committed %d boxes from %s to voter_data (one box = one insert).", inserted_this_pdf, pdf_name)
+                logger.info("Committed %d boxes from %s to voter_data (batch size=%d).", inserted_this_pdf, pdf_name, batch_size)
 
             if move_pdf(
                 pdf_path,

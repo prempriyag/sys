@@ -256,13 +256,6 @@ def get_stored_profiler_data(session_id: str, is_ajax: bool = False) -> Optional
 # ============================================================================
 # Auth check
 # ============================================================================
-def is_ktech_user(email: str) -> bool:
-    """Check if user is a KTech user (authorized for profiler).
-    Matches CI3 checkemailktech()."""
-    if not email:
-        return False
-    email_lower = email.lower()
-    return email_lower.endswith('@ktechproducts.com') or email_lower.endswith('@ktech.com')
 
 
 # ============================================================================

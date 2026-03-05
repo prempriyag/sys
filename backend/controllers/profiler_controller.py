@@ -17,7 +17,7 @@ from helpers.profiler_helper import (
     get_stored_profiler_data,
     get_all_stored_requests,
     clear_stored_requests,
-    is_ktech_user,
+    
 )
 from config.constants import TBL_ADMIN, TBL_CONFIGURATION, TBL_ROLES, TBL_KICKOUT, COLLEGE_PROJECT_ID
 from models import User
@@ -42,12 +42,7 @@ async def get_profiler_data(
     Args:
         type: 'page' or 'ajax' - type of profiler data to retrieve
     """
-    # Check if user is authorized (KTech employee)
-    if not is_ktech_user(current_user.email):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Profiler access restricted to authorized users"
-        )
+    
     
     is_ajax = type == "ajax"
     session_id = str(current_user.id)  # Use user ID as session identifier
@@ -86,11 +81,7 @@ async def get_request_profiles(
     Get all recent request profiles for this user.
     Shows every API call with its SQL queries and timing.
     """
-    if not is_ktech_user(current_user.email):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Profiler access restricted to authorized users"
-        )
+   
     
     session_id = str(current_user.id)
     requests_data = get_all_stored_requests(session_id)
@@ -107,11 +98,7 @@ async def clear_request_profiles(
     current_user: User = Depends(get_current_user),
 ):
     """Clear stored request profiles for this user."""
-    if not is_ktech_user(current_user.email):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Profiler access restricted to authorized users"
-        )
+ 
     
     session_id = str(current_user.id)
     clear_stored_requests(session_id)
@@ -127,12 +114,7 @@ async def speedtest(
     Database speed test - matches CI3 Speedtest controller.
     Only available for KTech users.
     """
-    # Check if user is authorized (KTech employee)
-    if not is_ktech_user(current_user.email):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Speedtest access restricted to authorized users"
-        )
+   
     
     results = {
         "tests": [],
@@ -257,7 +239,7 @@ async def profiler_status(
     """
     Get profiler status - whether it's enabled for current user.
     """
-    is_user_authorized = is_ktech_user(current_user.email)
+    
     
     return {
         "enabled": is_user_authorized,

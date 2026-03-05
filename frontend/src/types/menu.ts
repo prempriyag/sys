@@ -13,7 +13,7 @@ export type MenuItem = {
   };
 };
 
-export type ModuleType = "sir";
+export type ModuleType = "sir" | "college";
 
 export type MenuConfig = {
   module: ModuleType;

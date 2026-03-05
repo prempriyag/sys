@@ -65,7 +65,13 @@ async function notificationFetch(endpoint: string, method: "GET" | "POST" = "GET
       console.warn("[Notifications] No auth token found – skipping fetch");
       return null;
     }
-    const url = `${API_BASE_URL}${endpoint}`;
+    if (endpoint == null || endpoint === "") {
+      console.warn("[Notifications] Skipping fetch – endpoint is undefined or empty");
+      return null;
+    }
+    const base = API_BASE_URL ?? "";
+    const path = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
+    const url = `${base.replace(/\/$/, "")}${path}`;
     console.debug(`[Notifications] ${method} ${url}`);
     const res = await fetch(url, {
       method,

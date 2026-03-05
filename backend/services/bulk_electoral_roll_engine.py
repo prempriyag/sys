@@ -12,10 +12,13 @@ import os
 import re
 import shutil
 import sys
+import time
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
+
+
 
 # Strict EPIC: 3 uppercase letters + 7 digits
 RE_EPIC_STRICT = re.compile(r"^[A-Z]{3}[0-9]{7}$")
@@ -335,8 +338,7 @@ def parse_voter_records_from_text(
                 epic_clean, was_corrected = validate_and_correct_epic(epic_raw)
                 if not epic_clean:
                     invalid_epics.append(epic_raw)
-                    i += 1
-                    continue
+                    epic_clean = clean_epic(epic_raw) or None
                 # One line per field; scan in order until next EPIC
                 name = None
                 relative_name = None
@@ -391,19 +393,63 @@ def process_one_pdf(pdf_path: str) -> Tuple[List[Dict[str, Any]], List[str], int
         return [], [], 0
     source_name = path.name
     pdf_type = detect_pdf_type(str(path))
-    if pdf_type == "text":
-        text_per_page = extract_text_with_pdfminer(str(path))
-    else:
-        text_per_page = extract_text_with_ocr(str(path))
-    if not text_per_page:
+
+    # Force card-based extraction for bulk flow by default (safer for 3-column ECI layout).
+    force_ocr_per_card = os.getenv("BULK_FORCE_OCR_PER_CARD", "true").strip().lower() in ("1", "true", "yes")
+    skip_merged_cards = os.getenv("BULK_SKIP_MERGED_CARDS", "true").strip().lower() in ("1", "true", "yes")
+
+    # Prefer per-card extractor so each detected voter box maps to exactly one DB row.
+    # This avoids full-page OCR line-order mixing where multiple cards leak into one record.
+    try:
+        from services.electoral_roll_pdf_extractor import extract_from_pdf
+
+        result = extract_from_pdf(path, use_ocr=(force_ocr_per_card or pdf_type != "text"))
+        records = result.get("records") or []
+        invalid_epics: List[str] = []
+        filtered_records: List[Dict[str, Any]] = []
+        for r in records:
+            if skip_merged_cards:
+                warnings = [str(w) for w in (r.get("_warnings") or [])]
+                if any(w in ("possible_cross_card_merge", "multiple_epics_in_card") for w in warnings):
+                    continue
+            r["source_pdf"] = source_name
+            raw_epic = (r.get("epic_number") or "").strip()
+            if not raw_epic:
+                filtered_records.append(r)
+                continue
+            epic_clean, _ = validate_and_correct_epic(raw_epic)
+            if epic_clean:
+                r["epic_number"] = epic_clean
+            else:
+                invalid_epics.append(raw_epic)
+                r["epic_number"] = clean_epic(raw_epic) or None
+            filtered_records.append(r)
+        total = len(filtered_records) + len(invalid_epics)
+        return filtered_records, invalid_epics, total
+    except Exception as e:
+        logger.exception("extract_from_pdf failed for %s: %s", pdf_path, e)
         return [], [], 0
-    records, invalid_epics = parse_voter_records_from_text(text_per_page, source_name)
-    total = len(records) + len(invalid_epics)
-    return records, invalid_epics, total
 
 
 # PostgreSQL (and psycopg2) limit ~32,767 bind parameters per statement. With ~17 columns per row, use batch_size <= 1500.
-SAFE_BATCH_SIZE = 50
+SAFE_BATCH_SIZE = 100
+
+
+def _get_voter_data_insert_capabilities(db) -> Tuple[set, Optional[List[str]]]:
+    """
+    Read table columns/constraints at runtime so inserts can work with both
+    legacy and migrated voter_data schemas.
+    """
+    from sqlalchemy import inspect
+
+    inspector = inspect(db.bind)
+    table_cols = {c.get("name") for c in inspector.get_columns("voter_data")}
+    unique_sets = {frozenset(u.get("column_names") or []) for u in inspector.get_unique_constraints("voter_data")}
+    if {"pdf_name", "box_id"}.issubset(table_cols) and frozenset(("pdf_name", "box_id")) in unique_sets:
+        return table_cols, ["pdf_name", "box_id"]
+    if "epic_number" in table_cols and frozenset(("epic_number",)) in unique_sets:
+        return table_cols, ["epic_number"]
+    return table_cols, None
 
 
 def _record_to_row(r: Dict[str, Any], source_pdf: str, box_id: int) -> Dict[str, Any]:
@@ -436,12 +482,21 @@ def _record_to_row(r: Dict[str, Any], source_pdf: str, box_id: int) -> Dict[str,
     }
 
 
+def _filter_row_for_table(row: Dict[str, Any], table_cols: set) -> Dict[str, Any]:
+    return {k: v for k, v in row.items() if k in table_cols}
+
+
+def _sleep_after_100_batch() -> None:
+    """Throttle between full 100-row commits for DB stability."""
+    time.sleep(2)
+
+
 def insert_records_one_by_one(
     db_session_factory,
     records: List[Dict[str, Any]],
 ) -> Tuple[int, int]:
     """
-    Insert each record (one box) with an immediate commit. Same as folder flow: read one box, insert, commit, next.
+    Insert records in chunks of 100 and commit each chunk.
     Uses ON CONFLICT (pdf_name, box_id) DO NOTHING. Returns (total_inserted, 0).
     """
     from sqlalchemy.dialects.postgresql import insert
@@ -452,18 +507,36 @@ def insert_records_one_by_one(
     db = db_session_factory()
     pdf_counter: Dict[str, int] = {}
     total_inserted = 0
+    total_attempted = 0
+    pending_rows: List[Dict[str, Any]] = []
+    batch_size = 100
     try:
+        table_cols, conflict_cols = _get_voter_data_insert_capabilities(db)
         for r in records:
             source_pdf = (r.get("source_pdf") or "").strip() or "upload"
             pdf_counter[source_pdf] = pdf_counter.get(source_pdf, 0) + 1
             box_id = pdf_counter[source_pdf]
-            one_row = _record_to_row(r, source_pdf, box_id)
-            stmt = insert(BulkVoterImport).values(one_row).on_conflict_do_nothing(
-                index_elements=["pdf_name", "box_id"]
-            )
+            pending_rows.append(_filter_row_for_table(_record_to_row(r, source_pdf, box_id), table_cols))
+            if len(pending_rows) >= batch_size:
+                batch_len = len(pending_rows)
+                stmt = insert(BulkVoterImport).values(pending_rows)
+                if conflict_cols:
+                    stmt = stmt.on_conflict_do_nothing(index_elements=conflict_cols)
+                res = db.execute(stmt)
+                db.commit()
+                total_attempted += len(pending_rows)
+                total_inserted += res.rowcount if res.rowcount is not None and res.rowcount >= 0 else len(pending_rows)
+                pending_rows = []
+                if batch_len >= 100:
+                    _sleep_after_100_batch()
+        if pending_rows:
+            stmt = insert(BulkVoterImport).values(pending_rows)
+            if conflict_cols:
+                stmt = stmt.on_conflict_do_nothing(index_elements=conflict_cols)
             res = db.execute(stmt)
             db.commit()
-            total_inserted += res.rowcount if res.rowcount is not None and res.rowcount >= 0 else 1
+            total_attempted += len(pending_rows)
+            total_inserted += res.rowcount if res.rowcount is not None and res.rowcount >= 0 else len(pending_rows)
     except Exception as e:
         db.rollback()
         logger.exception("DB INSERT FAILED (one-by-one): %s", e)
@@ -471,8 +544,8 @@ def insert_records_one_by_one(
     finally:
         db.close()
     if total_inserted:
-        logger.info("Committed %d boxes to voter_data (one box = one insert).", total_inserted)
-    return total_inserted, 0
+        logger.info("Committed %d boxes to voter_data (batch size=100).", total_inserted)
+    return total_inserted, max(0, total_attempted - total_inserted)
 
 
 def bulk_insert_on_conflict_nothing(
@@ -495,29 +568,32 @@ def bulk_insert_on_conflict_nothing(
     db = db_session_factory()
     pdf_counter: Dict[str, int] = {}
     values_list: List[Dict[str, Any]] = []
-    for r in records:
-        source_pdf = (r.get("source_pdf") or "").strip() or "upload"
-        pdf_counter[source_pdf] = pdf_counter.get(source_pdf, 0) + 1
-        box_id = pdf_counter[source_pdf]
-        values_list.append(_record_to_row(r, source_pdf, box_id))
-    if values_list:
-        logger.info("Bulk insert: inserting %d records into voter_data (pdf_name + box_id).", len(values_list))
-    # Cap batch to stay under PostgreSQL bind parameter limit (~32767)
-    effective_batch = min(batch_size, 50)
     try:
+        table_cols, conflict_cols = _get_voter_data_insert_capabilities(db)
+        for r in records:
+            source_pdf = (r.get("source_pdf") or "").strip() or "upload"
+            pdf_counter[source_pdf] = pdf_counter.get(source_pdf, 0) + 1
+            box_id = pdf_counter[source_pdf]
+            values_list.append(_filter_row_for_table(_record_to_row(r, source_pdf, box_id), table_cols))
+        if values_list:
+            logger.info("Bulk insert: inserting %d records into voter_data.", len(values_list))
+        # Cap batch to stay under PostgreSQL bind parameter limit (~32767)
+        effective_batch = min(batch_size, 100)
         for i in range(0, len(values_list), effective_batch):
             batch = values_list[i : i + effective_batch]
             if not batch:
                 continue
             total_attempted += len(batch)
-            stmt = insert(BulkVoterImport).values(batch).on_conflict_do_nothing(
-                index_elements=["pdf_name", "box_id"]
-            )
+            stmt = insert(BulkVoterImport).values(batch)
+            if conflict_cols:
+                stmt = stmt.on_conflict_do_nothing(index_elements=conflict_cols)
             res = db.execute(stmt)
             db.commit()
             inserted_this_batch = res.rowcount if res.rowcount is not None and res.rowcount >= 0 else len(batch)
             total_inserted += inserted_this_batch
             logger.info("Committed %d rows to voter_data", inserted_this_batch)
+            if len(batch) >= 100:
+                _sleep_after_100_batch()
     except Exception as e:
         db.rollback()
         logger.exception("DB INSERT FAILED (bulk): %s", e)
@@ -536,22 +612,19 @@ def _move_pdf_to_extracted(
     district: Optional[str],
     constituency_name: Optional[str],
 ) -> bool:
-    """Move PDF to extracted folder: state/year/district/constituency_name/filename. If all four are empty, use single folder 'bulk_rolls'."""
+    """Move PDF to extracted folder: state/year/district/constituency_name/filename."""
     try:
         src = Path(pdf_path)
         if not src.exists():
             return False
-        has_any = bool((state or "").strip() or (year or "").strip() or (district or "").strip() or (constituency_name or "").strip())
-        if not has_any:
-            folder = extracted_base / "bulk_rolls"
-        else:
-            folder = (
-                extracted_base
-                / _safe_folder_name(state)
-                / _safe_folder_name(year)
-                / _safe_folder_name(district)
-                / _safe_folder_name(constituency_name)
-            )
+        constituency_folder = _safe_folder_name(constituency_name) if (constituency_name or "").strip() else _safe_folder_name(src.stem)
+        folder = (
+            extracted_base
+            / _safe_folder_name(state)
+            / _safe_folder_name(year)
+            / _safe_folder_name(district)
+            / constituency_folder
+        )
         folder.mkdir(parents=True, exist_ok=True)
         dest = folder / src.name
         if dest.resolve() == src.resolve():
@@ -577,17 +650,15 @@ def run_bulk(
     progress_callback: Optional[Callable[[int, int, str, int], None]] = None,
 ) -> Dict[str, Any]:
     """
-    Process PDFs one by one: for each PDF, extract boxes → insert one box → commit → next box → then move PDF.
-    No batching: one box = one insert = one commit (safe resume if crash).
+    Process PDFs one by one: for each PDF, extract boxes → insert in 100-row batches → then move PDF.
     Optional constituency_name and year are stored on every inserted row.
     If extracted_base is set, each PDF is moved after processing to:
       extracted_base/<state>/<year>/<district>/<constituency_name>/<filename>
-    max_workers is fixed at 1 (per-PDF processing only). batch_size is ignored (one-by-one insert).
+    max_workers is fixed at 1 (per-PDF processing only). batch_size is ignored (uses 100-row commits).
     Returns: total_found, inserted, duplicates_skipped, invalid_epic_count, invalid_epics, pdf_count, moved_count, extracted_folder.
     """
     total_found = 0
     all_invalid_epics: List[str] = []
-    seen_epic: set = set()
     moved_count = 0
     base_path: Optional[Path] = None
     if extracted_base and extracted_base.strip():
@@ -597,7 +668,7 @@ def run_bulk(
     total_inserted = 0
     total_duplicates_skipped = 0
 
-    # Strictly per-PDF: extract → insert one-by-one (one box → one commit) → then move PDF
+    # Strictly per-PDF: extract → insert in 100-row batches → then move PDF
     for current_index, pdf_path in enumerate(pdf_paths, start=1):
         try:
             if progress_callback:
@@ -605,6 +676,7 @@ def run_bulk(
             records, invalid_epics, count = process_one_pdf(pdf_path)
             total_found += count
             all_invalid_epics.extend(invalid_epics)
+            per_pdf_constituency = (constituency_name or "").strip() or Path(pdf_path).stem
             # Apply constituency/year to this PDF's records
             if constituency_name is not None or year is not None:
                 for r in records:
@@ -612,24 +684,19 @@ def run_bulk(
                         r["constituency_name"] = constituency_name.strip() or None
                     if year is not None:
                         r["year"] = str(year).strip() or None
-            # Dedupe by EPIC when present; include all records (with or without EPIC)
-            batch = []
             for r in records:
-                epic = (r.get("epic_number") or "").strip()
-                if epic:
-                    if epic not in seen_epic:
-                        seen_epic.add(epic)
-                        batch.append(r)
-                else:
-                    batch.append(r)
-            # One box → one insert → one commit (no batching)
+                if not (r.get("constituency_name") or "").strip():
+                    r["constituency_name"] = per_pdf_constituency
+            # Keep all extracted records; do not drop rows before DB insert.
+            batch = records
+            # Insert in 100-row batches
             inserted, dup = insert_records_one_by_one(db_session_factory, batch)
             total_inserted += inserted
             total_duplicates_skipped += dup
             # Only then move this PDF to extracted folder
             if base_path is not None:
                 if _move_pdf_to_extracted(
-                    pdf_path, base_path, state, year, district, constituency_name
+                    pdf_path, base_path, state, year, district, per_pdf_constituency
                 ):
                     moved_count += 1
             if progress_callback:

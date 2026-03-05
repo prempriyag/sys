@@ -409,26 +409,25 @@ body, html {
   background-color: var(--color-brand-400);
 }
 
-@utility no-scrollbar {
-  /* Chrome, Safari and Opera */
-  &::-webkit-scrollbar {
-    display: none;
-  }
-  -ms-overflow-style: none; /* IE and Edge */
-  scrollbar-width: none; /* Firefox */
+/* no-scrollbar: plain CSS to avoid minifier :is() */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }
-@utility custom-scrollbar {
-  &::-webkit-scrollbar {
-    @apply size-1.5;
-  }
-
-  &::-webkit-scrollbar-track {
-    @apply rounded-full;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    @apply bg-gray-200 rounded-full dark:bg-gray-700;
-  }
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+/* custom-scrollbar: plain CSS to avoid minifier producing invalid :is() */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 0.375rem;
+  height: 0.375rem;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  border-radius: 9999px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgb(229 231 235);
+  border-radius: 9999px;
 }
 .dark .custom-scrollbar::-webkit-scrollbar-thumb {
   background-color: #344054;
@@ -729,7 +728,21 @@ span.flatpickr-weekday,
 }
 
 .fc .fc-view-harness {
-  @apply max-w-full overflow-x-auto custom-scrollbar;
+  @apply max-w-full overflow-x-auto;
+}
+.fc .fc-view-harness::-webkit-scrollbar {
+  width: 0.375rem;
+  height: 0.375rem;
+}
+.fc .fc-view-harness::-webkit-scrollbar-track {
+  border-radius: 9999px;
+}
+.fc .fc-view-harness::-webkit-scrollbar-thumb {
+  background-color: rgb(229 231 235);
+  border-radius: 9999px;
+}
+.dark .fc .fc-view-harness::-webkit-scrollbar-thumb {
+  background-color: #344054;
 }
 .fc-dayGridMonth-view.fc-view.fc-daygrid {
   @apply min-w-[718px];
@@ -952,16 +965,17 @@ span.flatpickr-weekday,
   @apply min-h-screen;
 }
 
+/* simplebar: plain CSS to avoid minifier :is() syntax error */
 .simplebar-scrollbar::before {
-  @apply !bg-gray-200 !rounded-full dark:!bg-gray-700 !opacity-100;
+  background-color: rgb(229 231 235) !important;
+  border-radius: 9999px !important;
+  opacity: 1 !important;
 }
-
 .dark .simplebar-scrollbar::before {
-  @apply !bg-gray-700;
+  background-color: rgb(55 65 81) !important;
 }
-
-.simplebar-scrollbar.simplebar-visible:before {
-  @apply opacity-100;
+.simplebar-scrollbar.simplebar-visible::before {
+  opacity: 1;
 }
 
 /* ============================================

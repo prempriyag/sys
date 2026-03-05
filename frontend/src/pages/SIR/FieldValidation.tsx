@@ -178,7 +178,7 @@ export default function FieldValidation({ type }: FieldValidationProps) {
                             {Number(booth.deletion_velocity).toFixed(2)}%
                           </td>
                           <td className="px-4 py-3 text-sm">
-                            <Badge variant={booth.risk_category === 'ANOMALY' ? 'error' : 'warning'}>
+                            <Badge color={booth.risk_category === 'ANOMALY' ? 'error' : 'warning'}>
                               {booth.risk_category}
                             </Badge>
                           </td>

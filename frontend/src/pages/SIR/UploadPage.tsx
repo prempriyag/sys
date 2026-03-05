@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
-import { uploadPreSir, uploadPostSir, uploadPreSirPdf, uploadPostSirPdf, runMatching, getConstituencies } from '../../services/api';
+import { uploadPreSir, uploadPostSir, uploadPreSirPdf, uploadPostSirPdf, runMatching, getConstituencies, parseElectoralRollPdf } from '../../services/api';
 import PageContainer from '../../components/common/PageContainer';
 import PageMeta from '../../components/common/PageMeta';
 import ThemedLoader from '../../components/common/ThemedLoader';

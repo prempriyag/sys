@@ -16,10 +16,10 @@ VITE_APP_ENV=DEV
 ```env
 # Backend API Base URL (overrides default based on environment)
 # Defaults:
-#   DEV:  http://localhost:8000
+#   DEV:  http://localhost:8001
 #   UAT:  https://digiscript-csc-uat.ktechproducts.com/backend
 #   PROD: https://digiscript-csc.ktechproducts.com/backend
-VITE_API_BASE_URL=http://localhost:8000
+VITE_API_BASE_URL=http://localhost:8001
 ```
 
 ### Application Settings
@@ -66,7 +66,7 @@ VITE_DEBUG_MODE=false
 
 ```env
 VITE_APP_ENV=DEV
-VITE_API_BASE_URL=http://localhost:8000
+VITE_API_BASE_URL=http://localhost:8001
 VITE_APP_NAME=DigiScript
 VITE_PROFILER_ENABLED=true
 VITE_PROFILER_ALLOWED_DOMAINS=ktechproducts.com,ktech.com

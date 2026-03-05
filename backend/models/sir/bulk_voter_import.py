@@ -34,6 +34,9 @@ class BulkVoterImport(Base):
     confidence = Column(Numeric(5, 4), nullable=True)  # legacy
     created_at = Column(DateTime, server_default=func.now())
 
+    batch_id = Column(String(20), nullable=True, index=True)  # epic_downloads.batch_id
+    file_id = Column(Integer, nullable=True, index=True)  # epic_voter_files.id
+
     __table_args__ = (
         UniqueConstraint("pdf_name", "box_id", name="uq_voter_data_pdf_box"),
     )

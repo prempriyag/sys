@@ -452,7 +452,10 @@ def _get_voter_data_insert_capabilities(db) -> Tuple[set, Optional[List[str]]]:
     return table_cols, None
 
 
-def _record_to_row(r: Dict[str, Any], source_pdf: str, box_id: int) -> Dict[str, Any]:
+def _record_to_row(
+    r: Dict[str, Any], source_pdf: str, box_id: int,
+    batch_id: Optional[str] = None, file_id: Optional[int] = None,
+) -> Dict[str, Any]:
     """Build one voter_data row dict from a record (shared by bulk and one-by-one insert)."""
     epic = (r.get("epic_number") or "").strip() or None
     conf = r.get("confidence")
@@ -461,7 +464,7 @@ def _record_to_row(r: Dict[str, Any], source_pdf: str, box_id: int) -> Dict[str,
             conf = float(conf)
         except (TypeError, ValueError):
             conf = None
-    return {
+    row = {
         "pdf_name": source_pdf[:255],
         "page_number": r.get("page_number"),
         "box_id": box_id,
@@ -480,6 +483,11 @@ def _record_to_row(r: Dict[str, Any], source_pdf: str, box_id: int) -> Dict[str,
         "confidence_score": conf,
         "confidence": r.get("confidence"),
     }
+    if batch_id is not None:
+        row["batch_id"] = batch_id
+    if file_id is not None:
+        row["file_id"] = file_id
+    return row
 
 
 def _filter_row_for_table(row: Dict[str, Any], table_cols: set) -> Dict[str, Any]:
@@ -494,6 +502,8 @@ def _sleep_after_100_batch() -> None:
 def insert_records_one_by_one(
     db_session_factory,
     records: List[Dict[str, Any]],
+    batch_id: Optional[str] = None,
+    file_id: Optional[int] = None,
 ) -> Tuple[int, int]:
     """
     Insert records in chunks of 100 and commit each chunk.
@@ -516,7 +526,12 @@ def insert_records_one_by_one(
             source_pdf = (r.get("source_pdf") or "").strip() or "upload"
             pdf_counter[source_pdf] = pdf_counter.get(source_pdf, 0) + 1
             box_id = pdf_counter[source_pdf]
-            pending_rows.append(_filter_row_for_table(_record_to_row(r, source_pdf, box_id), table_cols))
+            eff_batch_id = r.get("batch_id") if r.get("batch_id") is not None else batch_id
+            eff_file_id = r.get("file_id") if r.get("file_id") is not None else file_id
+            pending_rows.append(_filter_row_for_table(
+                _record_to_row(r, source_pdf, box_id, batch_id=eff_batch_id, file_id=eff_file_id),
+                table_cols,
+            ))
             if len(pending_rows) >= batch_size:
                 batch_len = len(pending_rows)
                 stmt = insert(BulkVoterImport).values(pending_rows)

@@ -16,6 +16,7 @@ from models.sir.district import District
 from models.sir.assembly_constituency import AssemblyConstituency
 from models.sir.eci_roll_selection import EciRollSelection
 from models.sir.eci_download import EciDownload, EciDownloadFile
+from models.sir.epic_download import EpicDownload, EpicVoterFile
 from models.sir.bulk_voter_import import BulkVoterImport
 from services.normalization import NormalizationService
 from services.electoral_roll_pdf_extractor import extract_from_pdf, debug_pdf, get_pdf_page_texts
@@ -1437,6 +1438,17 @@ async def bulk_electoral_roll_stream(
     )
 
 
+def _generate_epic_batch_id(db_session) -> str:
+    """Generate unique 5-digit batch_id for epic_downloads."""
+    import random
+    for _ in range(50):
+        candidate = str(random.randint(10000, 99999))
+        if not db_session.query(EpicDownload).filter_by(batch_id=candidate).first():
+            return candidate
+    import time
+    return str(int(time.time() % 100000)).zfill(5)
+
+
 @router.post("/eci-download")
 async def eci_download_roll(
     db: Session = Depends(get_db),
@@ -1445,11 +1457,12 @@ async def eci_download_roll(
     district: str = Form("Chennai"),
     ac_name: str = Form("11 - Dr.Radhakrishnan Nagar"),
     language: str = Form("English"),
+    role: str = Form(""),
     manual_captcha: str = Form("true"),
 ):
     """
     Automate ECI electoral roll PDF download: pre-fill state, revyear, district, AC, language.
-    Saves PDF under backend/download/<state>/<year>/<district>/<AC>/ and stores record in eci_roll_selections (pdf_path).
+    Inserts epic_downloads BEFORE download. Saves PDF to download/tobeprocess then processed, stores in epic_voter_files.
     Default: manual captcha. Use manual_captcha=false for OCR.
     Requires: pip install playwright && playwright install chromium
     """
@@ -1463,7 +1476,38 @@ async def eci_download_roll(
             detail="ECI downloader not available. Install: pip install playwright && playwright install chromium",
         )
     use_manual = _parse_bool_form(manual_captcha)
-    # In Python 3.12+, prefer the running loop inside async endpoints.
+    state_s = state.strip()
+    year_s = revyear.strip()
+    district_s = district.strip()
+    ac_s = ac_name.strip()
+    language_s = (language or "").strip() or "English"
+    role_s = (role or "").strip() or None
+
+    # 1. Insert epic_downloads BEFORE executing download script
+    epic_download_id = None
+    epic_batch_id = None
+    try:
+        epic_batch_id = _generate_epic_batch_id(db)
+        epic_dl = EpicDownload(
+            batch_id=epic_batch_id,
+            state=state_s,
+            year=year_s,
+            role=role_s,
+            district=district_s,
+            constancy=ac_s,
+            language=language_s,
+            status="new",
+            created_by="system",
+        )
+        db.add(epic_dl)
+        db.commit()
+        db.refresh(epic_dl)
+        epic_download_id = epic_dl.id
+    except Exception as e:
+        logger.exception("Could not insert epic_downloads: %s", e)
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to create download record: {e}")
+
     loop = asyncio.get_running_loop()
     try:
         pdf_bytes, error_msg = await loop.run_in_executor(
@@ -1503,20 +1547,74 @@ async def eci_download_roll(
     if not pdf_bytes:
         raise HTTPException(status_code=502, detail="No PDF was downloaded from ECI portal")
 
-    # Save PDF to persistent path and store record in eci_roll_selections
     base_dir = Path(__file__).resolve().parent.parent.parent / "download"
+    role_part = _safe_folder_name(role_s or "SIR")
+    tobeprocess_folder = (
+        base_dir / "tobeprocess"
+        / _safe_folder_name(state_s)
+        / _safe_folder_name(year_s)
+        / role_part
+        / _safe_folder_name(district_s)
+        / _safe_folder_name(ac_s)
+    )
+    tobeprocess_folder.mkdir(parents=True, exist_ok=True)
+    from datetime import datetime
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    pdf_filename = f"eci_electoral_roll_{ts}.pdf"
+    tobeprocess_path = tobeprocess_folder / pdf_filename
+    tobeprocess_path.write_bytes(pdf_bytes)
+
+    # Move to processed folder and register in epic_voter_files
+    processed_folder = (
+        base_dir / "processed"
+        / _safe_folder_name(state_s)
+        / _safe_folder_name(year_s)
+        / role_part
+        / _safe_folder_name(district_s)
+        / _safe_folder_name(ac_s)
+    )
+    processed_folder.mkdir(parents=True, exist_ok=True)
+    processed_path = processed_folder / pdf_filename
+    if tobeprocess_path.resolve() != processed_path.resolve():
+        import shutil
+        shutil.move(str(tobeprocess_path), str(processed_path))
+
+    # Relative path for epic_voter_files: download/processed/state/year/role/district/constancy/filename.pdf
+    rel_processed = "download/processed/" + "/".join([
+        _safe_folder_name(state_s),
+        _safe_folder_name(year_s),
+        role_part,
+        _safe_folder_name(district_s),
+        _safe_folder_name(ac_s),
+        pdf_filename,
+    ])
+    saved_path_str = str(processed_path.resolve())
+
+    # Insert epic_voter_files
+    try:
+        evf = EpicVoterFile(
+            downloaded_id=epic_download_id,
+            batch_id=epic_batch_id,
+            file_path=rel_processed,
+            status="new",
+        )
+        db.add(evf)
+        db.commit()
+    except Exception as exc:
+        logger.exception("Could not insert epic_voter_files: %s", exc)
+        db.rollback()
+
+    # Also save to legacy path for eci_roll_selections / eci_downloads
     folder = (
         base_dir
-        / _safe_folder_name(state)
-        / _safe_folder_name(revyear)
-        / _safe_folder_name(district)
-        / _safe_folder_name(ac_name)
+        / _safe_folder_name(state_s)
+        / _safe_folder_name(year_s)
+        / _safe_folder_name(district_s)
+        / _safe_folder_name(ac_s)
     )
     folder.mkdir(parents=True, exist_ok=True)
-    pdf_filename = "downloaded.pdf"
-    pdf_file_path = folder / pdf_filename
+    pdf_file_path = folder / "downloaded.pdf"
     pdf_file_path.write_bytes(pdf_bytes)
-    saved_path_str = str(pdf_file_path.resolve())
 
     # ---- On every download: save PDF details in DB (check existing → update, else insert) ----
     state_s = state.strip()

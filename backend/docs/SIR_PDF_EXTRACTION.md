@@ -89,6 +89,12 @@ Data is inserted into the **PostgreSQL** table `voter_data`. If nothing appears 
    ```
    Or in PostgreSQL: `ALTER TABLE voter_data ADD COLUMN IF NOT EXISTS year VARCHAR(20);`
 
+2b. **Column `relation_type` missing** – To store Father/Husband/Mother separately from relative_name:
+   ```bash
+   psql -d your_db -f backend/scripts/sql/add_relation_type_to_voter_data.sql
+   ```
+   Or: `ALTER TABLE voter_data ADD COLUMN IF NOT EXISTS relation_type VARCHAR(20);`
+
 3. **Wrong database** – The app uses **PostgreSQL** (see `backend/database/connection.py` and `.env`). Ensure you are querying the same DB (same host, port, database name).
 
 4. **No records extracted** – If all PDFs are scanned and Tesseract (or EasyOCR) fails, `total_found` and `inserted` are 0. Check the API response and server logs (e.g. "OCR extract failed", "tesseract is not installed").

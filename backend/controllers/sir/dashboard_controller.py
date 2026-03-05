@@ -16,25 +16,34 @@ router = APIRouter(
 )
 
 @router.get("/constituencies")
-async def get_constituencies(db: Session = Depends(get_db)):
-    """Get list of all constituencies"""
+async def get_constituencies(db: Session = Depends(get_db), include_voter_data: bool = Query(False, alias="include_voter_data")):
+    """
+    Get list of all constituencies.
+    If include_voter_data=true, also includes unique constituency_name from voter_data (Bulk Upload).
+    """
     try:
-        constituencies = db.query(Constituency).all()
-        return [
-            {
-                "id": c.id,
-                "name": c.name,
-                "district": c.district,
-                "state": c.state
-            }
+        constituencies = db.query(Constituency).order_by(Constituency.name).all()
+        result = [
+            {"id": c.id, "name": c.name, "district": c.district or "", "state": c.state or ""}
             for c in constituencies
         ]
+        seen_names = {(c.name or "").strip().lower() for c in constituencies}
+        if include_voter_data:
+            from models.sir.bulk_voter_import import BulkVoterImport
+            voter_names = (
+                db.query(BulkVoterImport.constituency_name)
+                .filter(BulkVoterImport.constituency_name.isnot(None), BulkVoterImport.constituency_name != "")
+                .distinct().all()
+            )
+            for row in voter_names:
+                name = (row.constituency_name or "").strip()
+                if name and name.lower() not in seen_names:
+                    seen_names.add(name.lower())
+                    result.append({"id": None, "name": name, "district": "", "state": ""})
+        return result
     except Exception as e:
         logger.exception(f"Error fetching constituencies: {str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error fetching constituencies: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/aggregates/{constituency_id}")
 async def get_dashboard_aggregates(constituency_id: int, db: Session = Depends(get_db)):

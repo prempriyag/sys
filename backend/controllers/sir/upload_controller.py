@@ -15,6 +15,7 @@ from models.sir.state import State
 from models.sir.district import District
 from models.sir.assembly_constituency import AssemblyConstituency
 from models.sir.eci_roll_selection import EciRollSelection
+from models.sir.eci_download import EciDownload, EciDownloadFile
 from models.sir.bulk_voter_import import BulkVoterImport
 from services.normalization import NormalizationService
 from services.electoral_roll_pdf_extractor import extract_from_pdf, debug_pdf, get_pdf_page_texts
@@ -699,6 +700,7 @@ class ExtractByPathRequest(BaseModel):
     constituency_name: Opt[str] = None
     booth_number: Opt[str] = None
     use_ocr: bool = False
+    use_textract: bool = False
     extraction_config: Opt[dict] = None
     save_to_db: bool = False
     year: Opt[str] = None
@@ -721,9 +723,10 @@ async def extract_pdf_by_path(body: ExtractByPathRequest = Body(...), db: Sessio
             default_constituency_name=body.constituency_name,
             default_booth_number=body.booth_number,
             use_ocr=body.use_ocr,
+            use_textract=body.use_textract,
             extraction_config=body.extraction_config,
         )
-        mode = "ocr" if body.use_ocr else "text"
+        mode = "textract" if body.use_textract else ("ocr" if body.use_ocr else "text")
         result["accuracy_summary"] = _compute_accuracy_summary(
             result.get("records") or [], mode, result.get("metadata", {}).get("validation_stats")
         )
@@ -753,6 +756,7 @@ async def extract_pdf_only(
     constituency_name: str = Form(None),
     booth_number: str = Form(None),
     use_ocr: str = Form("false"),
+    use_textract: str = Form("false"),
     extraction_config_json: str = Form(None),
     save_to_db: str = Form("false"),
     year: str = Form(None),
@@ -761,7 +765,9 @@ async def extract_pdf_only(
     """
     Extract voter records from an ECI-style electoral roll PDF.
     When the PDF has no text (image-only), OCR runs automatically. Set use_ocr=true to force OCR.
+    use_textract: true to use AWS Textract (requires boto3, AWS_BUCKET, AWS credentials).
     extraction_config_json: Optional JSON for coordinate tuning, e.g. {"cards_per_row":9,"header_top":120,"data_bottom":750}
+      Or {"engine":"textract"} to force Textract.
     save_to_db: true/false. When true, extracted rows are inserted into voter_data.
     Returns { "records": [...], "metadata": {...}, "raw_page_texts": [...] } for preview.
     """
@@ -784,6 +790,7 @@ async def extract_pdf_only(
                 default_constituency_name=constituency_name or None,
                 default_booth_number=booth_number or None,
                 use_ocr=use_ocr.lower() in ("true", "1", "yes"),
+                use_textract=use_textract.lower() in ("true", "1", "yes"),
                 extraction_config=extraction_config,
             )
         finally:
@@ -791,7 +798,7 @@ async def extract_pdf_only(
                 os.unlink(tmp_path)
             except OSError:
                 pass
-        mode = "ocr" if use_ocr.lower() in ("true", "1", "yes") else "text"
+        mode = "textract" if use_textract.lower() in ("true", "1", "yes") else ("ocr" if use_ocr.lower() in ("true", "1", "yes") else "text")
         result["accuracy_summary"] = _compute_accuracy_summary(
             result.get("records") or [], mode, result.get("metadata", {}).get("validation_stats")
         )
@@ -810,7 +817,8 @@ async def extract_pdf_only(
             result["db_save"] = {"enabled": False, "inserted": 0, "duplicates_skipped": 0, "attempted": 0}
         return result
     except ImportError as e:
-        raise HTTPException(status_code=500, detail="PDF extraction requires pdfplumber. Install with: pip install pdfplumber")
+        logger.exception("PDF extraction ImportError")
+        raise HTTPException(status_code=500, detail=f"PDF extraction import failed: {e}. In venv run: pip install pdfplumber boto3")
     except Exception as e:
         logger.exception("Error extracting PDF")
         raise HTTPException(status_code=500, detail=f"Error processing PDF: {str(e)}")
@@ -1052,6 +1060,47 @@ def bulk_electoral_roll_data(
             for r in rows
         ],
     }
+
+
+@router.get("/voter-data-summary-by-constituency-year")
+def voter_data_summary_by_constituency_year(db: Session = Depends(get_db)):
+    """
+    Summary of voter_data (Bulk Upload) grouped by constituency_name and year.
+    For dashboard: constituency-based view with year comparison.
+    """
+    from sqlalchemy import func
+
+    rows = (
+        db.query(
+            BulkVoterImport.constituency_name,
+            BulkVoterImport.year,
+            func.count(BulkVoterImport.id).label("record_count"),
+            func.count(func.distinct(BulkVoterImport.pdf_name)).label("pdf_count"),
+        )
+        .filter(
+            BulkVoterImport.constituency_name.isnot(None),
+            BulkVoterImport.constituency_name != "",
+        )
+        .group_by(BulkVoterImport.constituency_name, BulkVoterImport.year)
+        .order_by(BulkVoterImport.constituency_name, BulkVoterImport.year.desc().nullslast())
+        .all()
+    )
+    by_constituency: dict = {}
+    for r in rows:
+        cn = (r.constituency_name or "").strip() or "unknown"
+        yr = (r.year or "").strip() or "unknown"
+        if cn not in by_constituency:
+            by_constituency[cn] = []
+        by_constituency[cn].append({
+            "year": yr,
+            "record_count": int(r.record_count or 0),
+            "pdf_count": int(r.pdf_count or 0),
+        })
+    items = [
+        {"constituency_name": cn, "years": yrs, "total_records": sum(y["record_count"] for y in yrs)}
+        for cn, yrs in sorted(by_constituency.items())
+    ]
+    return {"items": items, "count": len(items)}
 
 
 @router.get("/bulk-electoral-roll-quality")
@@ -1480,6 +1529,7 @@ async def eci_download_roll(
     selection_id = None
     save_db = SessionLocal()
     try:
+        # maintain existing eci_roll_selections behaviour for backward compatibility
         existing = (
             save_db.query(EciRollSelection)
             .filter(
@@ -1513,6 +1563,45 @@ async def eci_download_roll(
             record_saved = True
             selection_id = new_row.id
             logger.info("ECI inserted eci_roll_selections id=%s pdf_path=%s", new_row.id, saved_path_str)
+
+        # additionally record in download + files tables
+        try:
+            new_dl = EciDownload(
+                state=state_s,
+                year_of_revision=year_s,
+                district=district_s,
+                assembly_constituency=ac_s,
+                language=language_s,
+                created_by="system",
+            )
+            save_db.add(new_dl)
+            save_db.commit()
+            save_db.refresh(new_dl)
+
+            # unique batch of 4-6 digits
+            from random import randint
+
+            def _generate_batch():
+                for _ in range(20):
+                    candidate = str(randint(1000, 999999))
+                    if not save_db.query(EciDownloadFile).filter_by(batch=candidate).first():
+                        return candidate
+                # fallback to timestamp if something odd
+                return str(int(time.time()))
+
+            import time
+            batch_code = _generate_batch()
+            new_file = EciDownloadFile(
+                download_id=new_dl.id,
+                batch=batch_code,
+                file_path=saved_path_str,
+                status="pending",
+            )
+            save_db.add(new_file)
+            save_db.commit()
+        except Exception as exc:
+            logger.exception("Could not save download/files record: %s", exc)
+            save_db.rollback()
     except Exception as e:
         logger.exception("Could not save eci_roll_selections: %s", e)
         save_db.rollback()
@@ -1609,7 +1698,7 @@ async def upload_pre_sir_pdf(
             "metadata": metadata,
         }
     except ImportError as e:
-        raise HTTPException(status_code=500, detail="PDF extraction requires pdfplumber. Install with: pip install pdfplumber")
+        raise HTTPException(status_code=500, detail=f"PDF extraction import failed: {e}. Ensure pdfplumber is installed in the same Python that runs uvicorn: pip install pdfplumber")
     except Exception as e:
         logger.exception("Error uploading Pre-SIR PDF")
         raise HTTPException(status_code=500, detail=f"Error processing PDF: {str(e)}")
@@ -1661,7 +1750,7 @@ async def upload_post_sir_pdf(
             "metadata": metadata,
         }
     except ImportError as e:
-        raise HTTPException(status_code=500, detail="PDF extraction requires pdfplumber. Install with: pip install pdfplumber")
+        raise HTTPException(status_code=500, detail=f"PDF extraction import failed: {e}. Ensure pdfplumber is installed in the same Python that runs uvicorn: pip install pdfplumber")
     except Exception as e:
         logger.exception("Error uploading Post-SIR PDF")
         raise HTTPException(status_code=500, detail=f"Error processing PDF: {str(e)}")

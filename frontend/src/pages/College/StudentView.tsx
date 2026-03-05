@@ -818,7 +818,7 @@ export default function StudentView() {
                   return (
                     <HorizontalTree
                       rootNode={treeData}
-                      headerTitle={null}
+                      headerTitle={undefined}
                       className="mb-4"
                     />
                   );

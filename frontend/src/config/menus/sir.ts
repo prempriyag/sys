@@ -34,9 +34,14 @@ export const sirMenu: MenuConfig = {
           path: "/upload/roll-data",
           icon: "table",
         },
+        // {
+        //   name: "Extract PDF (Preview)",
+        //   path: "/upload/pdf-extract",
+        //   icon: "file-text",
+        // },
         {
-          name: "Extract PDF (Preview)",
-          path: "/upload/pdf-extract",
+          name: "Bulk Extract PDF (Textract)",
+          path: "/upload/bulk-textract-extract",
           icon: "file-text",
         },
         {
@@ -44,21 +49,21 @@ export const sirMenu: MenuConfig = {
           path: "/upload/eci-download",
           icon: "download",
         },
-        {
-          name: "OCR PDF Detector",
-          path: "/upload/ocr-pdf-detector",
-          icon: "file-text",
-        },
-        {
-          name: "Bulk Electoral Roll",
-          path: "/upload/bulk-electoral-roll",
-          icon: "file-text",
-        },
-        {
-          name: "Extract Batches",
-          path: "/upload/extract-batches",
-          icon: "folder",
-        },
+        // {
+        //   name: "OCR PDF Detector",
+        //   path: "/upload/ocr-pdf-detector",
+        //   icon: "file-text",
+        // },
+        // {
+        //   name: "Bulk Electoral Roll",
+        //   path: "/upload/bulk-electoral-roll",
+        //   icon: "file-text",
+        // },
+        // {
+        //   name: "Extract Batches",
+        //   path: "/upload/extract-batches",
+        //   icon: "folder",
+        // },
       ],
     },
     {

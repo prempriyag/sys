@@ -17,7 +17,7 @@ export default function SignUpForm() {
       </div>
       <div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
-          <button className="auth-sso-btn">
+          {/* <button className="auth-sso-btn">
             <svg
               width="20"
               height="20"
@@ -43,7 +43,7 @@ export default function SignUpForm() {
               />
             </svg>
             Sign up with Google
-          </button>
+          </button> */}
           <button className="auth-sso-btn">
             <svg
               width="21"

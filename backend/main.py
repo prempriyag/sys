@@ -55,10 +55,12 @@ logging.basicConfig(
 )
 
 # Create FastAPI app
+# root_path: when served behind nginx at /backend/, docs/openapi.json must use this base path
 app = FastAPI(
     title="SIR Impact Analysis System API",
     description="Backend for SIR Impact Analysis comparing Pre-SIR and Post-SIR electoral rolls.",
-    version="1.0.0"
+    version="1.0.0",
+    root_path=os.getenv("ROOT_PATH", ""),  # Set ROOT_PATH=/backend when behind nginx proxy
 )
 
 # Static files
@@ -136,8 +138,11 @@ from controllers.sir.validation_controller import router as validation_router
 from controllers.sir.reports_controller import router as reports_router
 from controllers.sir.extractor_controller import router as extractor_router
 from controllers.sir.extract_batch_controller import router as extract_batch_router
+from controllers.sir.docling_controller import router as docling_router
+from controllers.sir.textract_bulk_controller import router as textract_bulk_router
 from bulk_electoral import router as bulk_electoral_router
 
+app.include_router(textract_bulk_router)
 app.include_router(extract_batch_router)
 app.include_router(bulk_electoral_router)
 app.include_router(upload_router)
@@ -171,6 +176,41 @@ async def root():
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
+
+
+@app.get("/api/extraction-deps")
+async def extraction_deps():
+    """
+    Diagnostic: which Python is running and whether pdfplumber/boto3 are importable.
+    Use this to fix 'PDF extraction import failed' or Textract errors.
+    """
+    import sys
+    boto3_ok = False
+    pdfplumber_ok = False
+    boto3_err = ""
+    pdfplumber_err = ""
+    try:
+        import boto3  # noqa: F401
+        boto3_ok = True
+    except ImportError as e:
+        boto3_err = str(e)
+    try:
+        import pdfplumber  # noqa: F401
+        pdfplumber_ok = True
+    except ImportError as e:
+        pdfplumber_err = str(e)
+    return {
+        "python_executable": sys.executable,
+        "boto3_available": boto3_ok,
+        "pdfplumber_available": pdfplumber_ok,
+        "boto3_error": boto3_err or None,
+        "pdfplumber_error": pdfplumber_err or None,
+        "hint": (
+            f"Run: {sys.executable} -m pip install boto3 pdfplumber"
+            if not (boto3_ok and pdfplumber_ok)
+            else "All extraction deps OK"
+        ),
+    }
 
 @app.get("/api/db-info")
 async def db_info():

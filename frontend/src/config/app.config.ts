@@ -33,7 +33,7 @@ export const IS_UAT = APP_ENV === "UAT";
 export const IS_PROD = APP_ENV === "PROD";
 
 // Application
-export const APP_NAME = import.meta.env.VITE_APP_NAME || "DigiScript";
+export const APP_NAME = import.meta.env.VITE_APP_NAME || "KK Surveys";
 
 // API Base URLs by environment
 const API_BASE_URL_BY_ENV: Record<string, string> = {

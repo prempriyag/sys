@@ -15,9 +15,9 @@ import SIRDashboard from "./pages/SIR/Dashboard";
 import UploadPage from "./pages/SIR/UploadPage";
 import RollDataPage from "./pages/SIR/RollDataPage";
 import PdfExtractPage from "./pages/SIR/PdfExtractPage";
+import TextractExtractPage from "./pages/SIR/TextractExtractPage";
+import BulkTextractExtractPage from "./pages/SIR/BulkTextractExtractPage";
 import EciDownloadPage from "./pages/SIR/EciDownloadPage";
-import OcrPdfDetector from "./pages/SIR/OcrPdfDetector";
-import BulkElectoralRollPage from "./modules/bulk-electoral-roll";
 import ExtractBatchListPage from "./pages/SIR/ExtractBatchListPage";
 import ExtractBatchDetailPage from "./pages/SIR/ExtractBatchDetailPage";
 import BoothAnalysis from "./pages/SIR/BoothAnalysis";
@@ -75,12 +75,12 @@ export default function App() {
           <Route path="/upload/post-sir" element={<UploadPage type="post" />} />
           <Route path="/upload/matching" element={<UploadPage type="matching" />} />
           <Route path="/upload/roll-data" element={<RollDataPage />} />
-          <Route path="/upload/pdf-extract" element={<PdfExtractPage />} />
+          {/* <Route path="/upload/pdf-extract" element={<PdfExtractPage />} /> */}
+          <Route path="/upload/textract-extract" element={<TextractExtractPage />} />
+          <Route path="/upload/bulk-textract-extract" element={<BulkTextractExtractPage />} />
           <Route path="/upload/eci-download" element={<EciDownloadPage />} />
-          <Route path="/upload/ocr-pdf-detector" element={<OcrPdfDetector />} />
-          <Route path="/upload/bulk-electoral-roll" element={<BulkElectoralRollPage />} />
-          <Route path="/upload/extract-batches" element={<ExtractBatchListPage />} />
-          <Route path="/upload/extract-batches/:batchId" element={<ExtractBatchDetailPage />} />
+          {/* <Route path="/upload/extract-batches" element={<ExtractBatchListPage />} />
+          <Route path="/upload/extract-batches/:batchId" element={<ExtractBatchDetailPage />} /> */}
           <Route path="/upload" element={<UploadPage />} />
 
           {/* Booth Analysis */}

@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
+import DataTable from 'react-data-table-component';
 import { getBoothsKPI, getConstituencies } from '../../services/api';
 import PageContainer from '../../components/common/PageContainer';
 import PageMeta from '../../components/common/PageMeta';
 import ThemedLoader from '../../components/common/ThemedLoader';
-import DataTable from '../../components/ui/DataTable';
 import { alerterror } from '../../utils/toast';
 
 interface BoothKPI {
@@ -68,115 +68,19 @@ const BoothKPIs: React.FC = () => {
   };
 
   const columns = [
-    {
-      name: 'Booth Number',
-      selector: (row: BoothKPI) => row.booth_number,
-      sortable: true,
-    },
-    {
-      name: 'Location',
-      selector: (row: BoothKPI) => row.location_name || '-',
-      sortable: true,
-    },
-    {
-      name: 'Pre-SIR',
-      selector: (row: BoothKPI) => row.total_pre,
-      sortable: true,
-      format: (row: BoothKPI) => row.total_pre.toLocaleString(),
-    },
-    {
-      name: 'Post-SIR',
-      selector: (row: BoothKPI) => row.total_post,
-      sortable: true,
-      format: (row: BoothKPI) => row.total_post.toLocaleString(),
-    },
-    {
-      name: 'Additions',
-      selector: (row: BoothKPI) => row.additions,
-      sortable: true,
-      format: (row: BoothKPI) => row.additions.toLocaleString(),
-    },
-    {
-      name: 'Deletions',
-      selector: (row: BoothKPI) => row.deletions,
-      sortable: true,
-      format: (row: BoothKPI) => row.deletions.toLocaleString(),
-    },
-    {
-      name: 'Net Change %',
-      selector: (row: BoothKPI) => row.net_change_percent,
-      sortable: true,
-      format: (row: BoothKPI) => (
-        <span className={row.net_change_percent > 0 ? 'text-green-600' : 'text-red-600'}>
-          {row.net_change_percent > 0 ? '+' : ''}{row.net_change_percent.toFixed(2)}%
-        </span>
-      ),
-    },
-    {
-      name: 'Deletion Velocity',
-      selector: (row: BoothKPI) => row.deletion_velocity,
-      sortable: true,
-      format: (row: BoothKPI) => (
-        <span className={row.deletion_velocity > 5 ? 'text-red-600 font-semibold' : ''}>
-          {row.deletion_velocity.toFixed(2)}%
-        </span>
-      ),
-    },
-    {
-      name: 'Youth Intake %',
-      selector: (row: BoothKPI) => row.youth_intake_percent,
-      sortable: true,
-      format: (row: BoothKPI) => `${row.youth_intake_percent.toFixed(2)}%`,
-    },
-    {
-      name: 'Gender Shift %',
-      selector: (row: BoothKPI) => row.gender_shift_percent,
-      sortable: true,
-      format: (row: BoothKPI) => (
-        <span className={row.gender_shift_percent !== 0 ? 'text-blue-600' : ''}>
-          {row.gender_shift_percent > 0 ? '+' : ''}{row.gender_shift_percent.toFixed(2)}%
-        </span>
-      ),
-    },
-    {
-      name: 'Anomaly Households',
-      selector: (row: BoothKPI) => row.anomaly_household_count,
-      sortable: true,
-      format: (row: BoothKPI) => (
-        <span className={row.anomaly_household_count > 0 ? 'text-orange-600 font-semibold' : ''}>
-          {row.anomaly_household_count}
-        </span>
-      ),
-    },
-    {
-      name: 'Risk Category',
-      selector: (row: BoothKPI) => row.risk_category,
-      sortable: true,
-      format: (row: BoothKPI) => {
-        const colors: Record<string, string> = {
-          HIGH_RISK: 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400',
-          HIGH_OPPORTUNITY: 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400',
-          ANOMALY: 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400',
-          NORMAL: 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400',
-        };
-        return (
-          <span className={`px-2 py-1 rounded-full text-xs font-medium ${colors[row.risk_category] || colors.NORMAL}`}>
-            {row.risk_category}
-          </span>
-        );
-      },
-    },
-    {
-      name: 'Actions',
-      cell: (row: BoothKPI) => (
-        <button
-          onClick={() => navigate(`/booth-analysis/${row.booth_id}`)}
-          className="text-blue-600 hover:text-blue-700 text-sm font-medium"
-        >
-          View Details
-        </button>
-      ),
-    },
+    { id: 'booth_number', name: 'Booth Number', selector: (row: BoothKPI) => row.booth_number, sortable: true },
+    { id: 'location_name', name: 'Location', selector: (row: BoothKPI) => row.location_name || '-', sortable: true },
+    { id: 'total_pre', name: 'Pre-SIR', selector: (row: BoothKPI) => row.total_pre, sortable: true, format: (row: BoothKPI) => row.total_pre.toLocaleString() },
+    { id: 'total_post', name: 'Post-SIR', selector: (row: BoothKPI) => row.total_post, sortable: true, format: (row: BoothKPI) => row.total_post.toLocaleString() },
+    { id: 'additions', name: 'Additions', selector: (row: BoothKPI) => row.additions, sortable: true, format: (row: BoothKPI) => row.additions.toLocaleString() },
+    { id: 'deletions', name: 'Deletions', selector: (row: BoothKPI) => row.deletions, sortable: true, format: (row: BoothKPI) => row.deletions.toLocaleString() },
+    { id: 'net_change_percent', name: 'Net Change %', selector: (row: BoothKPI) => row.net_change_percent, sortable: true, format: (row: BoothKPI) => (<span className={row.net_change_percent > 0 ? 'text-green-600' : 'text-red-600'}>{row.net_change_percent > 0 ? '+' : ''}{row.net_change_percent.toFixed(2)}%</span>) },
+    { id: 'deletion_velocity', name: 'Deletion Velocity', selector: (row: BoothKPI) => row.deletion_velocity, sortable: true, format: (row: BoothKPI) => (<span className={row.deletion_velocity > 5 ? 'text-red-600 font-semibold' : ''}>{row.deletion_velocity.toFixed(2)}%</span>) },
+    { id: 'youth_intake_percent', name: 'Youth Intake %', selector: (row: BoothKPI) => row.youth_intake_percent, sortable: true, format: (row: BoothKPI) => `${row.youth_intake_percent.toFixed(2)}%` },
+    { id: 'gender_shift_percent', name: 'Gender Shift %', selector: (row: BoothKPI) => row.gender_shift_percent, sortable: true, format: (row: BoothKPI) => (<span className={row.gender_shift_percent !== 0 ? 'text-blue-600' : ''}>{row.gender_shift_percent > 0 ? '+' : ''}{row.gender_shift_percent.toFixed(2)}%</span>) },
+    { id: 'anomaly_household_count', name: 'Anomaly Households', selector: (row: BoothKPI) => row.anomaly_household_count, sortable: true, format: (row: BoothKPI) => (<span className={row.anomaly_household_count > 0 ? 'text-orange-600 font-semibold' : ''}>{row.anomaly_household_count}</span>) },
+    { id: 'risk_category', name: 'Risk Category', selector: (row: BoothKPI) => row.risk_category, sortable: true, format: (row: BoothKPI) => { const colors: Record<string, string> = { HIGH_RISK: 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400', HIGH_OPPORTUNITY: 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400', ANOMALY: 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400', NORMAL: 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400' }; return (<span className={`px-2 py-1 rounded-full text-xs font-medium ${colors[row.risk_category] || colors.NORMAL}`}>{row.risk_category}</span>); } },
+    { id: 'actions', name: 'Actions', cell: (row: BoothKPI) => (<button onClick={() => navigate(`/booth-analysis/${row.booth_id}`)} className="text-blue-600 hover:text-blue-700 text-sm font-medium">View Details</button>) },
   ];
 
   if (loading) {
@@ -221,14 +125,16 @@ const BoothKPIs: React.FC = () => {
           )}
         </div>
 
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 overflow-hidden">
           <DataTable
             data={booths}
             columns={columns}
             title="Booth Analysis"
-            searchable
             pagination
-            defaultSortField="booth_number"
+            defaultSortFieldId="booth_number"
+            responsive
+            striped
+            dense
           />
         </div>
       </div>

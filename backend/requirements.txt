@@ -28,3 +28,4 @@ opencv-python
 pdf2image
 docling
 scipy
+boto3

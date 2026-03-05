@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 
 interface TreeNode {
   id: string;
-  label: string;
+  label: React.ReactNode;
   icon?: React.ReactNode;
   badge?: number;
   children?: TreeNode[];
@@ -12,7 +12,7 @@ interface TreeNode {
 
 interface HorizontalTreeProps {
   rootNode: TreeNode;
-  headerTitle?: string;
+  headerTitle?: string | null;
   className?: string;
   onHeaderToggle?: (isExpanded: boolean) => void;
 }

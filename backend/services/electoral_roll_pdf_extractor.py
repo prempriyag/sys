@@ -1521,8 +1521,30 @@ def _normalize_column_header(cell: str) -> str:
     return ""
 
 
-def _map_row_to_record(headers: List[str], row: List[Any], default_booth: str, default_constituency: str) -> Optional[Dict[str, Any]]:
-    """Map a table row to a single voter record (schema-ready)."""
+def _infer_relation_type_from_header(header: str) -> Optional[str]:
+    """Infer Father/Husband/Mother from table column header (e.g. \"Father's Name\")."""
+    if not header:
+        return None
+    h = str(header).strip().lower()
+    if "father" in h and "husband" not in h and "mother" not in h:
+        return "Father"
+    if "husband" in h:
+        return "Husband"
+    if "mother" in h:
+        return "Mother"
+    return None
+
+
+def _map_row_to_record(
+    headers: List[str],
+    row: List[Any],
+    default_booth: str,
+    default_constituency: str,
+    raw_headers: Optional[List[str]] = None,
+) -> Optional[Dict[str, Any]]:
+    """Map a table row to a single voter record (schema-ready).
+    When key is relative_name, infer relation_type from raw_headers if provided.
+    """
     record = {}
     for i, val in enumerate(row):
         if i >= len(headers):
@@ -1543,6 +1565,10 @@ def _map_row_to_record(headers: List[str], row: List[Any], default_booth: str, d
             record["gender"] = "M" if g == "M" else "F" if g == "F" else (raw or None)
         else:
             record[key] = raw or None
+        if key == "relative_name" and raw and raw_headers and i < len(raw_headers):
+            rel_type = _infer_relation_type_from_header(raw_headers[i])
+            if rel_type:
+                record["relation_type"] = rel_type
 
     # Required for our schema
     if not record.get("name") and not record.get("epic_number"):
@@ -2517,6 +2543,7 @@ def _parse_one_card_block(
         m_h = RE_HUSBAND.search(bl) or RE_HUSBAND_FUZZY.match(bl)
         m_m = RE_MOTHER.search(bl) or RE_MOTHER_FUZZY.match(bl)
         if m_f:
+            rec["relation_type"] = "Father"
             val = (m_f.group(1) or "").strip().rstrip("-").rstrip('"').strip()
             label_like = re.sub(r"[\s\"]+", "", val).lower() in ("name", "naine", "namie", "nama", "namo", "namc", "narne", "narie") or len(val) < 3
             if val and not label_like:
@@ -2527,6 +2554,7 @@ def _parse_one_card_block(
             i += 1
             continue
         if m_h:
+            rec["relation_type"] = "Husband"
             val = (m_h.group(1) or "").strip().rstrip("-")
             if val:
                 rec["relative_name"] = val
@@ -2536,6 +2564,7 @@ def _parse_one_card_block(
             i += 1
             continue
         if m_m:
+            rec["relation_type"] = "Mother"
             val = (m_m.group(1) or "").strip().rstrip("-")
             if val:
                 rec["relative_name"] = val
@@ -3200,6 +3229,7 @@ def extract_from_pdf(
     default_constituency_name: Optional[str] = None,
     default_booth_number: Optional[str] = None,
     use_ocr: bool = False,
+    use_textract: bool = False,
     extraction_config: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
@@ -3210,8 +3240,10 @@ def extract_from_pdf(
         default_constituency_name: Override constituency if not found in PDF.
         default_booth_number: Override booth/part number if not found in PDF.
         use_ocr: If True and PDF has no text layer, use OCR (needs pdf2image, pytesseract, Tesseract).
+        use_textract: If True, use AWS Textract instead (requires boto3, AWS_BUCKET, AWS credentials).
         extraction_config: Optional config for position-based extraction (ABBYY-like).
             Keys: cards_per_row (default 9), header_top, data_bottom, margin_left, margin_right.
+            Or engine: "textract" to force Textract.
 
     Returns:
         {
@@ -3219,14 +3251,30 @@ def extract_from_pdf(
             "metadata": { "constituency_name", "booth_number", "part_name", "pages_processed", "raw_headers" }
         }
     """
+    pdf_path = Path(pdf_path)
+    if not pdf_path.exists():
+        raise FileNotFoundError(f"PDF not found: {pdf_path}")
+
+    # AWS Textract path (from ocr project integration)
+    if use_textract or (extraction_config and extraction_config.get("engine") == "textract"):
+        try:
+            from services.textract_extractor import extract_from_pdf_textract
+            return extract_from_pdf_textract(
+                pdf_path,
+                default_constituency_name=default_constituency_name,
+                default_booth_number=default_booth_number,
+            )
+        except ImportError as e:
+            import sys
+            raise ImportError(
+                f"boto3 not found. Run: {sys.executable} -m pip install boto3. "
+                f"(AWS credentials in .env are fine; the package must be installed.)"
+            ) from e
+
     try:
         import pdfplumber
     except ImportError:
         raise ImportError("pdfplumber is required for PDF extraction. Install with: pip install pdfplumber")
-
-    pdf_path = Path(pdf_path)
-    if not pdf_path.exists():
-        raise FileNotFoundError(f"PDF not found: {pdf_path}")
 
     all_records: List[Dict[str, Any]] = []
     first_page_text = ""
@@ -3283,7 +3331,10 @@ def extract_from_pdf(
                         if data_row is None:
                             continue
                         data_row = [str(c).strip() if c is not None else "" for c in data_row]
-                        rec = _map_row_to_record(mapped_headers, data_row, booth, constituency)
+                        rec = _map_row_to_record(
+                            mapped_headers, data_row, booth, constituency,
+                            raw_headers=header_row,
+                        )
                         if rec:
                             rec["page_number"] = page_num + 1
                             all_records.append(rec)

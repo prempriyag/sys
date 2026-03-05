@@ -25,7 +25,7 @@ export default function SignInForm() {
       </div>
       <div>
         <div className="grid grid-cols-1 gap-3 mb-1.5">
-          <button
+          {/* <button
             onClick={() => redirectToClientSSO(window.location.href)}
             className="auth-sso-btn"
           >
@@ -54,7 +54,7 @@ export default function SignInForm() {
               />
             </svg>
             Sign in with CSC
-          </button>
+          </button> */}
           {/*<button
             onClick={() => redirectToKTechSSO(window.location.href)}
             className="auth-sso-btn"

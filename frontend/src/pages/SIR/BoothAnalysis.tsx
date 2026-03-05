@@ -104,21 +104,24 @@ const BoothAnalysis: React.FC = () => {
             </div>
 
             <div className="flex-1 bg-white rounded-xl shadow-md overflow-hidden relative" style={{ minHeight: '600px' }}>
-                {/* Check if we have data to center the map, else default to some coords */}
-                <MapContainer center={[12.9716, 77.5946]} zoom={12} style={{ height: '100%', width: '100%' }} key={constituencyId}>
+                <MapContainer
+                    {...({ center: [12.9716, 77.5946], zoom: 12, style: { height: '100%', width: '100%' }, key: constituencyId } as any)}
+                >
                     <TileLayer
-                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                        {...({
+                            url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                        } as any)}
                     />
                     {mapData.map(booth => (
                         <CircleMarker
                             key={booth.booth_id}
-                            center={[booth.lat, booth.lng]}
-                            pathOptions={{ color: getRiskColor(booth.risk_category), fillColor: getRiskColor(booth.risk_category), fillOpacity: 0.7 }}
-                            radius={8}
-                            eventHandlers={{
-                                click: () => navigate(`/booth-analysis/${booth.booth_id}`)
-                            }}
+                            {...({
+                                center: [booth.lat, booth.lng],
+                                pathOptions: { color: getRiskColor(booth.risk_category), fillColor: getRiskColor(booth.risk_category), fillOpacity: 0.7 },
+                                radius: 8,
+                                eventHandlers: { click: () => navigate(`/booth-analysis/${booth.booth_id}`) },
+                            } as any)}
                         >
                             <Popup>
                                 <div className="text-sm">
